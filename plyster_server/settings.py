@@ -1,0 +1,1 @@
+server = 'doors.osuosl.org'

@@ -1,0 +1,176 @@
+from tasks import *
+
+""" TaskManager - Class that tracks and controls tasks
+"""
+class TaskManager():
+
+    def __init__(self):
+        self.registry = {}
+
+
+    """ Registers a task making it available through the manager
+
+    @param key: key for task
+    @param task: task instance
+    """
+    def register(self, key, task):
+        self.registry[key] = task
+
+
+    """ deregisters a task, stopping it and removing it from the manager
+
+    @param key: key for task
+    @param task: task instance
+    """
+    def deregister(self, key, task):
+        # stop the task in case its running
+        task.stop()
+
+        # remove the task from the registry
+        del registry[key]
+
+
+    """ Iterates through a task and its children to build an array display information
+
+    @param task: Task to process
+    @param tasklist: Array to append data onto.  Uused for recursion.
+    """
+    def processTask(self, task, tasklist=None, parent=False):
+        # initial call wont have an area yet
+        if tasklist==None:
+            tasklist = []
+
+        #turn the task into a tuple
+        processedTask = [task.id, parent, task.msg]
+
+        #add that task to the list
+        tasklist.append(processedTask)
+
+        #add all children if the task is a container
+        if isinstance(task,TaskContainer):
+            for subtask in task.subtasks:
+                self.processTask(subtask.task, tasklist, task.id)
+
+        return tasklist
+
+
+    """ Iterates through a task and its children to build an array of status information
+    @param task: Task to process
+    @param tasklist: Array to append data onto.  Uused for recursion.
+    """
+    def processTaskProgress(self, task, tasklist=None):
+        # initial call wont have an area yet
+        if tasklist==None:
+            tasklist = []
+
+        #turn the task into a tuple
+        processedTask = {'id':task.id, 'status':task.status(), 'progress':task.progress(), 'msg':task.progressMessage()}
+
+        #add that task to the list
+        tasklist.append(processedTask)
+
+        #add all children if the task is a container
+        if isinstance(task,TaskContainer):
+            for subtask in task.subtasks:
+                self.processTaskProgress(subtask.task, tasklist)
+
+        return tasklist
+
+
+    """ 
+    listTasks - builds a list of tasks
+    @param keys: filters list to include only these tasks
+    """
+    def listTasks(self, keys=None):
+        message = {}
+        # show all tasks by default
+        if keys == None:
+            keys = self.registry.keys()
+
+        for key in keys:
+            message[key] = self.processTask(self.registry[key])
+
+        return message
+
+    """  
+    builds a dictionary of progresses for tasks
+    @param keys: filters list to include only these tasks
+    """
+    def progress(self, keys=None):
+        message = {}
+
+        # show all tasks by default
+        if keys == None:
+            keys = self.registry.keys()
+
+        # store progress of each task in a dictionary
+        for key in keys:
+            progress = self.processTaskProgress(self.registry[key])
+            message[key] = {
+                'status':progress
+            }
+
+        return message
+
+    """ Starts a task
+
+    @param key: key to the task to start
+    """
+    def start(self, key):
+        self.registry[key].start()
+        return '1'
+
+    """ Stops a task
+
+    @param key: key to the task to stop
+    """
+    def stop(self, key):
+        self.registry[key].stop()
+        return '1'
+
+    """
+    Auto-discover any tasks that are in the tasks directory
+    """
+    def autodiscover(self, worker=None):
+        import imp
+        import os
+        import inspect
+
+        # Step 1: get all python files in the tasks directory
+        files = os.listdir('./task_cache')
+
+        # Step 2: iterate through all the python files importing each one and 
+        #         and add it as an available Task
+        for filename in files:
+            if filename <> '__init__.py' and filename[-3:] == '.py':
+                module = 'task_cache.%s' % filename[:-3]
+                tasks = __import__(module, {}, {}, ['Task'])
+
+                # iterate through the objects in  the module to find Tasks
+                # TODO replace this logic with code in Task that adds all tasks
+                # to module.tasks when they are created.  This would be similar
+                # to how django does this in db/base.py.  It's extremely complicated
+                # and would take more time than is possible now.
+
+                #class exclusions.  do not include any of these class
+                class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
+
+                for key, value in tasks.__dict__.items():
+                    # Add any classes that a runnable task.
+                    # TODO: filter out subtasks not marked as standalone
+                    if inspect.isclass(value) and key not in class_exclusions and issubclass(value, (Task,)):
+
+                        try:
+                            #generate a unique key for this 
+                            task_key = key
+                            task_instance = value.__new__(value)
+                            task_instance.__init__()
+                            task_instance.parent = worker
+
+                            self.register(task_key, task_instance)
+                            print 'Loaded task: %s' % key
+                        except:
+                            print 'ERROR Loading task: %s' % key
+
+
+
