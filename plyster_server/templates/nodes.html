@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<html>
+    <head>
+      
+        <style>
+        </style>
+
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
+        <script type="text/javascript">
+
+            $(document).ready(function() {
+                
+            });
+
+        </script>
+    </head>
+    <body>
+
+    {% include 'header.html' %}
+
+    {% if form.errors %}
+        <div id="errors">
+        Please correct the following errors:
+            <ul class="errors">
+            {% for field, msg in form.errors.items %}
+                <li class="error"><strong>{{ field|escape }}</strong>{{msg|escape}}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div id="formContainer">
+        <form name="node" method="POST" action="{{SITE_ROOT}}/node/edit/">
+            <table id="protein">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Host</th>
+                    <th>Cores</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for node in nodes.item_list %}
+                    <tr>
+                        <td>[status]</td>
+                        <td>{{node.host}}</td>
+                        <td>{{node.cores}}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+            </div>
+
+        </form>
+    </div>
+    </body>
+</html>
+

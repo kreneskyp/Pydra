@@ -1,4 +1,4 @@
-# Django settings for plyster project.
+# Django settings for pgd project.
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
@@ -9,12 +9,20 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
-DATABASE_ENGINE = ''           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-DATABASE_NAME = ''             # Or path to database file if using sqlite3.
-DATABASE_USER = ''             # Not used with sqlite3.
-DATABASE_PASSWORD = ''         # Not used with sqlite3.
+DATABASE_ENGINE = 'mysql'           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
+DATABASE_NAME = 'pydra'             # Or path to database file if using sqlite3.
+DATABASE_USER = 'pydra'             # Not used with sqlite3.
+DATABASE_PASSWORD = 'pydra'         # Not used with sqlite3.
 DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
 DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
+
+# prefix used for the site.  ie. http://myhost.com/<SITE_ROOT>/
+# for the django standalone server this should be /
+# for apache this is the url the site is mapped to, probably /pgd
+SITE_ROOT = ''
+
+# absolute path to the docroot of this site
+DOC_ROOT = '/home/peter/wrk/plyster'
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -35,12 +43,12 @@ USE_I18N = True
 
 # Absolute path to the directory that holds media.
 # Example: "/home/media/media.lawrence.com/"
-MEDIA_ROOT = ''
+MEDIA_ROOT = '%s/static' % DOC_ROOT
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash if there is a path component (optional in other cases).
 # Examples: "http://media.lawrence.com", "http://example.com/media/"
-MEDIA_URL = ''
+MEDIA_URL = '%s/%s' % (SITE_ROOT, 'static')
 
 # URL prefix for admin media -- CSS, JavaScript and images. Make sure to use a
 # trailing slash.
@@ -48,7 +56,7 @@ MEDIA_URL = ''
 ADMIN_MEDIA_PREFIX = '/media/'
 
 # Make this unique, and don't share it with anybody.
-SECRET_KEY = 'dk#^frv&4y_&7a90#bn62@t-1jyc@q9*!69y7zq&@&8)g#szu4'
+SECRET_KEY = 'g3#f517j(b4$ze*3_8pi3i$=1@mk=fnbb_gunjwk_f8whrbo=a'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -63,12 +71,19 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 )
 
-ROOT_URLCONF = 'plyster.urls'
+TEMPLATE_CONTEXT_PROCESSORS = (
+    'django.core.context_processors.auth',
+    'django.core.context_processors.debug',
+    'django.core.context_processors.media',
+)
+
+ROOT_URLCONF = 'urls'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
+    '%s/templates' % DOC_ROOT
 )
 
 INSTALLED_APPS = (
@@ -76,4 +91,7 @@ INSTALLED_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.sites',
+    'django.contrib.admin',
+    'plyster_server',
+    'dbsettings',
 )
