@@ -5,6 +5,40 @@
     <head>
       
         <style>
+            table {
+                border: 1px solid black;
+                width:90%;
+                margin-left:5%;
+                margin-top:10px;
+            }
+
+            td {
+                padding-left:10px;
+                padding-right:10px;
+                text-align:center;
+            }
+            
+            td.status {
+                border: 1px solid black;
+                background-color: gray;
+            }
+
+            #content {
+                text-align:center;
+            }
+
+            #master_errors {
+                width:90%;
+                margin-left:5%;
+                margin-top:20px;
+                margin-bottom:20px;
+                padding-top:5px;
+                padding-bottom:5px;                
+                background-color:#ee9c98;
+                border: 1px solid black;
+
+            }
+
         </style>
 
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
@@ -20,45 +54,41 @@
 
     {% include 'header.html' %}
 
-    {% if form.errors %}
-        <div id="errors">
-        Please correct the following errors:
-            <ul class="errors">
-            {% for field, msg in form.errors.items %}
-                <li class="error"><strong>{{ field|escape }}</strong>{{msg|escape}}</li>
-            {% endfor %}
-            </ul>
+    <div id="content">
+
+    {% if not master.running %}
+        <div id="master_errors">
+            Master Node is not running. 
         </div>
     {% endif %}
 
-    <div id="formContainer">
-        <form name="node" method="POST" action="{{SITE_ROOT}}/node/edit/">
-            <table id="protein">
-            <thead>
+    
+        <table id="ndoes">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Host</th>
+                <th>Cores Allowed</th>                
+                <th>Cores</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for node in nodes.object_list %}
                 <tr>
-                    <th>Status</th>
-                    <th>Host</th>
-                    <th>Cores</th>
+                    <td class="status">{% if master.running %}{{master.status}}{%else%}Unknown{%endif%}</td>
+                    <td><a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a></td>
+                    <td>{{node.cores_available}}</td>                    
+                    <td>{{node.cores}}</td>
                 </tr>
-            </thead>
-            <tbody>
-                {% for node in nodes.item_list %}
-                    <tr>
-                        <td>[status]</td>
-                        <td>{{node.host}}</td>
-                        <td>{{node.cores}}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-            </table>
-            </div>
+                <tr>
+                    <td colspan="100%">
+                        detailed information about the node goes here
+                    </td>
+                </tr>
 
-        </form>
+            {% endfor %}
+        </tbody>
+        </table>
     </div>
     </body>
 </html>

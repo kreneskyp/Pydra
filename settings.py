@@ -92,6 +92,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sites',
     'django.contrib.admin',
-    'plyster_server',
     'dbsettings',
+    'plyster_server',
 )

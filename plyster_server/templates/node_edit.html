@@ -32,17 +32,39 @@
     {% endif %}
 
     <div id="formContainer">
-        <form name="node" method="POST" action="{{SITE_ROOT}}/node/edit/">
+        <form name="node" method="POST" action="{{SITE_ROOT}}/nodes/edit/{{id}}">
             <table id="protein">
             <tbody>
             <tr>
-                <td class="label" rowspan="4">{{form.proteins.label}}</td>
-                <td  rowspan="4">
-                    <span class="toggle">&nbsp;</span>{{form.proteins}} {{form.proteins_i}}
-                </td>
+                <td class="label">{{form.host.label}}</td>
+                <td>{{form.host}}</td>
             </tr>
+            <tr>
+                <td class="label">{{form.port.label}}</td>
+                <td>{{form.port}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.cores_available.label}}</td>
+                <td>{{form.cores_available}}</td>
+            </tr>
+            
+            
+            <tr>
+                <td colspan="100%">These fields will be autodetected by the node and reported back.  You may update them if you like.   At some point these fields will be used to pick automatically set node priority</td>
+            </td>
+            <tr>
+                <td class="label">{{form.cores.label}}</td>
+                <td>{{form.cores}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.cpu_speed.label}}</td>
+                <td>{{form.cpu_speed}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.memory.label}}</td>
+                <td>{{form.memory}}</td>
+            </tr>          
 
-          
 
             <tr class="spacer"/>
             <tr class="submit"><td class="submit" colspan="100%"><input class="submit" type="submit" value="Submit"></td></tr>

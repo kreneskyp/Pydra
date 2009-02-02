@@ -1,9 +1,12 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
+from django.http import HttpResponseRedirect
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 import math
 
-from pgd_search.models import searchSettings
+from plyster_server.models import Node, pydraSettings
+from forms import NodeForm
+import settings
 
 """
 display nodes
@@ -12,13 +15,15 @@ def nodes(request):
     # get nodes
     nodes = Node.objects.all()    
 
-    #paginate
-    segments = search.querySet().order_by('protein')
+    # Get the master control interface
+    master = {'running':False}
+
+    # paginate
     paginator = Paginator(nodes, 25) # Show 25 segments per page
 
     # Make sure page request is an int. If not, deliver first page.
     try:
-        page = lint(request.GET.get('page', '1'))
+        page = int(request.GET.get('page', '1'))
     except ValueError:
         page = 1
 
@@ -35,8 +40,9 @@ def nodes(request):
             [i for i in range(paginator.num_pages-(1 if page < paginator.num_pages-6 else 9), paginator.num_pages+1)])
 
     return render_to_response('nodes.html', {
-        'nodes':paginatedNode,
+        'nodes':paginatedNodes,
         'pages':pages,
+        'master':master,
     }, context_instance=RequestContext(request))
 
 
@@ -44,29 +50,32 @@ def nodes(request):
 Handler for creating and editing nodes
 """
 def node_edit(request, id=None):
-    if request.method == 'POST': # If the form has been submitted
+    if request.method == 'POST': 
         if id:
+            print id
             node = Node(pk=id)
-            form = NodeForm(request.POST, node) # A form bound to the POST data
+            form = NodeForm(request.POST, instance=node) 
         else:
-            form = NodeForm(request.POST) # A form bound to the POST data
+            form = NodeForm(request.POST)
 
-        if form.is_valid(): # All validation rules pass
-                   
+        if form.is_valid():
             form.save()
-
             return HttpResponseRedirect('%s/nodes' % settings.SITE_ROOT) # Redirect after POST
 
     else:
         if id:
-            node = Node(pk=id)
-            form = NodeForm(node)
+            node = Node.objects.get(pk=id)
+            form = NodeForm(instance=node)
         else:
             # An unbound form
             form = NodeForm() 
 
     return render_to_response('node_edit.html', {
         'form': form,
+        'id':id,
     }, context_instance=RequestContext(request))
 
+
+def jobs(request):
+    pass
 
