@@ -1,23 +1,45 @@
 #! /usr/bin/python
+from __future__ import with_statement
 
-from zope.interface import implements
-from twisted.cred import portal, checkers
 from twisted.spread import pb
 from twisted.internet import reactor
 from task_manager import TaskManager
+from twisted.cred import credentials
 import os, sys
+from twisted.internet.protocol import ReconnectingClientFactory
+from threading import Lock
+
+
+
+
+class ReconnectingPBClientFactory(pb.PBClientFactory):
+    def clientConnectionLost(self, connector, reason):
+        print 'Lost connection.  Reason:', reason
+        #ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+
+    def clientConnectionFailed(self, connector, reason):
+        print 'Connection failed. Reason:', reason
+        #ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+
+
+
 
 """
 Worker - The Worker is the workhorse of the cluster.  It sits and waits for Tasks and SubTasks to be executed
          Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
          the first worker will make requests for work to be distributed to other Nodes
 """
-class Worker:
+class Worker(pb.Referenceable):
 
     def __init__(self, master_host, master_port, node_key, worker_key):
         self.id = id
         self.__task = None
+        self.__lock = Lock()
         self.master = None
+        self.master_host = master_host
+        self.master_port = master_port
+        self.node_key = node_key
+        self.worker_key = worker_key
 
         #load tasks that are cached locally
         self.task_manager = TaskManager()
@@ -25,21 +47,51 @@ class Worker:
         self.available_tasks = self.task_manager.registry
 
         print '===== STARTED Worker ===='
-        print self.available_tasks
+        self.connect()
 
+    """
+    Make initial connections to all Nodes
+    """
+    def connect(self):
+        "Begin the connection process"
+        factory = ReconnectingPBClientFactory()
+        reactor.connectTCP(self.master_host, self.master_port, factory)
+        deferred = factory.login(credentials.UsernamePassword(self.worker_key, "1234"), client=self)
+        deferred.addCallbacks(self.connected, self.connect_failed, errbackArgs=("Failed to Connect"))
+
+    """
+    Callback called when connection to master is made
+    """
+    def connected(self, result):
+        self.master = result
+
+    """
+    Callback called when conenction to master fails
+    """
+    def connect_failed(self, result, *arg, **kw):
+        print result
 
     """
      Runs a task on this worker
     """
-    def run_task(self, key, args=None):
+    def run_task(self, key, args={}, subtask_key=None, available_workers=1):
         #Check to ensure this worker is not already busy.
         # The Master should catch this but lets be defensive.
-        if self.__task:
-            return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
-        self.__task = key
-        
+        with self.__lock:
+            if self.__task:
+                return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
+            self.__task = key
+
+        self.available_workers = available_workers
+
         print 'Starting task: %s' % key
-        return self.available_tasks[key].start(args, callback=self.work_complete)
+
+        #create an instance of the requested task
+        self.__task_instance = object.__new__(self.available_tasks[key])
+        self.__task_instance.__init__()
+        self.__task_instance.parent = self
+
+        return self.__task_instance.start(args, subtask_key, self.work_complete)
 
     """
     Return the status of the current task if running, else None
@@ -57,61 +109,33 @@ class Worker:
     def work_complete(self, results):
         _results = results
         self.__task = None
-        self.master.send_results(_results)
+        self.master.callRemote("send_results", results)
 
     """
     Requests a work unit be handled by another worker in the cluster
     """
     def request_worker(self, subtask_key, args):
-        self.master.request_worker(self.__task, subtask_key, args)
+        deferred = self.master.request_worker(self.__task, subtask_key, args)
 
+    """
+    Recursive function so tasks can find this worker
+    """
+    def get_worker(self):
+        return self
 
-class ClusterRealm:
-    implements(portal.IRealm)
-    def requestAvatar(self, avatarID, mind, *interfaces):
-        assert pb.IPerspective in interfaces
-        avatar = MasterWorker(avatarID)
-        avatar.server = self.server
-        avatar.attached(mind)
-        self.server.master = avatar
-        return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
-
-"""
-Avatar representing the Master's control over a worker.  There should
-only ever be one instance of this class per worker.
-"""
-class MasterWorker(pb.Avatar):
-    def __init__(self, name):
-        self.name = name
-        print '   client connected (worker)'
-
-    def attached(self, mind):
-        print mind
-        self.remote = mind
-
-    def detached(self, mind):
-        self.remote = None
-        self.server.master = None
 
     # returns the status of this node
-    def perspective_status(self):
-        return self.server.status()
+    def remote_status(self):
+        return self.status()
 
     # returns the list of available tasks
-    def perspective_task_list(self):
-        return self.server.available_tasks.keys()
+    def remote_task_list(self):
+        return self.available_tasks.keys()
 
     # run a task
-    def perspective_run_task(self, key, args=None):
-        return self.server.run_task(key, args)
+    def remote_run_task(self, key, args={}, subtask_key=None, available_workers=1):
+        return self.run_task(key, args, subtask_key, available_workers)
 
-    def send_results(self, results):
-        print 'results sent! [%s]' % results
-        self.remote.callRemote("send_results", results)
-
-    def request_worker(self, task_key, subtask_key, args):
-        deferred = self.remote.callRemote("request_worker", subtask_key, args)
-        #deferred.addCallback()
 
 
 if __name__ == "__main__":

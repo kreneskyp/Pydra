@@ -131,7 +131,7 @@ class TaskManager():
     """
     Auto-discover any tasks that are in the tasks directory
     """
-    def autodiscover(self, worker=None):
+    def autodiscover(self):
         import imp
         import os
         import inspect
@@ -155,22 +155,20 @@ class TaskManager():
                 #class exclusions.  do not include any of these class
                 class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
 
-                for key, value in tasks.__dict__.items():
+                for key, task_class in tasks.__dict__.items():
                     # Add any classes that a runnable task.
                     # TODO: filter out subtasks not marked as standalone
-                    if inspect.isclass(value) and key not in class_exclusions and issubclass(value, (Task,)):
+                    if inspect.isclass(task_class) and key not in class_exclusions and issubclass(task_class, (Task,)):
 
-                        try:
+                        #try:
                             #generate a unique key for this 
                             task_key = key
-                            task_instance = value.__new__(value)
-                            task_instance.__init__()
-                            task_instance.parent = worker
 
-                            self.register(task_key, task_instance)
+                            self.register(task_key, task_class)
                             print 'Loaded task: %s' % key
-                        except:
-                            print 'ERROR Loading task: %s' % key
+                        #except :
+                        #    print 'ERROR Loading task: %s' % key
+                            
 
 
 
