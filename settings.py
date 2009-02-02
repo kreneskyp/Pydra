@@ -76,4 +76,10 @@ INSTALLED_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.sites',
+<<<<<<< HEAD:settings.py
+    'django.contrib.admin',
+    'dbsettings',
+    'plyster_server',
+=======
+>>>>>>> 48823547b9be150920f37117b8c2f1b2709315b6:settings.py
 )

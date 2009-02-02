@@ -8,7 +8,7 @@ from dbsettings.loading import set_setting_value
 Settings
 ================================ """
 class PydraSettings(dbsettings.Group):
-    host        = dbsettings.CharValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect')
+    host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect')
     port        = dbsettings.IntegerValue('port','Port for this server')
 pydraSettings = PydraSettings('Pydra')
 
@@ -26,15 +26,15 @@ Models
 """
  Represents a node in the cluster
 """
-class Node(models.Model)
+class Node(models.Model):
     host            = models.CharField(max_length=255)
     port            = models.IntegerField(default=11880)
-    cores_available = models.IntegerField(required=False)
-    cores           = models.IntegerField(required=False)
-    key             = models.CharField(max_length=50, required=False)
+    cores_available = models.IntegerField(null=True)
+    cores           = models.IntegerField(null=True)
+    key             = models.CharField(max_length=50, null=True)
 
-    cpu_speed       = models.IntegerField(required=False)
-    memory          = models.IntegerField(required=False)
+    cpu_speed       = models.IntegerField(null=True)
+    memory          = models.IntegerField(null=True)
 
 
 """

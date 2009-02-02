@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<html>
+    <head>
+      
+        <style>
+        </style>
+
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
+        <script type="text/javascript">
+
+            $(document).ready(function() {
+                
+            });
+
+        </script>
+    </head>
+    <body>
+
+    {% include 'header.html' %}
+
+    {% if form.errors %}
+        <div id="errors">
+        Please correct the following errors:
+            <ul class="errors">
+            {% for field, msg in form.errors.items %}
+                <li class="error"><strong>{{ field|escape }}</strong>{{msg|escape}}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div id="formContainer">
+        <form name="node" method="POST" action="{{SITE_ROOT}}/nodes/edit/{{id}}">
+            <table id="protein">
+            <tbody>
+            <tr>
+                <td class="label">{{form.host.label}}</td>
+                <td>{{form.host}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.port.label}}</td>
+                <td>{{form.port}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.cores_available.label}}</td>
+                <td>{{form.cores_available}}</td>
+            </tr>
+            
+            
+            <tr>
+                <td colspan="100%">These fields will be autodetected by the node and reported back.  You may update them if you like.   At some point these fields will be used to pick automatically set node priority</td>
+            </td>
+            <tr>
+                <td class="label">{{form.cores.label}}</td>
+                <td>{{form.cores}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.cpu_speed.label}}</td>
+                <td>{{form.cpu_speed}}</td>
+            </tr>
+            <tr>
+                <td class="label">{{form.memory.label}}</td>
+                <td>{{form.memory}}</td>
+            </tr>          
+
+
+            <tr class="spacer"/>
+            <tr class="submit"><td class="submit" colspan="100%"><input class="submit" type="submit" value="Submit"></td></tr>
+            </tbody>
+            </table>
+            </div>
+
+        </form>
+    </div>
+    </body>
+</html>
+
