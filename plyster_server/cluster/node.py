@@ -49,7 +49,7 @@ class Node:
     Starts all of the workers.  By default there will be one worker for each core
     """
     def start_workers(self):
-        self.pids = [Popen(["python", "worker.py", self.host, str(port)]).pid for port in self.info['workers']]
+        self.pids = [Popen(["python", "cluster/worker.py", self.host, str(port)]).pid for port in self.info['workers']]
         print "PIDs:", self.pids
 
 
