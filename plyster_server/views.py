@@ -1,3 +1,4 @@
+<<<<<<< HEAD:plyster_server/views.py
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
@@ -79,3 +80,6 @@ def node_edit(request, id=None):
 def jobs(request):
     pass
 
+=======
+# Create your views here.
+>>>>>>> 48823547b9be150920f37117b8c2f1b2709315b6:plyster_server/views.py

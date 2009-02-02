@@ -1,1 +1,0 @@
-server = 'doors.osuosl.org'
