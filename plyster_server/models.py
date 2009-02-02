@@ -35,8 +35,14 @@ class Node(models.Model):
 
     cpu_speed       = models.IntegerField(null=True)
     memory          = models.IntegerField(null=True)
+    seen            = models.IntegerField(default=False)
+   
+    # non-model fields
+    ref             = None
+    _info           = None
 
-
+    def __str__(self):
+        return '%s:%s' % (self.host, self.port)
 """
 Represents and instance of a Task.  This is used to track when a Task was run
 and whether it completed.

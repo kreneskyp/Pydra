@@ -1,20 +1,59 @@
-"""
-Controller.py
-Starts and manages solvers in separate processes for parallel processing.
-Provides an interface to the Flex UI.
-"""
+#!/usr/bin/env python
+
 from __future__ import with_statement
+
+#
+# Setup django environment 
+#
+if __name__ == '__main__':
+    import sys
+    import os
+
+    #python magic to add the current directory to the pythonpath
+    sys.path.append(os.getcwd())
+
+    #
+    if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
 
 import os, sys
 from zope.interface import implements
 from twisted.cred import portal, checkers
 from twisted.spread import pb
 from twisted.internet import reactor, defer
+from twisted.internet.error import AlreadyCalled
 from twisted.web import server, resource
 from twisted.cred import credentials
 from threading import Lock
-from pyamf.remoting.gateway.twisted import TwistedGateway
+#from pyamf.remoting.gateway.twisted import TwistedGateway
 
+from plyster_server.models import Node
+
+"""
+Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code
+"""
+class ReconnectingPBClientFactory(pb.PBClientFactory):
+    node = None
+
+    def __init__(self, node, master):
+        self.node = node
+        self.master = master
+        pb.PBClientFactory.__init__(self)
+
+    def clientConnectionLost(self, connector, reason):
+        #lock - ensures that this blocks any connection attempts
+        with self.master._lock:
+            self.node.ref = None       
+
+        self.master.reconnect_nodes(True);
+        pb.PBClientFactory.clientConnectionLost(self, connector, reason)
+
+
+"""
+Master is the server that controls the cluster.  There must be one and only one master
+per cluster.  It will direct and delegate work taking place on the Nodes and Workers
+"""
 class Master(object):
 
     def __init__(self):
@@ -22,95 +61,185 @@ class Master(object):
         self.nodes = self.load_nodes()
         self.__workers_idle = []
         self.__workers_working = {}
-        self.connected = False
+        self._lock = Lock()
+        self.connecting = True
+        self.reconnect_count = 0
+        self.attempts = None
+        self.reconnect_call_ID = None
         self.connect()
-        self.__lock = Lock()
-
+        
         self.host = 'localhost'
         self.port = 18800
 
     def load_nodes(self):
-        return {('localhost',18801):{}}
-
-    def failed(self, results, failureMessage="Call Failed"):
-        for (success, returnValue), (address, port) in zip(results, self.nodes):
-            if not success:
-                raise Exception("address: %s port: %d %s" % (address, port, failureMessage))
+        nodes = Node.objects.all()
+        node_dict = {}
+        for node in nodes:
+            node_dict[node.id] = node
+        return node_dict
 
     """
-    Make initial connections to all Nodes
+    Make connections to all Nodes that are not connected.  This method is a single control 
+    for connecting to nodes.  individual nodes cannot be connected to.  This is to ensure that
+    only one attempt at a time is ever made to connect to a node.
     """
     def connect(self):
-        "Begin the connection process"
-        connections = []
-        for address, port in self.nodes:
-            factory = pb.PBClientFactory()
-            reactor.connectTCP(address, port, factory)
-            deferred = factory.login(credentials.UsernamePassword("tester", "1234"), client=self)
-            connections.append(deferred)
+        #lock for two reasons:
+        #  1) connect() cannot be called more than once at a time
+        #  2) if a node fails while connecting the reconnect call will block till 
+        #     connections are finished
+        with self._lock:
+            self.connecting=True
+            
+            #clear the reconnect id, its already been called if it reached this far
+            #if self.reconnect_call_ID:
+            #    self.reconnect_call_ID = None
 
-        defer.DeferredList(connections, consumeErrors=True).addCallbacks(
-            self.store_node_connections, self.failed, errbackArgs=("Failed to Connect"))
+            "Begin the connection process"
+            connections = []
+            self.attempts = []
+            for id, node in self.nodes.items():
+                #only connect to nodes that aren't connected yet
+                if not node.ref:
+                    factory = ReconnectingPBClientFactory(node, self)
+                    reactor.connectTCP(node.host, node.port, factory)
+                    deferred = factory.login(credentials.UsernamePassword("tester", "1234"), client=self)
+                    #deferred.addCallback(self.node_connected, self.node_connect_failed, callbackArgs=node, errbackArgs=node)            
+                    #deferred.addErrback(self.node_connect_failed, node)            
+                    connections.append(deferred)
+                    self.attempts.append(node)
 
+            defer.DeferredList(connections, consumeErrors=True).addCallbacks(
+                self.nodes_connected, errbackArgs=("Failed to Connect"))
+        
+            # Release the connection flag.
+            self.connecting=False
 
     """
-    Store connections and retrieve info from node.  The node will repsond with info including
+    Store connections and retrieve info from node.  The node will respond with info including
     how many workers it has.  
     """
-    def store_node_connections(self, results):
+    def nodes_connected(self, results):
         # process each connected node
-        for (success, node), (address, port) in zip(results, self.nodes):
-            # save reference for remote calls
-            self.nodes[address, port]['ref'] = node
+        failures = False
 
-            # Generate a node_key unique to this node instance, it will be used as
-            # a base for the worker_key unique to the worker instance.  The
-            # key will be used by its workers as identification and verification
-            # that they really belong to the cluster.  This does not need to be 
-            # extremely secure because workers only process data, they can't modify
-            # anything anywhere else in the network.  The worst they should be able to
-            # do is cause invalid results
-            node_key = '%s:%s' % (address, port)
+        for result, node in zip(results, self.attempts):
 
-            #Initialize the node, this will result in it sending its info
-            d = node.callRemote('info')
-            d.addCallback(self.add_node, node_key=(address, port))
+            #successes           
+            if result[0]:
+                # save reference for remote calls
+                node.ref = result[1]
 
+                # Generate a node_key unique to this node instance, it will be used as
+                # a base for the worker_key unique to the worker instance.  The
+                # key will be used by its workers as identification and verification
+                # that they really belong to the cluster.  This does not need to be 
+                # extremely secure because workers only process data, they can't modify
+                # anything anywhere else in the network.  The worst they should be able to
+                # do is cause invalid results
+                #node_key = '%s:%s' % (node.host, node.port)
+                print '[info] connected to node: %s:%s' % (node.host, node.port)
+        
+                #Initialize the node, this will result in it sending its info
+                d = node.ref.callRemote('info')
+                d.addCallback(self.add_node, node=node)
+
+            #failures            
+            else:
+                print '[error] failed to connect to node: %s:%s' % (node.host, node.port)
+                node.ref = None
+                failures = True
+
+
+        #single call to reconnect for all failures
+        if failures:
+            self.reconnect_nodes()
+
+        else:
+            self.reconnect_count = 0                        
+      
+
+    """
+    Called to signal that a reconnection attempt is needed for one or more nodes.  This is the single control
+    for requested reconnection.  This single control is used to ensure at most 
+    one request for reconnection is pending.
+    """
+    def reconnect_nodes(self, reset_counter=False):
+        #lock - Blocking here ensures that connect() cannot happen while requesting
+        #       a reconnect.
+        with self._lock:
+            #reconnecting flag ensures that connect is only called a single time
+            #it's possible that multiple nodes can have problems at the same time
+            #reset_counter overrides this
+            if not self.connecting or reset_counter:
+                self.connecting = True
+
+                #reset the counter, useful when a new failure occurs                   
+                if reset_counter:
+                    #cancel existing call if any
+                    if self.reconnect_call_ID:
+                        try:
+                            self.reconnect_call_ID.cancel()
+
+                        # There is a slight chance that this method can be called
+                        # and receive the lock, after connect() has been called.
+                        # in that case reconnect_call_ID will point to an already called
+                        # item.  The error can just be ignored as the locking will ensure
+                        # the call we are about to make does not start
+                        # until the first one does.
+                        except AlreadyCalled:
+                            pass
+                            
+                    self.reconnect_count = 0
+     
+                reconnect_delay = 5*pow(2, self.reconnect_count)
+                #let increment grow exponentially to 5 minutes
+                if self.reconnect_count < 6:
+                    self.reconnect_count += 1 
+                print '[debug] reconnecting in %i seconds' % reconnect_delay
+                self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
     """
     Process Node information.  Most will just be stored for later use.  Info will include
     a list of workers.  The master will then connect to all Workers
     """
-    def add_node(self, info, node_key):
-        #store the information with the node
-        self.nodes[node_key]['info'] = info
-
+    def add_node(self, info, node):
+        
         # if we have never seen this node before save its information in the database
+        # TODO diff the information to ensure it stays up to date
+        if not node.seen:
+            print '[Info] first connect, saving info: %s:%s' % (node.host, node.port)
+            print info
+            node.cores = info['cores']
+            node.cpu_speed = info['cpu']
+            node.memory = info['memory']
+            node.seen = True
+            node.save()
 
-
-        #add the nodes to the checker so they are allowed to connect
-        node_key_str = '%s:%s' % node_key
+        #add the Node's workers to the checker so they are allowed to connect
+        node_key_str = '%s:%s' % (node.host, node.port)
         for i in range(info['cores']):
             self.checker.addUser('%s:%i' % (node_key_str, i), "1234")
 
         # we have allowed access for all the workers, tell the node to init
-        d = self.nodes[node_key]['ref'].callRemote('init', self.host, self.port, node_key_str)
-        d.addCallback(self.node_ready, node_key_str)
+        d = node.ref.callRemote('init', self.host, self.port, node_key_str)
+        d.addCallback(self.node_ready, node)
 
         #reactor.callLater(3, self.run_task, 'TestTask');
         reactor.callLater(3, self.run_task, 'TestParallelTask');
 
-
-    def node_ready(self, result, node_key):
-        print 'Node ready: %s' % node_key
-
+    """ 
+    Called when a call to initialize a Node is successful
+    """
+    def node_ready(self, result, node):
+        print '[Info] Node ready: %s' % node
 
 
     """
     Add a worker avatar as worker available to the cluster
     """
     def add_worker(self, worker_key, worker):
-        with self.__lock:
+        with self._lock:
                 self.workers[worker_key] = worker
                 self.__workers_idle.append(worker_key)
                 print '    added worker'
@@ -121,7 +250,7 @@ class Master(object):
     """
     def select_worker(self, task_key):
         #lock, selecting workers must be threadsafe
-        with self.__lock:
+        with self._lock:
             if len(self.__workers_idle):
                 #move the first worker to the working state storing the task its working on
                 worker_key = self.__workers_idle.pop(0)

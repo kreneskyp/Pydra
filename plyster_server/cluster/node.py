@@ -1,5 +1,21 @@
 #! /usr/bin/python
 from __future__ import with_statement
+
+#
+# Setup django environment 
+#
+if __name__ == '__main__':
+    import sys
+    import os
+
+    #python magic to add the current directory to the pythonpath
+    sys.path.append(os.getcwd())
+
+    #
+    if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
+
 from threading import Lock
 from zope.interface import implements
 from twisted.cred import portal, checkers
@@ -16,7 +32,7 @@ Node - A Node manages a server in your cluster.  There is one instance of Node r
 class NodeServer:
     def __init__(self):
         self.workers = {}
-        self.port_base = 11000
+        self.port_base = 11881
         self.host='localhost'
         self.node_key = None
         self.initialized = False
@@ -27,7 +43,7 @@ class NodeServer:
         # get information about the server
         self.determine_info()
 
-        print '===== STARTED ===='
+        print '[Info] - Starting server on port %s' % self.port_base
 
 
     """
@@ -144,5 +160,5 @@ checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
 checker.addUser("tester", "1234")
 p = portal.Portal(realm, [checker])
 
-reactor.listenTCP(18801, pb.PBServerFactory(p))
+reactor.listenTCP(11880, pb.PBServerFactory(p))
 reactor.run()
