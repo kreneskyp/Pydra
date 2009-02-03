@@ -327,16 +327,25 @@ class MasterRealm:
     implements(portal.IRealm)
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
-        avatar = WorkerAvatar(avatarID)
-        avatar.server = self.server
-        avatar.attached(mind)
 
-        # save the worker avatar so the master can interact with it
-        self.server.add_worker(avatarID, avatar)
+        if avatarID == 'controller':
+            avatar = ControllerAvatar(avatarID)
+            avatar.server = self.server
+            avatar.attached(mind)
+
+        else:
+            avatar = WorkerAvatar(avatarID)
+            avatar.server = self.server
+            avatar.attached(mind)
+
+            # save the worker avatar so the master can interact with it
+            self.server.add_worker(avatarID, avatar)
 
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
 
-
+"""
+Avatar used by Workers connecting to the Master.   
+"""
 class WorkerAvatar(pb.Avatar):
     def __init__(self, name):
         self.name = name
@@ -363,15 +372,45 @@ class WorkerAvatar(pb.Avatar):
         return self.server.request_worker(self, subtask_key, args)
 
 
-if __name__ == "__main__":
-    #master = MasterClient()
-    #reactor.run()
+"""
+Avatar used by Controllers connected to the Master
+"""
+class ControlAvatar(pb.Avatar):
+    def __init__(self, name):
+        self.name = name
+        print '   worker connected: %s' % name
 
+    def attached(self, mind):
+        self.remote = mind
+
+    def detached(self, mind):
+        self.remote = None
+
+    """
+    Called when the controller wants an update of node statuses
+    """
+    def perspective_node_statuses(self):
+        return self.server.node_statuses()
+
+    """
+    Called to start a task
+    """
+    def perspective_run_task(self, task_key, args):
+        return self.server.request_worker(self, subtask_key, args)
+
+    """
+    Called to stop a task
+    """
+    def perspective_stop_task(self, task_instance_id, args):
+        return self.server.request_worker(self, subtask_key, args)   
+    
+
+if __name__ == "__main__":
     realm = MasterRealm()
     realm.server = Master()
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
     realm.server.checker = checker
-    #checker.addUser("tester", "1234")
+    checker.addUser("controller", "1234")
     p = portal.Portal(realm, [checker])
 
     reactor.listenTCP(18800, pb.PBServerFactory(p))

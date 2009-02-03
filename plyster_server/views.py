@@ -1,8 +1,9 @@
-<<<<<<< HEAD:plyster_server/views.py
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
+from django.utils import simplejson
+
 import math
 
 from plyster_server.models import Node, pydraSettings
@@ -77,9 +78,33 @@ def node_edit(request, id=None):
     }, context_instance=RequestContext(request))
 
 
+
+
+pydraController = Controller()
+
+def pydra_processor(request):
+    global pydraController
+
+    if pydraController == None:
+        pydraController = Controller()
+
+    if not taskClient.connected:
+        taskClient.connect(5800)
+
+    return {}
+
+
+"""
+Retrieves Status of nodes
+"""
+def nodes_status(request):
+    c = RequestContext(request, {
+        'MEDIA_URL': settings.MEDIA_URL
+    }, [pydra_processor])
+
+    return HttpResponse(pydraController.nodes_status(), mimetype='application/javascript')
+
+
 def jobs(request):
     pass
 
-=======
-# Create your views here.
->>>>>>> 48823547b9be150920f37117b8c2f1b2709315b6:plyster_server/views.py

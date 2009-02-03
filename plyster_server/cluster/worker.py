@@ -11,7 +11,6 @@ from threading import Lock
 
 
 
-
 class ReconnectingPBClientFactory(pb.PBClientFactory):
     def clientConnectionLost(self, connector, reason):
         print 'Lost connection.  Reason:', reason
