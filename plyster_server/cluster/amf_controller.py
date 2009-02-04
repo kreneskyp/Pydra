@@ -63,6 +63,7 @@ class AMFController(object):
     def remote_node_status(self):
         try:
             ret = self.service.node_status()
+            print ret
             return simplejson.dumps(ret)
         except socket.error:
             # need to reconnect after a socket error

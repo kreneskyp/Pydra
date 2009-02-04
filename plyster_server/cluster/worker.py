@@ -99,6 +99,7 @@ class Worker(pb.Referenceable):
     def connected(self, result):
         self.master = result
         self.reconnect_count = 0
+        print '[info] worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
 
     """
     Callback called when conenction to master fails

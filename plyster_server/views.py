@@ -97,10 +97,10 @@ def node_status(request):
     c = RequestContext(request, {
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
-
     return HttpResponse(pydraController.remote_node_status(), mimetype='application/javascript')
 
 
 def jobs(request):
+
     pass
 

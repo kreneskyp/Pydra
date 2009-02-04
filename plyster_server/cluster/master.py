@@ -62,8 +62,8 @@ class Master(object):
         print '[info] starting master'
         self.workers = {}
         self.nodes = self.load_nodes()
-        self.__workers_idle = []
-        self.__workers_working = {}
+        self._workers_idle = []
+        self._workers_working = {}
         self._lock = Lock()
         self.connecting = True
         self.reconnect_count = 0
@@ -208,16 +208,12 @@ class Master(object):
     """
     def add_node(self, info, node):
 
-        # if we have never seen this node before save its information in the database
-        # TODO diff the information to ensure it stays up to date
-        if not node.seen:
-            print '[Info] node:%s:%s - first connect, saving info' % (node.host, node.port)
-            print info
-            node.cores = info['cores']
-            node.cpu_speed = info['cpu']
-            node.memory = info['memory']
-            node.seen = True
-            node.save()
+        # save node's information in the database
+        node.cores = info['cores']
+        node.cpu_speed = info['cpu']
+        node.memory = info['memory']
+        node.seen = True
+        node.save()
 
         #add the Node's workers to the checker so they are allowed to connect
         node_key_str = '%s:%s' % (node.host, node.port)
@@ -251,13 +247,13 @@ class Master(object):
                 if result[0] == WORKER_STATUS_WORKING:
                     print '[info] worker:%s - is still working' % worker_key
                     #record what the worker is working on
-                    #self.__workers_working[worker_key] = task_key
+                    #self._workers_working[worker_key] = task_key
 
                 # worker is finished with a task
                 elif result[0] == WORKER_STATUS_FINISHED:
                     print '[info] worker:%s - was finished, requesting results' % worker_key
                     #record what the worker is working on
-                    #self.__workers_working[worker_key] = task_key
+                    #self._workers_working[worker_key] = task_key
 
                     #check if the Worker acting as master for this task is ready
                     if (True):
@@ -272,8 +268,8 @@ class Master(object):
                     with self._lock:
                         self.workers[worker_key] = worker
                         # worker shouldn't already be in the idle queue but check anyway
-                        if not worker_key in self.__workers_idle:
-                            self.__workers_idle.append(worker_key)
+                        if not worker_key in self._workers_idle:
+                            self._workers_idle.append(worker_key)
                             print '[info] worker:%s - added to idle workers' % worker_key
 
     """
@@ -282,14 +278,14 @@ class Master(object):
     def remove_worker(self, worker_key):
         with self._lock:
             # if idle, just remove it.  no need to do anything else
-            if worker_key in self.__workers_idle:
+            if worker_key in self._workers_idle:
                 print '[info] worker:%s - removing worker from idle pool' % worker_key
-                self.__workers_idle.remove(worker_key)
+                self._workers_idle.remove(worker_key)
 
             #worker was working on a task, need to clean it up
             else:
                 #worker was working on a subtask, return unfinished work to main worker
-                if self.__workers_working[1]:
+                if self._workers_working[1]:
                     pass
 
                 #worker was main worker for a task.  cancel the task and tell any
@@ -304,10 +300,10 @@ class Master(object):
     def select_worker(self, task_key):
         #lock, selecting workers must be threadsafe
         with self._lock:
-            if len(self.__workers_idle):
+            if len(self._workers_idle):
                 #move the first worker to the working state storing the task its working on
-                worker_key = self.__workers_idle.pop(0)
-                self.__workers_working[worker_key] = task_key
+                worker_key = self._workers_idle.pop(0)
+                self._workers_working[worker_key] = task_key
 
                 #return the worker object, not the key
                 return self.workers[worker_key]
@@ -331,7 +327,7 @@ class Master(object):
         worker = self.select_worker(task_instance_key)
 
         # determine how many workers are available for this task
-        available_workers = len(self.__workers_idle)+1
+        available_workers = len(self._workers_idle)+1
 
         if worker:
             d = worker.remote.callRemote('run_task', task_key, args, subtask_key, available_workers)
@@ -352,8 +348,8 @@ class Master(object):
     """
     def send_results(self, worker_key, results):
         # release the worker back into the idle pool
-        del self.__workers_working[worker_key]
-        self.__workers_idle.append(worker_key)
+        del self._workers_working[worker_key]
+        self._workers_idle.append(worker_key)
 
         #if this was the root task for the job then save info
 
@@ -370,7 +366,7 @@ class Master(object):
         #get the task key and run the task.  The key is looked up
         #here so that a worker can only request a worker for the 
         #their current task.
-        task_key = self.__workers_working[workerAvatar.name] 
+        task_key = self._workers_working[workerAvatar.name] 
         self.run_task(task_key, subtask_key)
 
     def my_print(self, str):
@@ -515,7 +511,6 @@ class AMFInterface(pb.Root):
     def node_status(self, _):
         node_status = {}
         worker_list = self.master.workers
-
         #iterate through all the nodes adding their status
         for key, node in self.master.nodes.items():
             worker_status = {}
@@ -523,8 +518,15 @@ class AMFInterface(pb.Root):
                 #iterate through all the workers adding their status as well
                 #also check for a worker whose should be running but is not connected
                 for i in range(node.cores):
-                    w_key = '%s:%i' % (node.key, i)
-                    worker_status[w_key] = (worker_list.has_key(w_key) and worker_list[w_key].status())
+                    w_key = '%s:%s:%i' % (node.host, node.port, i)
+                    html_key = '%s_%i' % (node.id, i)
+                    if w_key in self.master._workers_idle:
+                        worker_status[html_key] = (1,-1,-1)
+                    elif w_key in self.master._workers_working:
+                        task, subtask = self.master._workers_working[w_key]
+                        worker_status[html_key] = (1,task,subtask)
+                    else:
+                        worker_status[html_key] = -1
 
             else:
                 worker_status=-1

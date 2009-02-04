@@ -7,13 +7,21 @@
     <head>
         <style>
             table {
-                border: 1px solid black;
                 width:90%;
                 margin-left:5%;
+            }
+
+            #cluster {
+                border: 1px solid black;
                 margin-top:10px;
             }
 
-            td {
+            #nodes {
+                border: 1px solid black;
+                margin-top:20px;
+            }
+
+            td, th{
                 padding-left:10px;
                 padding-right:10px;
                 text-align:center;
@@ -22,8 +30,9 @@
             td.status {
                 border: 1px solid black;
                 background-color: gray;
+                width:100px;
             }
-            
+
             td.status_connected {
                 background-color:#c2e192;
             }
@@ -69,7 +78,22 @@
                         alert('workers are not known');
                     } else {
                         for (worker_key in workers) {
-                            //alert('worker')
+                            worker = workers[worker_key];
+                            base = '#worker_' + worker_key
+                            // is worker active
+                            if (worker == -1){
+                                $(base + ' .status').removeClass('status_connected').addClass('status_disconnected').html('disconnected')
+
+                            } else {
+                                $(base + ' .status').removeClass('status_disconnected').addClass('status_connected').html('connected')
+                                if (worker[1] != -1 && worker[2] != -1) {
+                                    $(base + ' .task').html(worker[1]+':'+worker[2]);
+                                } else if (worker[1] != -1) {
+                                    $(base + ' .task').html(worker[1])
+                                } else {
+                                    $(base + ' .task').html('idle')
+                                }
+                            }
                         }
                     }
                 }
@@ -79,7 +103,7 @@
                 //ajax call to status
                 $.post('{{SITE_ROOT}}/nodes/status/',{},process_status_update);
 
-                //rerun this update in 10 seconds
+                //rerun this update in 5 seconds
                 setTimeout('update()', 5000);
             }
 
@@ -101,29 +125,61 @@
         </div>
     {% endif %}
 
+        <table id="cluster">
+            <tr>
+                <td>Capacity</td>
+                <td>[3 of 5 workers busy]</td>
+            </tr>
+            <tr>
+                <td>Speed</td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Memory</td>
+                <td></td>
+            </tr>
+        </table>
 
         <table id="nodes">
         <thead>
-            <tr>
+            <tr id='header_top'>
+                <th rowspan="2">Status</th>
+                <th rowspan="2">Host</th>
+                <th rowspan="2">Port</th>
+                <th colspan="3">Workers</th>
+            </tr>
+            <tr id='header_bottom'>
                 <th>Status</th>
-                <th>Host</th>
-                <th>Port</th>
-                <th>Cores Allowed</th>
+                <th>Count</th>
                 <th>Cores</th>
             </tr>
         </thead>
         <tbody>
             {% for node in nodes.object_list %}
                 <tr>
-                    <td id="node_{{node.id}}" class="status">{% if master.running %}{{master.status}}{%else%}Unknown{%endif%}</td>
+                    <td id="node_{{node.id}}" class="status">Unknown</td>
                     <td><a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a></td>
-                    <td>{{node.port}}</td>
+                    <td class="port">{{node.port}}</td>
+                    <td>[3 of 4 connected]</td>
                     <td>{{node|available_cores}}</td>
                     <td>{{node.cores}}</td>
                 </tr>
                 <tr>
                     <td colspan="100%">
-                        detailed information about the node goes here
+                        <table>
+                        <tr id='header_top'>
+                            <th>Status</th>
+                            <th>Id</th>
+                            <th>Task</th>
+                        </tr>
+                        {% for id in node|node_range %}
+                            <tr id="worker_{{node.id}}_{{id}}">
+                                <td class="status">Unknown</td>
+                                <td>{{forloop.counter}}</td>
+                                <td class="task">Unknown</td>
+                            </tr>
+                        {% endfor %}
+                        </table>
                     </td>
                 </tr>
 

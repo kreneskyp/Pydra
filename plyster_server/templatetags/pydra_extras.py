@@ -12,3 +12,15 @@ def available_cores(node):
     else:
         return node.cores
 register.filter('available_cores',available_cores)
+
+"""
+Filter that creates a range
+"""
+@register.filter(name='node_range')
+def node_range(node):
+    if node.cores_available:
+        return range(0,node.cores_available)
+
+    return range(0,node.cores)
+
+register.filter('node_range',node_range)
