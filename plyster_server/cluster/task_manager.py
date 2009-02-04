@@ -137,13 +137,13 @@ class TaskManager():
         import inspect
 
         # Step 1: get all python files in the tasks directory
-        files = os.listdir('./task_cache')
+        files = os.listdir('./plyster_server/task_cache')
 
         # Step 2: iterate through all the python files importing each one and 
         #         and add it as an available Task
         for filename in files:
             if filename <> '__init__.py' and filename[-3:] == '.py':
-                module = 'task_cache.%s' % filename[:-3]
+                module = 'plyster_server.task_cache.%s' % filename[:-3]
                 tasks = __import__(module, {}, {}, ['Task'])
 
                 # iterate through the objects in  the module to find Tasks
@@ -165,10 +165,10 @@ class TaskManager():
                             task_key = key
 
                             self.register(task_key, task_class)
-                            print 'Loaded task: %s' % key
+                            print '[info] Loaded task: %s' % key
                         #except :
                         #    print 'ERROR Loading task: %s' % key
-                            
+
 
 
 

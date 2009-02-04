@@ -9,9 +9,9 @@ Form used when creating nodes
 class NodeForm(ModelForm):
     class Meta:
         model = Node
-        exclude=('key')
+        exclude=('key', 'seen')
 
     cores_available = forms.IntegerField(required=False)
-    cores           = forms.IntegerField(required=False)    
+    cores           = forms.IntegerField(required=False)
     cpu_speed       = forms.IntegerField(required=False)
     memory          = forms.IntegerField(required=False)

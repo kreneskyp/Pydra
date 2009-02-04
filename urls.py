@@ -14,9 +14,7 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     # (r'^admin/(.*)', admin.site.root),
-<<<<<<< HEAD:urls.py
 
     (r'^', include('plyster_server.urls')),
-=======
->>>>>>> 48823547b9be150920f37117b8c2f1b2709315b6:urls.py
+
 )

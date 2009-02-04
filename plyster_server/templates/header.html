@@ -45,10 +45,15 @@
         color:white; 
         text-decoration:none; 
     }
-    .menuitem a           { color:white; text-decoration:none; }
-    .menuitme a:visited           { color:white; text-decoration:none; }
-    .menuitem a:hover             { color:white; text-decoration:underline; }
-    .menuitem a:active            { color:white; text-decoration:none;}
+    a.menuitem                   { color:white; text-decoration:none; }
+    a.menuitme:visited           { color:white; text-decoration:none; }
+    a.menuitme:hover             { color:white; text-decoration:underline; }
+    a.menuitme:active            { color:white; text-decoration:none;}
+
+    a.mainmenuitem                   { color:white; text-decoration:none; }
+    a.mainmenuitem:visited           { color:white; text-decoration:none; }
+    a.mainmenuitem:hover             { color:white; text-decoration:underline; }
+    a.mainmenuitem:active            { color:white; text-decoration:none;}
 </style>
 
 <link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}/css/main.css" />
@@ -61,14 +66,14 @@
     </div>
     {% if nodes %}
         <div id="submenu">
-            <span class="menuitem"><a href="{{SITE_ROOT}}/nodes/edit">Create Node</a></span>
-            <span class="menuitem"><a href="{{SITE_ROOT}}/nodes/discover">Discover Nodes</a></span>
+            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/edit">Create Node</a></span>
+            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/discover">Discover Nodes</a></span>
         </div>
     {% endif %}
     {% if jobs %}
         <div id="submenu">
-            <span class="menuitem"><a href="{{SITE_ROOT}}/jobs/schedule">Edit Search</a></span>
-            <span class="menuitem"><a href="{{SITE_ROOT}}/jobs/edit">Plot</a></span>
+            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/jobs/schedule">Edit Search</a></span>
+            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/jobs/edit">Plot</a></span>
         </div>
     {% endif %}
 </div>

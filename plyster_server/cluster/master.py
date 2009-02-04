@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 #
-# Setup django environment 
+# Setup django environment when run from the commandline
 #
 if __name__ == '__main__':
     import sys
@@ -26,14 +26,16 @@ from twisted.internet.error import AlreadyCalled
 from twisted.web import server, resource
 from twisted.cred import credentials
 from threading import Lock
-#from pyamf.remoting.gateway.twisted import TwistedGateway
+import time
 
 from plyster_server.models import Node
+from plyster_server.cluster.constants import *
 
 """
-Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code
+Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code.
+This factory is specific to the master acting as a client of a Node.
 """
-class ReconnectingPBClientFactory(pb.PBClientFactory):
+class NodeClientFactory(pb.PBClientFactory):
     node = None
 
     def __init__(self, node, master):
@@ -44,7 +46,7 @@ class ReconnectingPBClientFactory(pb.PBClientFactory):
     def clientConnectionLost(self, connector, reason):
         #lock - ensures that this blocks any connection attempts
         with self.master._lock:
-            self.node.ref = None       
+            self.node.ref = None
 
         self.master.reconnect_nodes(True);
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
@@ -57,6 +59,7 @@ per cluster.  It will direct and delegate work taking place on the Nodes and Wor
 class Master(object):
 
     def __init__(self):
+        print '[info] starting master'
         self.workers = {}
         self.nodes = self.load_nodes()
         self.__workers_idle = []
@@ -67,15 +70,17 @@ class Master(object):
         self.attempts = None
         self.reconnect_call_ID = None
         self.connect()
-        
+
         self.host = 'localhost'
         self.port = 18800
 
     def load_nodes(self):
+        print '[info] loading nodes'
         nodes = Node.objects.all()
         node_dict = {}
         for node in nodes:
             node_dict[node.id] = node
+        print '[info] %i nodes loaded' % len(nodes)
         return node_dict
 
     """
@@ -90,7 +95,7 @@ class Master(object):
         #     connections are finished
         with self._lock:
             self.connecting=True
-            
+
             #clear the reconnect id, its already been called if it reached this far
             #if self.reconnect_call_ID:
             #    self.reconnect_call_ID = None
@@ -101,23 +106,21 @@ class Master(object):
             for id, node in self.nodes.items():
                 #only connect to nodes that aren't connected yet
                 if not node.ref:
-                    factory = ReconnectingPBClientFactory(node, self)
-                    reactor.connectTCP(node.host, node.port, factory)
+                    factory = NodeClientFactory(node, self)
+                    reactor.connectTCP(node.host, 11890, factory)
                     deferred = factory.login(credentials.UsernamePassword("tester", "1234"), client=self)
-                    #deferred.addCallback(self.node_connected, self.node_connect_failed, callbackArgs=node, errbackArgs=node)            
-                    #deferred.addErrback(self.node_connect_failed, node)            
                     connections.append(deferred)
                     self.attempts.append(node)
 
             defer.DeferredList(connections, consumeErrors=True).addCallbacks(
                 self.nodes_connected, errbackArgs=("Failed to Connect"))
-        
+
             # Release the connection flag.
             self.connecting=False
 
     """
-    Store connections and retrieve info from node.  The node will respond with info including
-    how many workers it has.  
+    Called with the results of all connection attempts.  Store connections and retrieve info from node.
+    The node will respond with info including how many workers it has.
     """
     def nodes_connected(self, results):
         # process each connected node
@@ -125,7 +128,7 @@ class Master(object):
 
         for result, node in zip(results, self.attempts):
 
-            #successes           
+            #successes
             if result[0]:
                 # save reference for remote calls
                 node.ref = result[1]
@@ -138,15 +141,15 @@ class Master(object):
                 # anything anywhere else in the network.  The worst they should be able to
                 # do is cause invalid results
                 #node_key = '%s:%s' % (node.host, node.port)
-                print '[info] connected to node: %s:%s' % (node.host, node.port)
-        
+                print '[info] node:%s:%s - connected' % (node.host, node.port)
+
                 #Initialize the node, this will result in it sending its info
                 d = node.ref.callRemote('info')
                 d.addCallback(self.add_node, node=node)
 
-            #failures            
+            #failures
             else:
-                print '[error] failed to connect to node: %s:%s' % (node.host, node.port)
+                print '[error] node:%s:%s - failed to connect' % (node.host, node.port)
                 node.ref = None
                 failures = True
 
@@ -156,8 +159,8 @@ class Master(object):
             self.reconnect_nodes()
 
         else:
-            self.reconnect_count = 0                        
-      
+            self.reconnect_count = 0
+
 
     """
     Called to signal that a reconnection attempt is needed for one or more nodes.  This is the single control
@@ -174,7 +177,7 @@ class Master(object):
             if not self.connecting or reset_counter:
                 self.connecting = True
 
-                #reset the counter, useful when a new failure occurs                   
+                #reset the counter, useful when a new failure occurs
                 if reset_counter:
                     #cancel existing call if any
                     if self.reconnect_call_ID:
@@ -189,9 +192,9 @@ class Master(object):
                         # until the first one does.
                         except AlreadyCalled:
                             pass
-                            
+
                     self.reconnect_count = 0
-     
+
                 reconnect_delay = 5*pow(2, self.reconnect_count)
                 #let increment grow exponentially to 5 minutes
                 if self.reconnect_count < 6:
@@ -204,11 +207,11 @@ class Master(object):
     a list of workers.  The master will then connect to all Workers
     """
     def add_node(self, info, node):
-        
+
         # if we have never seen this node before save its information in the database
         # TODO diff the information to ensure it stays up to date
         if not node.seen:
-            print '[Info] first connect, saving info: %s:%s' % (node.host, node.port)
+            print '[Info] node:%s:%s - first connect, saving info' % (node.host, node.port)
             print info
             node.cores = info['cores']
             node.cpu_speed = info['cpu']
@@ -226,24 +229,74 @@ class Master(object):
         d.addCallback(self.node_ready, node)
 
         #reactor.callLater(3, self.run_task, 'TestTask');
-        reactor.callLater(3, self.run_task, 'TestParallelTask');
+        #reactor.callLater(3, self.run_task, 'TestParallelTask');
 
     """ 
     Called when a call to initialize a Node is successful
     """
     def node_ready(self, result, node):
-        print '[Info] Node ready: %s' % node
+        print '[Info] node:%s - ready' % node
 
 
     """
-    Add a worker avatar as worker available to the cluster
+    Add a worker avatar as worker available to the cluster.  There are two possible scenarios:
+       1) Only the worker was started/restarted, it is idle
+       2) Only master was restarted.  Workers previous status must be reestablished
+
+       The best way to determine the state of the worker is to ask it.  It will return its status
+       plus any relevent information for reestablishing it's status
     """
-    def add_worker(self, worker_key, worker):
+    def add_worker(self, result, worker, worker_key):
+                # worker is working and it was the master for its task
+                if result[0] == WORKER_STATUS_WORKING:
+                    print '[info] worker:%s - is still working' % worker_key
+                    #record what the worker is working on
+                    #self.__workers_working[worker_key] = task_key
+
+                # worker is finished with a task
+                elif result[0] == WORKER_STATUS_FINISHED:
+                    print '[info] worker:%s - was finished, requesting results' % worker_key
+                    #record what the worker is working on
+                    #self.__workers_working[worker_key] = task_key
+
+                    #check if the Worker acting as master for this task is ready
+                    if (True):
+                        pass
+
+                    #else not ready to send the results
+                    else:
+                        pass
+
+                #otherwise its idle
+                else:
+                    with self._lock:
+                        self.workers[worker_key] = worker
+                        # worker shouldn't already be in the idle queue but check anyway
+                        if not worker_key in self.__workers_idle:
+                            self.__workers_idle.append(worker_key)
+                            print '[info] worker:%s - added to idle workers' % worker_key
+
+    """
+    Called when a worker disconnects
+    """
+    def remove_worker(self, worker_key):
         with self._lock:
-                self.workers[worker_key] = worker
-                self.__workers_idle.append(worker_key)
-                print '    added worker'
+            # if idle, just remove it.  no need to do anything else
+            if worker_key in self.__workers_idle:
+                print '[info] worker:%s - removing worker from idle pool' % worker_key
+                self.__workers_idle.remove(worker_key)
 
+            #worker was working on a task, need to clean it up
+            else:
+                #worker was working on a subtask, return unfinished work to main worker
+                if self.__workers_working[1]:
+                    pass
+
+                #worker was main worker for a task.  cancel the task and tell any
+                #workers working on subtasks to stop.  Cannot recover from the 
+                #main worker going down
+                else:
+                    pass
 
     """
     Select a worker to use for running a task or subtask
@@ -290,7 +343,7 @@ class Master(object):
         # no worker was available
         # TODO determine how to handle unavailable workers
         else:
-            print 'No worker available'
+            print '[warning] No worker available'
 
     """
     Called by workers when they have completed their task.
@@ -323,6 +376,9 @@ class Master(object):
     def my_print(self, str):
         print str
 
+"""
+Realm used by the Master server to assign avatars.
+"""
 class MasterRealm:
     implements(portal.IRealm)
     def requestAvatar(self, avatarID, mind, *interfaces):
@@ -332,14 +388,17 @@ class MasterRealm:
             avatar = ControllerAvatar(avatarID)
             avatar.server = self.server
             avatar.attached(mind)
+            print '[info] controller:%s - connected' % avatarID
 
         else:
             avatar = WorkerAvatar(avatarID)
             avatar.server = self.server
             avatar.attached(mind)
+            print '[info] worker:%s - connected' % avatarID
 
-            # save the worker avatar so the master can interact with it
-            self.server.add_worker(avatarID, avatar)
+            #request status to determine what this worker was doing
+            deferred = avatar.remote.callRemote('status')
+            deferred.addCallback(self.server.add_worker, worker=avatar, worker_key=avatarID)
 
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
 
@@ -349,12 +408,13 @@ Avatar used by Workers connecting to the Master.
 class WorkerAvatar(pb.Avatar):
     def __init__(self, name):
         self.name = name
-        print '   worker connected: %s' % name
 
     def attached(self, mind):
         self.remote = mind
 
     def detached(self, mind):
+        print '[info] worker:%s - disconnected' % self.name
+        self.server.remove_worker(self.name)
         self.remote = None
 
     """
@@ -375,10 +435,9 @@ class WorkerAvatar(pb.Avatar):
 """
 Avatar used by Controllers connected to the Master
 """
-class ControlAvatar(pb.Avatar):
+class ControllerAvatar(pb.Avatar):
     def __init__(self, name):
         self.name = name
-        print '   worker connected: %s' % name
 
     def attached(self, mind):
         self.remote = mind
@@ -402,16 +461,111 @@ class ControlAvatar(pb.Avatar):
     Called to stop a task
     """
     def perspective_stop_task(self, task_instance_id, args):
-        return self.server.request_worker(self, subtask_key, args)   
-    
+        return self.server.request_worker(self, subtask_key, args)
+
+
+"""
+Class used to authenticate the request.  This is a hack of a class but
+unfortunately required because there does not appear to be a better way
+to block until a deferred completes
+"""
+class AMFAuthenticator(object):
+    def __init__(self, checker):
+        self.result = False
+        self.checker = checker
+
+    def auth_success(self, result):
+        self.result = True
+        self.auth = True
+
+    def auth_failure(self, result):
+        print '[error] Unauthorized attempt to use service'
+        self.result = True
+        self.auth = False
+
+    def auth(self, user, password):
+        from twisted.cred.credentials import UsernamePassword
+        credentials = UsernamePassword(user, password)
+        avatarId = self.checker.requestAvatarId(credentials)
+        avatarId.addCallback(self.auth_success)
+        avatarId.addErrback(self.auth_failure)
+
+        # block for 5 seconds or until a result happens
+        # in most cases a result should happen very quickly
+        for i in range(25):
+            if self.result:
+                break
+            time.sleep(.2)
+
+        return self.auth
+
+"""
+Interface for Controller.  This exposes functions to a controller.
+"""
+class AMFInterface(pb.Root):
+
+    def __init__(self, master, checker):
+        self.master = master
+        self.checker = checker
+
+    def is_alive(self, _):
+        print '[debug] is alive'
+        return 1
+
+    def node_status(self, _):
+        node_status = {}
+        worker_list = self.master.workers
+
+        #iterate through all the nodes adding their status
+        for key, node in self.master.nodes.items():
+            worker_status = {}
+            if node.cores:
+                #iterate through all the workers adding their status as well
+                #also check for a worker whose should be running but is not connected
+                for i in range(node.cores):
+                    w_key = '%s:%i' % (node.key, i)
+                    worker_status[w_key] = (worker_list.has_key(w_key) and worker_list[w_key].status())
+
+            else:
+                worker_status=-1
+
+            node_status[key] = {'status':node.status(),
+                                'workers':worker_status
+                               }
+        return node_status
+
+    def auth(self, user, password):
+        authenticator = AMFAuthenticator(checker)
+        return authenticator.auth(user, password)
+
+
 
 if __name__ == "__main__":
+    # setup cluster connections
     realm = MasterRealm()
     realm.server = Master()
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
     realm.server.checker = checker
     checker.addUser("controller", "1234")
     p = portal.Portal(realm, [checker])
-
     reactor.listenTCP(18800, pb.PBServerFactory(p))
+
+    #setup controller connection via AMF gateway
+    # Place the namespace mapping into a TwistedGateway:
+    from pyamf.remoting.gateway.twisted import TwistedGateway
+    from pyamf.remoting import gateway
+    interface = AMFInterface(realm.server, checker)
+    gw = TwistedGateway({ 
+                    "controller": interface,
+                    }, authenticator=interface.auth)
+    # Publish the PyAMF gateway at the root URL:
+    root = resource.Resource()
+    root.putChild("", gw)
+    # Tell the twisted reactor to listen:
+    reactor.listenTCP(18801, server.Site(root))
+
+    #sr = gateway.ServiceRequest(None, gw.services['controller'], None)
+    #gw.authenticateRequest(sr, 'u', 'p')
+
+    #start the server
     reactor.run()

@@ -43,7 +43,7 @@ class NodeServer:
         # get information about the server
         self.determine_info()
 
-        print '[Info] - Starting server on port %s' % self.port_base
+        print '[info] Node - starting server on port %s' % self.port_base
 
 
     """
@@ -85,7 +85,7 @@ class NodeServer:
     """
     def start_workers(self):
         self.pids = [
-            Popen(["python", "cluster/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
+            Popen(["python", "plyster_server/cluster/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
             for i in range(self.info['cores'])
             ]
 
@@ -126,7 +126,7 @@ class ClusterRealm:
 class MasterAvatar(pb.Avatar):
     def __init__(self, name):
         self.name = name
-        print '   [Node]: master connected (node)'
+        print '[info] master connected to node'
 
     def attached(self, mind):
         self.remote = mind
@@ -136,10 +136,6 @@ class MasterAvatar(pb.Avatar):
 
     # returns the status of this node
     def perspective_status(self):
-        pass
-
-    # returns the list of available tasks
-    def perspective_task_list(self):
         pass
 
     # Returns a dictionary of useful information about this node
@@ -160,5 +156,5 @@ checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
 checker.addUser("tester", "1234")
 p = portal.Portal(realm, [checker])
 
-reactor.listenTCP(11880, pb.PBServerFactory(p))
+reactor.listenTCP(11890, pb.PBServerFactory(p))
 reactor.run()

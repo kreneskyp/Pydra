@@ -3,11 +3,14 @@ from django.template import RequestContext
 from django.http import HttpResponseRedirect
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.utils import simplejson
+from django.http import HttpResponse
 
 import math
 
 from plyster_server.models import Node, pydraSettings
+from cluster.amf_controller import AMFController
 from forms import NodeForm
+from models import pydraSettings
 import settings
 
 """
@@ -15,10 +18,7 @@ display nodes
 """
 def nodes(request):
     # get nodes
-    nodes = Node.objects.all()    
-
-    # Get the master control interface
-    master = {'running':False}
+    nodes = Node.objects.all()
 
     # paginate
     paginator = Paginator(nodes, 25) # Show 25 segments per page
@@ -44,8 +44,7 @@ def nodes(request):
     return render_to_response('nodes.html', {
         'nodes':paginatedNodes,
         'pages':pages,
-        'master':master,
-    }, context_instance=RequestContext(request))
+    }, context_instance=RequestContext(request, processors=[pydra_processor]))
 
 
 """
@@ -80,29 +79,26 @@ def node_edit(request, id=None):
 
 
 
-pydraController = Controller()
+pydraController = AMFController(pydraSettings.host , pydraSettings.port)
 
 def pydra_processor(request):
     global pydraController
 
     if pydraController == None:
-        pydraController = Controller()
+        pydraController = AMFController(pydraSettings.host , pydraSettings.port)
 
-    if not taskClient.connected:
-        taskClient.connect(5800)
-
-    return {}
+    return {'controller':pydraController}
 
 
 """
 Retrieves Status of nodes
 """
-def nodes_status(request):
+def node_status(request):
     c = RequestContext(request, {
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
 
-    return HttpResponse(pydraController.nodes_status(), mimetype='application/javascript')
+    return HttpResponse(pydraController.remote_node_status(), mimetype='application/javascript')
 
 
 def jobs(request):

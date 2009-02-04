@@ -13,12 +13,10 @@ from threading import Lock
 
 class ControllerFactory(pb.PBClientFactory):
     def clientConnectionLost(self, connector, reason):
-        print 'Lost connection.  Reason:', reason
-        #ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+        pb.PBClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
-        print 'Connection failed. Reason:', reason
-        #ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
+        pb.PBClientFactory.clientConnectionFailed(self, connector, reason)
 
 
 
@@ -31,15 +29,16 @@ Worker - The Worker is the workhorse of the cluster.  It sits and waits for Task
 class Controller(pb.Referenceable):
 
     def __init__(self, master_host, master_port):
-        self.id = id
         self.master = None
         self.master_host = master_host
         self.master_port = master_port
-  
-        print '===== STARTED Control ===='
+        self.connected = False
+
+        print '[Info] Initializing Pydra Controller'
         self.connect()
 
     def start(self):
+        print '[Info] Starting Pydra Controller'
         reactor.run()
 
     """
@@ -47,21 +46,25 @@ class Controller(pb.Referenceable):
     """
     def connect(self):
         "Begin the connection process"
-        factory = ReconnectingPBClientFactory()
+        factory = ControllerFactory()
         reactor.connectTCP(self.master_host, self.master_port, factory)
         deferred = factory.login(credentials.UsernamePassword('controller', "1234"), client=self)
-        deferred.addCallbacks(self.connected, self.connect_failed, errbackArgs=("Failed to Connect"))
+        deferred.addCallback(self.connection_success)
+        deferred.addErrback(self.connection_failed)
 
     """
     Callback called when connection to master is made
     """
-    def connected(self, result):
+    def connection_success(self, result):
+        print '[info] Connected to master'
         self.master = result
+        self.connected = True
 
     """
     Callback called when conenction to master fails
     """
-    def connect_failed(self, result, *arg, **kw):
+    def connection_failed(self, result, *arg, **kw):
+        print '[error] Connected to master failed'
         print result
 
     def status(self):

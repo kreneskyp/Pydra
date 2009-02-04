@@ -1,25 +1,49 @@
 #! /usr/bin/python
 from __future__ import with_statement
 
+#
+# Setup django environment 
+#
+if __name__ == '__main__':
+    import sys
+    import os
+
+    #python magic to add the current directory to the pythonpath
+    sys.path.append(os.getcwd())
+
+    #
+    if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
+import os, sys
 from twisted.spread import pb
 from twisted.internet import reactor
-from task_manager import TaskManager
 from twisted.cred import credentials
-import os, sys
 from twisted.internet.protocol import ReconnectingClientFactory
 from threading import Lock
 
+from task_manager import TaskManager
+from constants import *
 
+"""
+   Subclassing of PBClientFactory to add automatic reconnection
+"""
+class MasterClientFactory(pb.PBClientFactory):
 
-class ReconnectingPBClientFactory(pb.PBClientFactory):
+    def __init__(self, reconnect_func, *args, **kwargs):
+        pb.PBClientFactory.__init__(self)
+        self.reconnect_func = reconnect_func
+        self.args = args
+        self.kwargs = kwargs
+
     def clientConnectionLost(self, connector, reason):
-        print 'Lost connection.  Reason:', reason
-        #ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
+        print '[warning] Lost connection to master.  Reason:', reason
+        pb.PBClientFactory.clientConnectionLost(self, connector, reason)
+        self.reconnect_func(*(self.args), **(self.kwargs))
 
     def clientConnectionFailed(self, connector, reason):
-        print 'Connection failed. Reason:', reason
-        #ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
-
+        print '[warning] Connection to master failed. Reason:', reason
+        pb.PBClientFactory.clientConnectionFailed(self, connector, reason)
 
 
 
@@ -33,42 +57,54 @@ class Worker(pb.Referenceable):
     def __init__(self, master_host, master_port, node_key, worker_key):
         self.id = id
         self.__task = None
+        self.__results = None
         self.__lock = Lock()
         self.master = None
         self.master_host = master_host
         self.master_port = master_port
         self.node_key = node_key
         self.worker_key = worker_key
+        self.reconnect_count = 0
 
         #load tasks that are cached locally
         self.task_manager = TaskManager()
         self.task_manager.autodiscover()
         self.available_tasks = self.task_manager.registry
 
-        print '===== STARTED Worker ===='
+        print '[info] Started Worker: %s' % worker_key
         self.connect()
 
     """
     Make initial connections to all Nodes
     """
     def connect(self):
-        "Begin the connection process"
-        factory = ReconnectingPBClientFactory()
+        print '[info] worker:%s - connecting to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
+        factory = MasterClientFactory(self.reconnect)
         reactor.connectTCP(self.master_host, self.master_port, factory)
         deferred = factory.login(credentials.UsernamePassword(self.worker_key, "1234"), client=self)
-        deferred.addCallbacks(self.connected, self.connect_failed, errbackArgs=("Failed to Connect"))
+        deferred.addCallbacks(self.connected, self.reconnect, errbackArgs=("Failed to Connect"))
+
+    def reconnect(self, *arg, **kw):
+        self.master = None
+        reconnect_delay = 5*pow(2, self.reconnect_count)
+        #let increment grow exponentially to 5 minutes
+        if self.reconnect_count < 6:
+            self.reconnect_count += 1 
+        print '[debug] worker:%s - reconnecting in %i seconds' % (self.worker_key, reconnect_delay)
+        self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
     """
     Callback called when connection to master is made
     """
     def connected(self, result):
         self.master = result
+        self.reconnect_count = 0
 
     """
     Callback called when conenction to master fails
     """
-    def connect_failed(self, result, *arg, **kw):
-        print result
+    def connect_failed(self, result):
+        self.reconnect()
 
     """
      Runs a task on this worker
@@ -80,6 +116,7 @@ class Worker(pb.Referenceable):
             if self.__task:
                 return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
             self.__task = key
+            self.__subtask = subtask_key
 
         self.available_workers = available_workers
 
@@ -92,23 +129,48 @@ class Worker(pb.Referenceable):
 
         return self.__task_instance.start(args, subtask_key, self.work_complete)
 
+
     """
     Return the status of the current task if running, else None
     """
     def status(self):
+        # if there is a task it must still be running
         if self.__task:
-            return self.available_tasks[self.__task].status()
-        return None
+            return (WORKER_STATUS_WORKING, self.__task, self.__subtask)
+
+        # if there are results it was waiting for the master to retrieve them
+        if self.__results:
+            return (WORKER_STATUS_FINISHED, self.__task, self.__subtask)
+
+        return (WORKER_STATUS_IDLE,)
 
 
     """
-    Callback that is called when a job is run in non_blocking mode.  This function
-    saves the results until retrieved by get_results()
+    Callback that is called when a job is run in non_blocking mode.
     """
     def work_complete(self, results):
-        _results = results
         self.__task = None
-        self.master.callRemote("send_results", results)
+
+        # if the master is still there send the results
+        if self.master:
+            deferred = self.master.callRemote("send_results", results)
+            deferred.addErrback(self.send_results_failed, results)
+
+        # master disapeared, hold results until it requests them
+        else:
+            self.__results = results
+
+    """
+    Errback called when sending results to the master fails.  Worker
+    should hold onto results until the master requests it.
+
+    TODO examine auto-resend.  its possible the first re-send could fail
+    if it fails for a reason other than the master is offline then results
+    will never be retrieved
+    """
+    def send_results_failed(results, task_results):
+        self.__results = task_results
+
 
     """
     Requests a work unit be handled by another worker in the cluster
@@ -122,7 +184,6 @@ class Worker(pb.Referenceable):
     def get_worker(self):
         return self
 
-
     # returns the status of this node
     def remote_status(self):
         return self.status()
@@ -135,6 +196,12 @@ class Worker(pb.Referenceable):
     def remote_run_task(self, key, args={}, subtask_key=None, available_workers=1):
         return self.run_task(key, args, subtask_key, available_workers)
 
+    # allows the master to request results
+    def remote_send_results(self):
+        deferred = self.master.callRemote('send_results', self.__results)
+        deferred.addErrback(self.send_results_failed, results)
+
+        return 1
 
 
 if __name__ == "__main__":

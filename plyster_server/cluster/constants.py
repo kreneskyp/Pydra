@@ -1,0 +1,8 @@
+
+
+"""
+Worker Statuses
+"""
+WORKER_STATUS_IDLE       = 0
+WORKER_STATUS_WORKING    = 1
+WORKER_STATUS_FINISHED   = 2
