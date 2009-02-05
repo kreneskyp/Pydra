@@ -1,4 +1,5 @@
 from tasks import *
+from plyster_server.models import TaskInstance
 
 """ TaskManager - Class that tracks and controls tasks
 """
@@ -41,7 +42,7 @@ class TaskManager():
             tasklist = []
 
         #turn the task into a tuple
-        processedTask = [task.id, parent, task.msg]
+        processedTask = [task.__class__.__name__, parent, task.msg]
 
         #add that task to the list
         tasklist.append(processedTask)
@@ -81,14 +82,21 @@ class TaskManager():
     listTasks - builds a list of tasks
     @param keys: filters list to include only these tasks
     """
-    def listTasks(self, keys=None):
+    def list_tasks(self, toplevel=True, keys=None):
         message = {}
         # show all tasks by default
         if keys == None:
             keys = self.registry.keys()
 
         for key in keys:
-            message[key] = self.processTask(self.registry[key])
+            try:
+                last_run_instance = TaskInstance.objects.exclude(completed=None).order_by('-completed').values('completed')[0]
+                last_run = last_run_instance[0]
+            #no instances
+            except IndexError:
+                last_run = None
+
+            message[key] = {'description':self.registry[key].description ,'last_run':last_run}
 
         return message
 

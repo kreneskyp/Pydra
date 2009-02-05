@@ -38,6 +38,8 @@ class Task(object):
     _status = STATUS_STOPPED
     __callback = None
     workunit = None
+    msg = None
+    description = 'Default description about Task baseclass.'
 
     def __init__(self, msg=None):
         self.msg = msg

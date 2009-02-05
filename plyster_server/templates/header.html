@@ -1,4 +1,6 @@
 <style>
+    * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; font-color: #444; line-height: 25px; padding: 0px; margin: 0px; }
+
     div#headerContainer {
         padding:0px;
         text-align:center;
@@ -67,13 +69,13 @@
     {% if nodes %}
         <div id="submenu">
             <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/edit">Create Node</a></span>
-            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/discover">Discover Nodes</a></span>
+            <span class="menuitem lastmenuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/discover">Discover Nodes</a></span>
         </div>
     {% endif %}
-    {% if jobs %}
+    {% if tasks %}
         <div id="submenu">
             <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/jobs/schedule">Edit Search</a></span>
-            <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/jobs/edit">Plot</a></span>
+            <span class="menuitem lastmenuitem"><a class="menuitem" href="{{SITE_ROOT}}/jobs/edit">Plot</a></span>
         </div>
     {% endif %}
 </div>

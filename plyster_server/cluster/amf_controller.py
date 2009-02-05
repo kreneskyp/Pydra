@@ -69,3 +69,29 @@ class AMFController(object):
             # need to reconnect after a socket error
             self.connect()
             return 0
+
+    """
+    Returns a list of tasks that can be run
+    """
+    def remote_list_tasks(self):
+        try:
+            ret = self.service.list_tasks()
+            print ret
+            return ret
+        except socket.error:
+            # need to reconnect after a socket error
+            self.connect()
+            return 0
+
+    """
+    Requests a task be run
+    """
+    def remote_run_task(self, key):
+        try:
+            ret = self.service.run_task(key)
+            print ret
+            return ret
+        except socket.error:
+            # need to reconnect after a socket error
+            self.connect()
+            return 0

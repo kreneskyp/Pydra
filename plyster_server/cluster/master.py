@@ -18,6 +18,11 @@ if __name__ == '__main__':
 
 
 import os, sys
+import time
+import datetime
+
+from threading import Lock
+
 from zope.interface import implements
 from twisted.cred import portal, checkers
 from twisted.spread import pb
@@ -25,11 +30,11 @@ from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.web import server, resource
 from twisted.cred import credentials
-from threading import Lock
-import time
+from django.utils import simplejson
 
-from plyster_server.models import Node
+from plyster_server.models import Node, TaskInstance
 from plyster_server.cluster.constants import *
+from task_manager import TaskManager
 
 """
 Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code.
@@ -60,20 +65,41 @@ class Master(object):
 
     def __init__(self):
         print '[info] starting master'
+
+        #locks
+        self._lock = Lock()         #general lock, use when multiple shared resources are touched
+        self._lock_queue = Lock()   #for access to __queue
+
+        #tasks queue
+        self.__queue = []
+
+        #cluster management
         self.workers = {}
         self.nodes = self.load_nodes()
         self._workers_idle = []
         self._workers_working = {}
-        self._lock = Lock()
+
+        #connection management
         self.connecting = True
         self.reconnect_count = 0
         self.attempts = None
         self.reconnect_call_ID = None
+
+        #load tasks that are cached locally
+        #the master won't actually run the tasks unless there is also
+        #a node running locally, but it will be used to inform the controller what is available
+        self.task_manager = TaskManager()
+        self.task_manager.autodiscover()
+        self.available_tasks = self.task_manager.registry
+
         self.connect()
 
         self.host = 'localhost'
         self.port = 18800
 
+    """
+    Load node configuration from the database
+    """
     def load_nodes(self):
         print '[info] loading nodes'
         nodes = Node.objects.all()
@@ -224,7 +250,7 @@ class Master(object):
         d = node.ref.callRemote('init', self.host, self.port, node_key_str)
         d.addCallback(self.node_ready, node)
 
-        #reactor.callLater(3, self.run_task, 'TestTask');
+        reactor.callLater(10, self.queue_task, 'TestTask');
         #reactor.callLater(3, self.run_task, 'TestParallelTask');
 
     """ 
@@ -257,10 +283,12 @@ class Master(object):
 
                     #check if the Worker acting as master for this task is ready
                     if (True):
+                        #TODO
                         pass
 
                     #else not ready to send the results
                     else:
+                        #TODO
                         pass
 
                 #otherwise its idle
@@ -286,45 +314,98 @@ class Master(object):
             else:
                 #worker was working on a subtask, return unfinished work to main worker
                 if self._workers_working[1]:
+                    #TODO
                     pass
 
                 #worker was main worker for a task.  cancel the task and tell any
                 #workers working on subtasks to stop.  Cannot recover from the 
                 #main worker going down
                 else:
+                    #TODO
                     pass
 
     """
     Select a worker to use for running a task or subtask
     """
-    def select_worker(self, task_key):
+    def select_worker(self, task_instance_id, task_key, args={}, subtask_key=None):
         #lock, selecting workers must be threadsafe
         with self._lock:
             if len(self._workers_idle):
                 #move the first worker to the working state storing the task its working on
                 worker_key = self._workers_idle.pop(0)
-                self._workers_working[worker_key] = task_key
+                self._workers_working[worker_key] = (task_instance_id, task_key, args, subtask_key)
 
                 #return the worker object, not the key
                 return self.workers[worker_key]
             else:
                 return None
 
-    """
-    Run the task specified by the task_key.  This should create
-    a new instance of the specified task with a unique key
-    """
-    def run_task(self, task_key, args={}, subtask_key=None):
 
-        #If this is a subtask we need to look up the existing task_instance_key
-        #TODO create a better system for generating a key, probably just use django model ID
-        if subtask_key:
-            task_instance_key = task_key
-        else:
-            task_instance_key = task_key
+    """
+    Queue a task to be run.  All task requests come through this method.  It saves their
+    information in the database.  If the cluster has idle resources it will start the task
+    immediately, otherwise it will queue the task until it is ready.
+    """
+    def queue_task(self, task_key, args={}, subtask_key=None):
+        print '[info] Task:%s:%s - Queued' % (task_key, subtask_key)
+
+        #create a TaskInstance instance and save it
+        task_instance = TaskInstance()
+        task_instance.task_key = task_key
+        task_instance.subtask_key = subtask_key
+        task_instance.args = simplejson.dumps(args)
+        task_instance.save()
+
+        #queue the task and signal attempt to start it
+        with self._lock_queue:
+            self.__queue.append(task_instance)
+        self.advance_queue()
+
+        return task_instance
+
+
+    """
+    Advances the queue.  If there is a task waiting it will be started, otherwise the cluster will idle.
+    This should be called whenever a resource becomes available or a new task is queued
+    """
+    def advance_queue(self):
+        print '[debug] advancing queue'
+        with self._lock_queue:
+            try:
+                task_instance = self.__queue[0]
+
+            except IndexError:
+                #if there was nothing in the queue then fail silently
+                print '[debug] No tasks in queue, idling'
+                return False
+
+            if self.run_task(task_instance.id, task_instance.task_key, simplejson.loads(task_instance.args), task_instance.subtask_key):
+                #task started, update its info and remove it from the queue
+                print '[info] Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key)
+                task_instance.started = time.strftime('%Y-%m-%d %H:%M:%S')
+                task_instance.save()
+                del self.__queue[0]
+
+            else:
+                # cluster does not have idle resources.
+                # task will stay in the queue
+                print '[debug] Task:%s:%s - no resources available, remaining in queue' % (task_instance.task_key, task_instance.subtask_key)
+                return False
+
+
+    """
+    Run the task specified by the task_key.  This shouldn't be called directly.  Tasks should
+    be queued with queue_task().  If the cluster has idle resources it will be run automatically
+
+    This function is used internally by the cluster for parallel processing work requests.  Work
+    requests are never queued.  If there is no resource available the main worker for the task
+    should be informed and it can readjust its count of available resources.  Any type of resource
+    sharing logic should be handled within select_worker() to keep the logic organized.
+    """
+    def run_task(self, task_instance_id, task_key, args={}, subtask_key=None):
 
         # get a worker for this task
-        worker = self.select_worker(task_instance_key)
+        worker = self.select_worker(task_instance_id, task_key, args, subtask_key)
 
         # determine how many workers are available for this task
         available_workers = len(self._workers_idle)+1
@@ -332,14 +413,14 @@ class Master(object):
         if worker:
             d = worker.remote.callRemote('run_task', task_key, args, subtask_key, available_workers)
             d.addCallback(self.my_print)
-
-            #TODO remove after testing
-            #reactor.callLater(3, worker.remote.callRemote, 'status')
+            return 1
 
         # no worker was available
-        # TODO determine how to handle unavailable workers
+        # just return 0 (false), the calling function will decided what to do,
+        # depending what called run_task, different error handling will apply
         else:
             print '[warning] No worker available'
+            return 0
 
     """
     Called by workers when they have completed their task.
@@ -347,15 +428,32 @@ class Master(object):
         Tasks runtime and log should be saved in the database
     """
     def send_results(self, worker_key, results):
-        # release the worker back into the idle pool
-        del self._workers_working[worker_key]
-        self._workers_idle.append(worker_key)
+        print '[debug] Worker:%s - sent results: %s' % (worker_key, results)
+        with self._lock:
+            task_instance_id, task_key, args, subtask_key = self._workers_working[worker_key]
+            print '[info] Worker:%s - completed: %s:%s' % (worker_key, task_key, subtask_key)
+
+            # release the worker back into the idle pool
+            # this must be done before informing the 
+            # main worker.  otherwise a new work request
+            # can be made before the worker is released
+            del self._workers_working[worker_key]
+            self._workers_idle.append(worker_key)
+
 
         #if this was the root task for the job then save info
+        if not subtask_key:
+            task_instance = TaskInstance.objects.get(id=task_instance_id)
+            task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
+            task_instance.save()
 
         #if this was a subtask the main task needs to be informed
+        else:
+            #TODO
+            pass
 
-        print results
+        #attempt to advance the queue
+        self.advance_queue()
 
 
     """
@@ -504,6 +602,10 @@ class AMFInterface(pb.Root):
         self.master = master
         self.checker = checker
 
+    def auth(self, user, password):
+        authenticator = AMFAuthenticator(checker)
+        return authenticator.auth(user, password)
+
     def is_alive(self, _):
         print '[debug] is alive'
         return 1
@@ -536,9 +638,14 @@ class AMFInterface(pb.Root):
                                }
         return node_status
 
-    def auth(self, user, password):
-        authenticator = AMFAuthenticator(checker)
-        return authenticator.auth(user, password)
+    def list_tasks(self, _):
+        return self.master.task_manager.list_tasks()
+
+    def run_task(self, _, key):
+        return self.master.queue_task(key)
+
+    def task_status(self, _):
+        return self.master.task_manager.task_status()
 
 
 

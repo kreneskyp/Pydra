@@ -8,6 +8,7 @@ urlpatterns = patterns('',
     (r'^nodes/edit/(\d?)$', node_edit),
     (r'^nodes/status/$', node_status),
     (r'^jobs/$', jobs),
+    (r'^jobs/run/$', run_task),
 )
 
 

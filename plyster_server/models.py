@@ -50,11 +50,26 @@ class Node(models.Model):
 
 
 """
+Custom manager overridden to supply pre-made queryset for queued and running tasks
+"""
+class TaskInstanceManager(models.Manager):
+    def queued(self):
+        return self.filter(started=None)
+
+    def running(self):
+        return self.filter(completed=None).exclude(started=None)
+
+
+"""
 Represents and instance of a Task.  This is used to track when a Task was run
 and whether it completed.
 """
 class TaskInstance(models.Model):
     task_key    = models.CharField(max_length=255)
-    queued      = models.DateField()
-    started     = models.DateField()
-    completed   = models.DateField()
+    subtask_key = models.CharField(max_length=255, null=True)
+    args        = models.TextField(null=True)
+    queued      = models.DateTimeField(auto_now_add=True)
+    started     = models.DateTimeField(null=True)
+    completed   = models.DateTimeField(null=True)
+
+    objects = TaskInstanceManager()

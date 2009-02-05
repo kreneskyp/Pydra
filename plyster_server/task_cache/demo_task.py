@@ -11,6 +11,7 @@ if this task is used in a sequence of tasks
 class TestTask(Task):
     count = 0
     stop = 5
+    description = 'A Demo task that counts to 5, taking a nap after each number'
 
     def __init__(self, msg='Demo Task'):
         Task.__init__(self, msg)
@@ -58,6 +59,9 @@ Top level task for the test
 Extends TaskContainer only so that it can encapsulate the creation of its children
 """
 class TestContainerTask(TaskContainer):
+
+    description = 'A demo task that illustrates a ContainerTask.  This task runs 3 TestTasks sequentially'
+
     def __init__(self, msg=None):
         TaskContainer.__init__(self, msg)
 
@@ -66,11 +70,13 @@ class TestContainerTask(TaskContainer):
         self.addTask(TestTask('child 2'))
         self.addTask(TestTask('child 3'))
 
-
 """
 Example class for running tests in parallel
 """
 class TestParallelTask(ParallelTask):
+
+    description = 'A demo task illustrating a Parallel task.  This task runs 5 TestTasks at the same time'
+
     _data = range(5)
     _finished = []
 
