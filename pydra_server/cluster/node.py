@@ -85,7 +85,7 @@ class NodeServer:
     """
     def start_workers(self):
         self.pids = [
-            Popen(["python", "plyster_server/cluster/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
+            Popen(["python", "pydra_server/cluster/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
             for i in range(self.info['cores'])
             ]
 

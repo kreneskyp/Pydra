@@ -1,5 +1,5 @@
 from tasks import *
-from plyster_server.models import TaskInstance
+from pydra_server.models import TaskInstance
 
 """ TaskManager - Class that tracks and controls tasks
 """
@@ -145,13 +145,13 @@ class TaskManager():
         import inspect
 
         # Step 1: get all python files in the tasks directory
-        files = os.listdir('./plyster_server/task_cache')
+        files = os.listdir('./pydra_server/task_cache')
 
         # Step 2: iterate through all the python files importing each one and 
         #         and add it as an available Task
         for filename in files:
             if filename <> '__init__.py' and filename[-3:] == '.py':
-                module = 'plyster_server.task_cache.%s' % filename[:-3]
+                module = 'pydra_server.task_cache.%s' % filename[:-3]
                 tasks = __import__(module, {}, {}, ['Task'])
 
                 # iterate through the objects in  the module to find Tasks

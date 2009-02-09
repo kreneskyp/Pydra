@@ -14,9 +14,9 @@ pydraSettings = PydraSettings('Pydra')
 
 # set defaults for settings
 if not pydraSettings.host:
-    set_setting_value('plyster_server.models', '', 'host', 'localhost')
+    set_setting_value('pydra_server.models', '', 'host', 'localhost')
 if not pydraSettings.port:
-    set_setting_value('plyster_server.models', '', 'port', 18800)
+    set_setting_value('pydra_server.models', '', 'port', 18800)
 
 
 """ ================================

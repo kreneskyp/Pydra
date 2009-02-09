@@ -1,4 +1,4 @@
-# Django settings for plyster project.
+# Django settings for pydra project.
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG

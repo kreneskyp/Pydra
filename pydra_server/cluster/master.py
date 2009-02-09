@@ -32,8 +32,8 @@ from twisted.web import server, resource
 from twisted.cred import credentials
 from django.utils import simplejson
 
-from plyster_server.models import Node, TaskInstance
-from plyster_server.cluster.constants import *
+from pydra_server.models import Node, TaskInstance
+from pydra_server.cluster.constants import *
 from task_manager import TaskManager
 
 """

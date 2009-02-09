@@ -7,7 +7,7 @@ from django.http import HttpResponse
 
 import math
 
-from plyster_server.models import Node, TaskInstance, pydraSettings
+from pydra_server.models import Node, TaskInstance, pydraSettings
 from cluster.amf_controller import AMFController
 from forms import NodeForm
 from models import pydraSettings
