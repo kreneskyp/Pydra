@@ -7,7 +7,7 @@ from django.http import HttpResponse
 
 import math
 
-from plyster_server.models import Node, pydraSettings
+from plyster_server.models import Node, TaskInstance, pydraSettings
 from cluster.amf_controller import AMFController
 from forms import NodeForm
 from models import pydraSettings
@@ -75,7 +75,6 @@ Handler for creating and editing nodes
 def node_edit(request, id=None):
     if request.method == 'POST': 
         if id:
-            print id
             node = Node(pk=id)
             form = NodeForm(request.POST, instance=node) 
         else:
@@ -113,13 +112,15 @@ def node_status(request):
 handler for displaying jobs
 """
 def jobs(request):
-    json_list = pydra_controller.remote_list_tasks()
-    print json_list
-    #tasks = simplejson.loads(json_list)
+    tasks = pydra_controller.remote_list_tasks()
+    queue = TaskInstance.objects.queued()
+    running = TaskInstance.objects.running()
 
     return render_to_response('tasks.html', {
         'MEDIA_URL': settings.MEDIA_URL,
-        'tasks': json_list
+        'tasks': tasks,
+        'queue': queue,
+        'running': running,
     }, context_instance=RequestContext(request, processors=[pydra_processor]))
 
 """

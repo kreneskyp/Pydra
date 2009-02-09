@@ -110,7 +110,7 @@ class Worker(pb.Referenceable):
     """
      Runs a task on this worker
     """
-    def run_task(self, key, args={}, subtask_key=None, available_workers=1):
+    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, available_workers=1):
         #Check to ensure this worker is not already busy.
         # The Master should catch this but lets be defensive.
         with self.__lock:
@@ -118,10 +118,11 @@ class Worker(pb.Referenceable):
                 return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
             self.__task = key
             self.__subtask = subtask_key
+            self.__workunit_key = workunit_key
 
         self.available_workers = available_workers
 
-        print 'Starting task: %s' % key
+        print '[info] Worker:%s - starting task: %s:%s' % (self.worker_key, key,subtask_key)
 
         #create an instance of the requested task
         self.__task_instance = object.__new__(self.available_tasks[key])
@@ -154,8 +155,8 @@ class Worker(pb.Referenceable):
 
         # if the master is still there send the results
         if self.master:
-            deferred = self.master.callRemote("send_results", results)
-            deferred.addErrback(self.send_results_failed, results)
+            deferred = self.master.callRemote("send_results", results, self.__workunit_key)
+            deferred.addErrback(self.send_results_failed, results, self.__workunit_key)
 
         # master disapeared, hold results until it requests them
         else:
@@ -169,15 +170,24 @@ class Worker(pb.Referenceable):
     if it fails for a reason other than the master is offline then results
     will never be retrieved
     """
-    def send_results_failed(results, task_results):
+    def send_results_failed(self, results, task_results, workunit_key):
         self.__results = task_results
+        self.__workunit_key = workunit_key
 
+
+    """
+    Function called to make the subtask receive the results processed by another worker
+    """
+    def receive_results(self, results, subtask_key, workunit_key):
+        subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
+        subtask.parent._work_unit_complete(results, workunit_key)
 
     """
     Requests a work unit be handled by another worker in the cluster
     """
-    def request_worker(self, subtask_key, args):
-        deferred = self.master.request_worker(self.__task, subtask_key, args)
+    def request_worker(self, subtask_key, args, workunit_key):
+        print '[info] Worker:%s - requesting worker for: %s' % (self.worker_key, subtask_key)
+        deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
 
     """
     Recursive function so tasks can find this worker
@@ -194,16 +204,12 @@ class Worker(pb.Referenceable):
         return self.available_tasks.keys()
 
     # run a task
-    def remote_run_task(self, key, args={}, subtask_key=None, available_workers=1):
-        return self.run_task(key, args, subtask_key, available_workers)
+    def remote_run_task(self, key, args={}, subtask_key=None, workunit_key=None, available_workers=1):
+        return self.run_task(key, args, subtask_key, workunit_key, available_workers)
 
     # allows the master to request results
-    def remote_send_results(self):
-        deferred = self.master.callRemote('send_results', self.__results)
-        deferred.addErrback(self.send_results_failed, results)
-
-        return 1
-
+    def remote_receive_results(self, results, subtask_key, workunit_key):
+        return self.receive_results(results, subtask_key, workunit_key)
 
 if __name__ == "__main__":
     master_host = sys.argv[1]

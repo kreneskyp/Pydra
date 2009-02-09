@@ -24,3 +24,16 @@ def node_range(node):
     return range(0,node.cores)
 
 register.filter('node_range',node_range)
+
+"""
+Filter that retrieves a tasks description from a dict of tasks
+using task_key to look it up
+"""
+@register.filter(name='task_description')
+def task_description(tasks, key):
+    print '===================='
+    print tasks
+    print key
+    print '===================='
+    return tasks[key].description
+register.filter('task_description',task_description)

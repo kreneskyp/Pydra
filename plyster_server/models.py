@@ -65,11 +65,13 @@ Represents and instance of a Task.  This is used to track when a Task was run
 and whether it completed.
 """
 class TaskInstance(models.Model):
-    task_key    = models.CharField(max_length=255)
-    subtask_key = models.CharField(max_length=255, null=True)
-    args        = models.TextField(null=True)
-    queued      = models.DateTimeField(auto_now_add=True)
-    started     = models.DateTimeField(null=True)
-    completed   = models.DateTimeField(null=True)
+    task_key        = models.CharField(max_length=255)
+    subtask_key     = models.CharField(max_length=255, null=True)
+    args            = models.TextField(null=True)
+    queued          = models.DateTimeField(auto_now_add=True)
+    started         = models.DateTimeField(null=True)
+    completed       = models.DateTimeField(null=True)
+    worker          = models.CharField(max_length=255, null=True)
+    #completion_type = models.IntegerField(null=True)
 
     objects = TaskInstanceManager()

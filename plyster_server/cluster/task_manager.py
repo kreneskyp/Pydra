@@ -93,7 +93,7 @@ class TaskManager():
                 last_run_instance = TaskInstance.objects.exclude(completed=None).order_by('-completed').values('completed')[0]
                 last_run = last_run_instance[0]
             #no instances
-            except IndexError:
+            except (KeyError, IndexError):
                 last_run = None
 
             message[key] = {'description':self.registry[key].description ,'last_run':last_run}

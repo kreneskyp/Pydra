@@ -77,12 +77,15 @@ class TestParallelTask(ParallelTask):
 
     description = 'A demo task illustrating a Parallel task.  This task runs 5 TestTasks at the same time'
 
-    _data = range(5)
-    _finished = []
+    _data = None
+    _finished = None
 
     def __init__(self):
         ParallelTask.__init__(self)
         self.subtask = TestTask('subtask')
+        #assign data in init otherwise it could be consumed
+        self._data = range(10)
+        self._finished = []
 
     def work_unit_complete(self, data, results):
         print '   Adding results:%s' % results

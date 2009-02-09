@@ -68,10 +68,12 @@ class Master(object):
 
         #locks
         self._lock = Lock()         #general lock, use when multiple shared resources are touched
-        self._lock_queue = Lock()   #for access to __queue
+        self._lock_queue = Lock()   #for access to _queue
 
-        #tasks queue
-        self.__queue = []
+        #load tasks queue
+        self._running = list(TaskInstance.objects.running())
+        self._running_workers = {}
+        self._queue = list(TaskInstance.objects.queued())
 
         #cluster management
         self.workers = {}
@@ -108,6 +110,7 @@ class Master(object):
             node_dict[node.id] = node
         print '[info] %i nodes loaded' % len(nodes)
         return node_dict
+
 
     """
     Make connections to all Nodes that are not connected.  This method is a single control 
@@ -250,7 +253,8 @@ class Master(object):
         d = node.ref.callRemote('init', self.host, self.port, node_key_str)
         d.addCallback(self.node_ready, node)
 
-        reactor.callLater(10, self.queue_task, 'TestTask');
+        #TODO Remove
+        #reactor.callLater(10, self.queue_task, 'TestTask');
         #reactor.callLater(3, self.run_task, 'TestParallelTask');
 
     """ 
@@ -313,7 +317,7 @@ class Master(object):
             #worker was working on a task, need to clean it up
             else:
                 #worker was working on a subtask, return unfinished work to main worker
-                if self._workers_working[1]:
+                if self._workers_working[worker_key][3]:
                     #TODO
                     pass
 
@@ -358,7 +362,7 @@ class Master(object):
 
         #queue the task and signal attempt to start it
         with self._lock_queue:
-            self.__queue.append(task_instance)
+            self._queue.append(task_instance)
         self.advance_queue()
 
         return task_instance
@@ -369,10 +373,10 @@ class Master(object):
     This should be called whenever a resource becomes available or a new task is queued
     """
     def advance_queue(self):
-        print '[debug] advancing queue'
+        print '[debug] advancing queue: %s' % self._queue
         with self._lock_queue:
             try:
-                task_instance = self.__queue[0]
+                task_instance = self._queue[0]
 
             except IndexError:
                 #if there was nothing in the queue then fail silently
@@ -384,7 +388,9 @@ class Master(object):
                 print '[info] Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key)
                 task_instance.started = time.strftime('%Y-%m-%d %H:%M:%S')
                 task_instance.save()
-                del self.__queue[0]
+                del self._queue[0]
+
+                self._running.append[task_instance]
 
             else:
                 # cluster does not have idle resources.
@@ -402,7 +408,7 @@ class Master(object):
     should be informed and it can readjust its count of available resources.  Any type of resource
     sharing logic should be handled within select_worker() to keep the logic organized.
     """
-    def run_task(self, task_instance_id, task_key, args={}, subtask_key=None):
+    def run_task(self, task_instance_id, task_key, args={}, subtask_key=None, workunit_key=None):
 
         # get a worker for this task
         worker = self.select_worker(task_instance_id, task_key, args, subtask_key)
@@ -411,8 +417,9 @@ class Master(object):
         available_workers = len(self._workers_idle)+1
 
         if worker:
-            d = worker.remote.callRemote('run_task', task_key, args, subtask_key, available_workers)
-            d.addCallback(self.my_print)
+            print '[debug] Worker:%s - Assigned to task: %s:%s %s' % (worker.name, task_key, subtask_key, args)
+            d = worker.remote.callRemote('run_task', task_key, args, subtask_key, workunit_key, available_workers)
+            d.addCallback(self.run_task_successful, worker, task_instance_id, subtask_key)
             return 1
 
         # no worker was available
@@ -422,16 +429,30 @@ class Master(object):
             print '[warning] No worker available'
             return 0
 
+    def run_task_successful(self, results, worker, task_instance_id, subtask_key=None):
+
+        #save the history of what workers work on what task/subtask
+        #its needed for tracking finished work in ParallelTasks and will aide in Fault recovery
+        #it might also be useful for analysis purposes if one node is faulty
+        if subtask_key:
+            #TODO, update model and record what workers worked on what subtasks
+            pass
+
+        else:
+            task_instance = TaskInstance.objects.get(id=task_instance_id)
+            task_instance.worker = worker.name
+            task_instance.save()
+
     """
     Called by workers when they have completed their task.
 
         Tasks runtime and log should be saved in the database
     """
-    def send_results(self, worker_key, results):
+    def send_results(self, worker_key, results, workunit_key):
         print '[debug] Worker:%s - sent results: %s' % (worker_key, results)
         with self._lock:
             task_instance_id, task_key, args, subtask_key = self._workers_working[worker_key]
-            print '[info] Worker:%s - completed: %s:%s' % (worker_key, task_key, subtask_key)
+            print '[info] Worker:%s - completed: %s:%s (%s)' % (worker_key, task_key, subtask_key, workunit_key)
 
             # release the worker back into the idle pool
             # this must be done before informing the 
@@ -447,10 +468,13 @@ class Master(object):
             task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
             task_instance.save()
 
-        #if this was a subtask the main task needs to be informed
+
+        #if this was a subtask the main task needs the results and to be informed
         else:
-            #TODO
-            pass
+            task_instance = TaskInstance.objects.get(id=task_instance_id)
+            main_worker = self.workers[task_instance.worker]
+            print '[debug] Worker:%s - informed that subtask completed' % 'FOO'
+            main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
 
         #attempt to advance the queue
         self.advance_queue()
@@ -460,15 +484,14 @@ class Master(object):
     Called by workers running a Parallel task.  This is a request
     for a worker in the cluster to process a workunit from a task
     """
-    def request_worker(self, workerAvatar, subtask_key, args):
+    def request_worker(self, workerAvatar, subtask_key, args, workunit_key):
         #get the task key and run the task.  The key is looked up
         #here so that a worker can only request a worker for the 
         #their current task.
-        task_key = self._workers_working[workerAvatar.name] 
-        self.run_task(task_key, subtask_key)
-
-    def my_print(self, str):
-        print str
+        print self._workers_working
+        worker = self._workers_working[workerAvatar.name]
+        print '[debug] Worker:%s - request for worker: %s:%s' % (workerAvatar.name, subtask_key, args)
+        self.run_task(worker[0], worker[1], args, subtask_key, workunit_key)
 
 """
 Realm used by the Master server to assign avatars.
@@ -497,7 +520,7 @@ class MasterRealm:
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
 
 """
-Avatar used by Workers connecting to the Master.   
+Avatar used by Workers connecting to the Master.
 """
 class WorkerAvatar(pb.Avatar):
     def __init__(self, name):
@@ -515,15 +538,15 @@ class WorkerAvatar(pb.Avatar):
     Called by workers when they have completed their task and need to report the results.
        * Tasks runtime and log should be saved in the database
     """
-    def perspective_send_results(self, results):
-        return self.server.send_results(self.name, results)
+    def perspective_send_results(self, results, workunit_key):
+        return self.server.send_results(self.name, results, workunit_key)
 
     """
     Called by workers running a Parallel task.  This is a request
     for a worker in the cluster to process the args sent
     """
-    def perspective_request_worker(self, subtask_key, args):
-        return self.server.request_worker(self, subtask_key, args)
+    def perspective_request_worker(self, subtask_key, args, workunit_key):
+        return self.server.request_worker(self, subtask_key, args, workunit_key)
 
 
 """
@@ -548,7 +571,7 @@ class ControllerAvatar(pb.Avatar):
     """
     Called to start a task
     """
-    def perspective_run_task(self, task_key, args):
+    def perspective_run_task(self, subtask_key, args):
         return self.server.request_worker(self, subtask_key, args)
 
     """
@@ -640,6 +663,9 @@ class AMFInterface(pb.Root):
 
     def list_tasks(self, _):
         return self.master.task_manager.list_tasks()
+
+    def list_queue(self, _):
+        return self.master._queue
 
     def run_task(self, _, key):
         return self.master.queue_task(key)

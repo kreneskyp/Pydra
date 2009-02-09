@@ -1,4 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+{% load pydra_extras %}
+
 <html>
     <head>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
@@ -218,12 +221,12 @@
                 </tr>
             </thead>
 
-            {% for key,topleveltask in tasks.items %}
+            {% for task in queue %}
                 <tr>
                     <td>{{forloop.counter}}</td>
-                    <td>{{key}}</td>
-                    <td></td>
-                    <td></td>
+                    <td>{{task.task_key}}</td>
+                    <td>{{tasks|task_description:task.task_key}}</td>
+                    <td class="center">{{task.queued}}</td>
                     <td>
                         <input type="button" value="Up"/>
                         <input type="button" value="Down"/>
@@ -245,12 +248,12 @@
                 </tr>
             </thead>
 
-            {% for key,topleveltask in tasks.items %}
+            {% for task in running %}
                 <tr>
-                    <td>{{key}}</td>
-                    <td>[description]</td>
-                    <td class="center">[queue_time]</td>
-                    <td class="center">[start_time]</td>
+                    <td>{{task.task_key}}</td>
+                    <td>{{tasks|task_description:task.task_key}}</td>
+                    <td class="center">{{task.queued}}</td>
+                    <td class="center">{{task.started}}</td>
                     <td class="center">
                         <input type="button" value="Stop"/>
                     </td>

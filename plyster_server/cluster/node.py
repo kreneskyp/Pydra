@@ -50,7 +50,7 @@ class NodeServer:
     Builds a dictionary of useful information about this Node
     """
     def determine_info(self):
-        cores = 1 #self.detect_cores()
+        cores = self.detect_cores()
 
         self.info = {
             'cpu':2600,             # CPU MHZ per core
