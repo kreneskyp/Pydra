@@ -86,5 +86,5 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sites',
     'dbsettings',
-    'plyster_server',
+    'pydra_server',
 )

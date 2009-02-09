@@ -43,10 +43,10 @@ class Controller(object):
         # Solver connections will be indexed by (ip, port):
         self.solvers = dict.fromkeys([("localhost", i) for i in range(startIP, startIP + cores)])
         # Start a subprocess on a core for each solver:
-        self.pids = [Popen(["python", "solver.py", tsr(port)]).pid for ip, port in self.solvers]
-        print "PIDs:", self.pids
-        self.connected = False
-        reactor.callLater(1, self.connect) # Give the solvers time to start
+        #self.pids = [Popen(["python", "solver.py", tsr(port)]).pid for ip, port in self.solvers]
+        #print "PIDs:", self.pids
+        #self.connected = False
+        #reactor.callLater(1, self.connect) # Give the solvers time to start
 
     def connect(self):
         "Begin the connection process"
@@ -109,8 +109,8 @@ class FlexInterface(pb.Root):
     def __init__(self, controller):
         self.controller = controller
 
-    def start(self, _):
-        self.controller.start()
+    def test(self, _):
+        #self.controller.start()
         return "Starting parallel jobs"
 
     def terminate(self, _):
@@ -130,6 +130,6 @@ if __name__ == "__main__":
     root = resource.Resource()
     root.putChild("", gateway)
     # Tell the twisted reactor to listen:
-    reactor.listenTCP(FlexControlPanelPort, server.Site(root))
+    reactor.listenTCP(18801, server.Site(root))
     # One reactor runs all servers and clients:
     reactor.run()
