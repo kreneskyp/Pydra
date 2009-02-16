@@ -1,3 +1,20 @@
+"""
+    This file is part of Pydra.
+
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
 from django.template.defaultfilters import stringfilter
 from django import template
 register = template.Library()
@@ -21,7 +38,12 @@ def node_range(node):
     if node.cores_available:
         return range(0,node.cores_available)
 
-    return range(0,node.cores)
+    #default to all cores
+    if node.cores:
+        return range(0,node.cores)
+
+    #node hasn't been initialized, we don't know how many cores it has
+    return None
 
 register.filter('node_range',node_range)
 
