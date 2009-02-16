@@ -26,17 +26,15 @@ from dbsettings.loading import set_setting_value
 """ ================================
 Settings
 ================================ """
-class PydraSettings(dbsettings.Group):
-    host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect')
-    port        = dbsettings.IntegerValue('port','Port for this server')
-pydraSettings = PydraSettings('Pydra')
+from _mysql_exceptions import ProgrammingError
+try:
+    class PydraSettings(dbsettings.Group):
+        host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect', default='localhost')
+        port        = dbsettings.IntegerValue('port','Port for this server', default=18800)
+    pydraSettings = PydraSettings('Pydra')
 
-# set defaults for settings
-if not pydraSettings.host:
-    set_setting_value('pydra_server.models', '', 'host', 'localhost')
-if not pydraSettings.port:
-    set_setting_value('pydra_server.models', '', 'port', 18800)
-
+except ProgrammingError:
+    pass #table hasnt been created yet 
 
 """ ================================
 Models
@@ -73,10 +71,10 @@ Custom manager overridden to supply pre-made queryset for queued and running tas
 """
 class TaskInstanceManager(models.Manager):
     def queued(self):
-        return self.filter(started=None)
+        return self.filter(completion_type=None, started=None)
 
     def running(self):
-        return self.filter(completed=None).exclude(started=None)
+        return self.filter(completion_type=None).exclude(started=None)
 
 
 """
@@ -91,6 +89,6 @@ class TaskInstance(models.Model):
     started         = models.DateTimeField(null=True)
     completed       = models.DateTimeField(null=True)
     worker          = models.CharField(max_length=255, null=True)
-    #completion_type = models.IntegerField(null=True)
+    completion_type = models.IntegerField(null=True)
 
     objects = TaskInstanceManager()

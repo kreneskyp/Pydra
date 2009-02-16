@@ -40,11 +40,12 @@ any longer, but it will improve resource usage slightly
 """
 pydra_controller = AMFController(pydraSettings.host , pydraSettings.port)
 
-"""
-Pydra_processor is used by any view that will need information or control
-over the master server
-"""
+
 def pydra_processor(request):
+    """
+    Pydra_processor is used by any view that will need information or control
+    over the master server
+    """
     global pydra_controller
 
     if pydra_controller == None:
@@ -53,11 +54,11 @@ def pydra_processor(request):
     return {'controller':pydra_controller}
 
 
-
-"""
-display nodes
-"""
 def nodes(request):
+    """
+    display nodes
+    """
+
     # get nodes
     nodes = Node.objects.all()
 
@@ -88,10 +89,11 @@ def nodes(request):
     }, context_instance=RequestContext(request, processors=[pydra_processor]))
 
 
-"""
-Handler for creating and editing nodes
-"""
+
 def node_edit(request, id=None):
+    """
+    Handler for creating and editing nodes
+    """
     if request.method == 'POST': 
         if id:
             node = Node(pk=id)
@@ -117,20 +119,22 @@ def node_edit(request, id=None):
     }, context_instance=RequestContext(request))
 
 
-"""
-Retrieves Status of nodes
-"""
+
 def node_status(request):
+    """
+    Retrieves Status of nodes
+    """
     c = RequestContext(request, {
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
     return HttpResponse(pydra_controller.remote_node_status(), mimetype='application/javascript')
 
 
-"""
-handler for displaying jobs
-"""
+
 def jobs(request):
+    """
+    handler for displaying jobs
+    """
     tasks = pydra_controller.remote_list_tasks()
     queue = TaskInstance.objects.queued()
     running = TaskInstance.objects.running()
@@ -142,23 +146,36 @@ def jobs(request):
         'running': running,
     }, context_instance=RequestContext(request, processors=[pydra_processor]))
 
-"""
-Handler for retrieving status 
-"""
+
 def task_progress(request):
+    """
+    Handler for retrieving status 
+    """
     c = RequestContext(request, {
-        'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
 
     return HttpResponse(pydra_controller.remote_task_status(), mimetype='application/javascript')
 
 
 def run_task(request):
+    """
+    handler for sending a run_task signal
+    """
     key = request.POST['key']
 
     c = RequestContext(request, {
-        'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
 
     return HttpResponse(pydra_controller.remote_run_task(key), mimetype='application/javascript')
 
+
+def cancel_task(request):
+    """
+    handler for sending a cancel_task signal
+    """
+    id = request.POST['i']
+
+    c = RequestContext(request, {
+    }, [pydra_processor])
+
+    return HttpResponse(pydra_controller.remote_cancel_task(id), mimetype='application/javascript')

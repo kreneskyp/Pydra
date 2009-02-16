@@ -28,6 +28,7 @@ urlpatterns = patterns('',
     (r'^nodes/status/$', node_status),
     (r'^jobs/$', jobs),
     (r'^jobs/run/$', run_task),
+    (r'^jobs/cancel/$', cancel_task),
 )
 
 

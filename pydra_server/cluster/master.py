@@ -387,6 +387,27 @@ class Master(object):
         return task_instance
 
 
+    def cancel_task(self, task_id):
+        """
+        Cancel a task.  This function is used to cancel a task that was scheduled. 
+        If the task is in the queue still, remove it.  If it is running then
+        send signals to all workers assigned to it to stop work immediately.
+        """
+        task_instance = TaskInstance.objects.get(id=task_id)
+
+        with self._lock_queue:
+            if task_instance in self._queue:
+                #was still in queue
+                self._queue.remove(task_instance)
+                task_instance.completion_type=-1
+                task_instance.save()
+                return 1
+
+            else:
+                #not in queue, must be running
+                #self._running
+                pass
+
     """
     Advances the queue.  If there is a task waiting it will be started, otherwise the cluster will idle.
     This should be called whenever a resource becomes available or a new task is queued
@@ -485,6 +506,7 @@ class Master(object):
         if not subtask_key:
             task_instance = TaskInstance.objects.get(id=task_instance_id)
             task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
+            task_instance.completion_type = 1
             task_instance.save()
 
 
@@ -692,6 +714,8 @@ class AMFInterface(pb.Root):
     def task_status(self, _):
         return self.master.task_manager.task_status()
 
+    def cancel_task(self, _, task_id):
+        return self.master.cancel_task(task_id)
 
 
 if __name__ == "__main__":

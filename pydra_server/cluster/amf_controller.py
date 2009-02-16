@@ -21,15 +21,16 @@ from pyamf.remoting.client import RemotingService
 from django.utils import simplejson
 import socket
 
-"""
-AMFController - AMFController is a client for controlling the cluster via pyAMF, the actionscript
-             messaging protocol.  While this app does not now and has no plans for interacting 
-             with adobe flash.  The pyAMF protocol allows remoting in an asynchronous fashion.  
-             This is ideal for the Controller usecase.  Implementations using sockets resulted in
-             connections that would not exit properly when django is run with apache. Additionally, 
-             Twisted reactor does not play well with django server so a twisted client is not possible
-"""
+
 class AMFController(object):
+    """
+    AMFController - AMFController is a client for controlling the cluster via pyAMF, the actionscript
+                messaging protocol.  While this app does not now and has no plans for interacting 
+                with adobe flash.  The pyAMF protocol allows remoting in an asynchronous fashion.  
+                This is ideal for the Controller usecase.  Implementations using sockets resulted in
+                connections that would not exit properly when django is run with apache. Additionally, 
+                Twisted reactor does not play well with django server so a twisted client is not possible
+    """
 
     services_exposed_as_properties = [
         'is_alive',
@@ -43,10 +44,11 @@ class AMFController(object):
         print '[Info] Pydra Controller Started'
         self.connect()
 
-    """
-    Overridden to lookup some functions as properties
-    """
+
     def __getattr__(self, key):
+        """
+        Overridden to lookup some functions as properties
+        """
         #check to see if this is a function acting as a property
         if key in self.services_exposed_as_properties:
             return self.__class__.__dict__['remote_%s' % key](self)
@@ -54,20 +56,20 @@ class AMFController(object):
         return self.__dict__[key]
 
 
-    """
-    Setup the client and service
-    """
     def connect(self):
+        """
+        Setup the client and service
+        """
         #connect
         self.client = RemotingService('http://127.0.0.1:18801')
         self.client.setCredentials('controller','1234')
         self.service = self.client.getService('controller')
 
 
-    """
-    Simple ping just to see if connection is active
-    """
     def remote_is_alive(self):
+        """
+        Simple ping just to see if connection is active
+        """
         try:
             return self.service.is_alive()
         except socket.error:
@@ -76,10 +78,10 @@ class AMFController(object):
             return 0
 
 
-    """
-    Returns a json'ified list of status for nodes/workers
-    """
     def remote_node_status(self):
+        """
+        Returns a json'ified list of status for nodes/workers
+        """
         try:
             ret = self.service.node_status()
             print ret
@@ -89,10 +91,11 @@ class AMFController(object):
             self.connect()
             return 0
 
-    """
-    Returns a list of tasks that can be run
-    """
+
     def remote_list_tasks(self):
+        """
+        Returns a list of tasks that can be run
+        """
         try:
             ret = self.service.list_tasks()
             return ret
@@ -101,10 +104,11 @@ class AMFController(object):
             self.connect()
             return 0
 
-    """
-    Returns a list of tasks that can be run
-    """
+
     def remote_list_queue(self):
+        """
+        Returns a list of tasks that can be run
+        """
         try:
             ret = self.service.list_queue()
             print ret
@@ -114,10 +118,11 @@ class AMFController(object):
             self.connect()
             return 0
 
-    """
-    Returns a list of tasks that can be run
-    """
+
     def remote_list_running(self):
+        """
+        Returns a list of tasks that can be run
+        """
         try:
             ret = self.service.list_running()
             print ret
@@ -127,12 +132,28 @@ class AMFController(object):
             self.connect()
             return 0
 
-    """
-    Requests a task be run
-    """
+
     def remote_run_task(self, key):
+        """
+        Requests a task be run
+        """
         try:
             ret = self.service.run_task(key)
+            return ret
+        except socket.error:
+            # need to reconnect after a socket error
+            self.connect()
+            return 0
+
+
+    def remote_cancel_task(self, id):
+        """
+        Cancels a task.  This is used for tasks in the queue and 
+        tasks that are running.  Its the same function because that
+        state can change before this method reaches the remote server
+        """
+        try:
+            ret = self.service.cancel_task(id)
             print ret
             return ret
         except socket.error:

@@ -22,11 +22,11 @@
 
 <html>
     <head>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.progressbar.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/json2.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.acts_as_tree_table.js"></script>
-        
+
         <script>
             $(document).ready(function() {
                 //$('table[id^=taskstable-]').acts_as_tree_table({default_state:'collapsed'});
@@ -35,8 +35,12 @@
                 //$('span.progressbar').hide();
                 //$('span.progressbar').progressBar({barImage: 'http://doors.osuosl.org/media/images/progressbg_yellow.gif', boxImage:'http://doors.osuosl.org/media/images/progressbar.gif'});
 
-                $('.button-run').click(function(evt) {
+                $('.button_run').live('click', function(evt) {
                     $.post('run/', {'key':evt.target.parentNode.parentNode.id});
+                });
+
+                $('.button_cancel').live('click', function(evt) {
+                    $.post('cancel/', {'i':evt.target.parentNode.parentNode.id});
                 });
 
                 // AUTO UPDATES ARE DISABLED
@@ -103,15 +107,15 @@
                             if (!(elt.hasClass(CLASS_RUNNING) || elt.hasClass(CLASS_PAUSED))) {
                                 $(taskSelectString + ' span.progressbar').show();
                             }
-                            
+
                             // expand tree if needed
                             if (elt.hasClass('collapsed')) {
                                 elt.toggle();
                             }
-                            
+
                             //update progressbar
                             $(taskSelectString + ' .progressbar').progressBar(progress);
-                            
+
                             //set status
                             removeAllStatus(elt);
                             elt.addClass(CLASS_RUNNING);
@@ -220,7 +224,7 @@
                     <td class="center">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
                     <td class="center">[schedule]</td>
                     <td class="center">
-                        <input class="button-run" type="button" value="Run"/>
+                        <input class="button_run" type="button" value="Run"/>
                         <input type="button" value="Schedule"/>
                         <input type="button" value="Log"/>
                     </td>
@@ -240,15 +244,15 @@
             </thead>
 
             {% for task in queue %}
-                <tr>
-                    <td>{{forloop.counter}}</td>
+                <tr id="{{task.id}}">
+                    <td></td>
                     <td>{{task.task_key}}</td>
                     <td>{{tasks|task_description:task.task_key}}</td>
                     <td class="center">{{task.queued}}</td>
                     <td>
                         <input type="button" value="Up"/>
                         <input type="button" value="Down"/>
-                        <input type="button" value="Cancel"/>
+                        <input class="button_cancel" type="button" value="Cancel"/>
                     </td>
                 </tr>
             {% endfor %}
