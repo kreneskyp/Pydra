@@ -62,8 +62,28 @@ def get_setting_storage(module_name, class_name, attribute_name):
 def register_setting(setting):
     if setting not in _settings:
         _settings.insert(setting.key, bisect(list(_settings), setting), setting)
+
+        #Set default value if not set
+        try:
+            Setting.objects.get(
+                module_name=setting.module_name,
+                class_name=setting.class_name,
+                attribute_name=setting.attribute_name,
+            )
+        except Setting.DoesNotExist:
+            set_setting_initial(setting.module_name, setting.class_name, setting.attribute_name, setting.default)
+
     else:
         _settings[setting.key] = setting
+
+def set_setting_initial(module_name, class_name, attribute_name, value):
+    setting = get_setting(module_name, class_name, attribute_name)
+    storage = get_setting_storage(module_name, class_name, attribute_name)
+    storage.value = setting.get_db_prep_save(value)
+    storage.default = setting.get_db_prep_save(value)
+    storage.save()
+    key = _get_cache_key(module_name, class_name, attribute_name)
+    cache.delete(key)
 
 def set_setting_value(module_name, class_name, attribute_name, value):
     setting = get_setting(module_name, class_name, attribute_name)

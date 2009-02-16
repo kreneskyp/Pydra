@@ -3,6 +3,7 @@ import datetime
 from django import forms
 
 from dbsettings.loading import get_setting_storage
+from dbsettings.loading import set_setting_value
 
 try:
     from decimal import Decimal
@@ -17,11 +18,11 @@ class Value(object):
 
     creation_counter = 0
 
-    def __init__(self, description=None, help_text=None, choices=None):
+    def __init__(self, description=None, help_text=None, choices=None, default=None):
         self.description = description
         self.help_text = help_text
         self.choices = choices or []
-
+        self.default = default
         self.creation_counter = Value.creation_counter
         Value.creation_counter += 1
 

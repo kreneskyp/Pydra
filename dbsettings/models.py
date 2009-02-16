@@ -12,6 +12,7 @@ class Setting(models.Model):
     class_name = models.CharField(max_length=255, blank=True)
     attribute_name = models.CharField(max_length=255)
     value = models.CharField(max_length=255, blank=True)
+    default = models.CharField(max_length=255, blank=True)
 
     objects = SettingManager()
 
