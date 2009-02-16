@@ -1,6 +1,8 @@
 #! /usr/bin/python
 
 """
+    Copyright 2009 Oregon State University
+
     This file is part of Pydra.
 
     Pydra is free software: you can redistribute it and/or modify
