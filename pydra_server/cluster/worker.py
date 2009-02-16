@@ -45,11 +45,11 @@ from threading import Lock
 from task_manager import TaskManager
 from constants import *
 
-"""
-   Subclassing of PBClientFactory to add automatic reconnection
-"""
-class MasterClientFactory(pb.PBClientFactory):
 
+class MasterClientFactory(pb.PBClientFactory):
+    """
+    Subclassing of PBClientFactory to add automatic reconnection
+    """
     def __init__(self, reconnect_func, *args, **kwargs):
         pb.PBClientFactory.__init__(self)
         self.reconnect_func = reconnect_func
@@ -67,18 +67,20 @@ class MasterClientFactory(pb.PBClientFactory):
 
 
 
-"""
-Worker - The Worker is the workhorse of the cluster.  It sits and waits for Tasks and SubTasks to be executed
-         Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
-         the first worker will make requests for work to be distributed to other Nodes
-"""
-class Worker(pb.Referenceable):
 
+class Worker(pb.Referenceable):
+    """
+    Worker - The Worker is the workhorse of the cluster.  It sits and waits for Tasks and SubTasks to be executed
+            Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
+            the first worker will make requests for work to be distributed to other Nodes
+    """
     def __init__(self, master_host, master_port, node_key, worker_key):
         self.id = id
         self.__task = None
         self.__results = None
+        self.__stop_flag = None
         self.__lock = Lock()
+        self.__lock_connection = Lock()
         self.master = None
         self.master_host = master_host
         self.master_port = master_port
@@ -94,10 +96,10 @@ class Worker(pb.Referenceable):
         print '[info] Started Worker: %s' % worker_key
         self.connect()
 
-    """
-    Make initial connections to all Nodes
-    """
     def connect(self):
+        """
+        Make initial connections to all Nodes
+        """
         print '[info] worker:%s - connecting to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
         factory = MasterClientFactory(self.reconnect)
         reactor.connectTCP(self.master_host, self.master_port, factory)
@@ -105,7 +107,8 @@ class Worker(pb.Referenceable):
         deferred.addCallbacks(self.connected, self.reconnect, errbackArgs=("Failed to Connect"))
 
     def reconnect(self, *arg, **kw):
-        self.master = None
+        with self.__lock_connection:
+            self.master = None
         reconnect_delay = 5*pow(2, self.reconnect_count)
         #let increment grow exponentially to 5 minutes
         if self.reconnect_count < 6:
@@ -113,24 +116,27 @@ class Worker(pb.Referenceable):
         print '[debug] worker:%s - reconnecting in %i seconds' % (self.worker_key, reconnect_delay)
         self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
-    """
-    Callback called when connection to master is made
-    """
     def connected(self, result):
-        self.master = result
+        """
+        Callback called when connection to master is made
+        """
+        with self.__lock_connection:
+            self.master = result
         self.reconnect_count = 0
         print '[info] worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
 
-    """
-    Callback called when conenction to master fails
-    """
+
     def connect_failed(self, result):
+        """
+        Callback called when conenction to master fails
+        """
         self.reconnect()
 
-    """
-     Runs a task on this worker
-    """
     def run_task(self, key, args={}, subtask_key=None, workunit_key=None, available_workers=1):
+        """
+        Runs a task on this worker
+        """
+
         #Check to ensure this worker is not already busy.
         # The Master should catch this but lets be defensive.
         with self.__lock:
@@ -152,10 +158,18 @@ class Worker(pb.Referenceable):
         return self.__task_instance.start(args, subtask_key, self.work_complete)
 
 
-    """
-    Return the status of the current task if running, else None
-    """
+    def stop_task(self):
+        """
+        Stops the current task
+        """
+        print '[info] %s - Received STOP command' % self.worker_key
+        self.__task_instance._stop()
+
+
     def status(self):
+        """
+        Return the status of the current task if running, else None
+        """
         # if there is a task it must still be running
         if self.__task:
             return (WORKER_STATUS_WORKING, self.__task, self.__subtask)
@@ -167,52 +181,99 @@ class Worker(pb.Referenceable):
         return (WORKER_STATUS_IDLE,)
 
 
-    """
-    Callback that is called when a job is run in non_blocking mode.
-    """
     def work_complete(self, results):
+        """
+        Callback that is called when a job is run in non_blocking mode.
+        """
+        stop_flag = self.__task_instance.STOP_FLAG
         self.__task = None
 
-        # if the master is still there send the results
-        if self.master:
-            deferred = self.master.callRemote("send_results", results, self.__workunit_key)
-            deferred.addErrback(self.send_results_failed, results, self.__workunit_key)
+        if stop_flag:
+            #stop flag, this task was canceled.
+            with self.__lock_connection:
+                if self.master:
+                    deferred = self.master.callRemote("stopped")
+                    deferred.addErrback(self.send_stopped_failed)
+                else:
+                    self.__stop_flag = True
 
-        # master disapeared, hold results until it requests them
         else:
-            self.__results = results
+            #completed normally
+            # if the master is still there send the results
+            with self.__lock_connection:
+                if self.master:
+                    deferred = self.master.callRemote("send_results", results, self.__workunit_key)
+                    deferred.addErrback(self.send_results_failed, results, self.__workunit_key)
 
-    """
-    Errback called when sending results to the master fails.  Worker
-    should hold onto results until the master requests it.
+                # master disapeared, hold results until it requests them
+                else:
+                    self.__results = results
 
-    TODO examine auto-resend.  its possible the first re-send could fail
-    if it fails for a reason other than the master is offline then results
-    will never be retrieved
-    """
+
     def send_results_failed(self, results, task_results, workunit_key):
-        self.__results = task_results
-        self.__workunit_key = workunit_key
+        """
+        Errback called when sending results to the master fails.  resend when
+        master reconnects
+        """
+        with self.__lock_connection:
+            #check again for master.  the lock is released so its possible
+            #master could connect and be set before we set the flags indicating 
+            #the problem
+            if self.master:
+                # reconnected, just resend the call.  The call is recursive from this point
+                # if by some odd chance it disconnects again while sending
+                print 'RESULTS FAILED BUT MASTER STILL HERE'
+                #deferred = self.master.callRemote("send_results", task_results, task_results)
+                #deferred.addErrback(self.send_results_failed, task_results, task_results)
+
+            else:
+                #nope really isn't connected.  set flag.  even if connection is in progress
+                #this thread has the lock and reconnection cant finish till we release it
+                self.__results = task_results
+                self.__workunit_key = workunit_key
 
 
-    """
-    Function called to make the subtask receive the results processed by another worker
-    """
+    def send_stopped_failed(self, results):
+        """
+        failed to send the stopped message.  set the flag and wait for master to reconnect
+        """
+        with self.__lock_connection:
+            #check again for master.  the lock is released so its possible
+            #master could connect and be set before we set the flags indicating 
+            #the problem
+            if master:
+                # reconnected, just resend the call.  The call is recursive from this point
+                # if by some odd chance it disconnects again while sending
+                print 'STOP FAILED BUT MASTER STILL HERE'
+                #deferred = self.master.callRemote("stopped")
+                #deferred.addErrBack(self.send_stopped_failed)
+
+            else:
+                #nope really isn't connected.  set flag.  even if connection is in progress
+                #this thread has the lock and reconnection cant finish till we release it
+                self.__stop_flag = True
+
+
     def receive_results(self, results, subtask_key, workunit_key):
+        """
+        Function called to make the subtask receive the results processed by another worker
+        """
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
         subtask.parent._work_unit_complete(results, workunit_key)
 
-    """
-    Requests a work unit be handled by another worker in the cluster
-    """
+
     def request_worker(self, subtask_key, args, workunit_key):
+        """
+        Requests a work unit be handled by another worker in the cluster
+        """
         print '[info] Worker:%s - requesting worker for: %s' % (self.worker_key, subtask_key)
         deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
 
-    """
-    Recursive function so tasks can find this worker
-    """
+
     def get_worker(self):
+        """
+        Recursive function so tasks can find this worker
+        """
         return self
 
     # returns the status of this node
@@ -226,6 +287,9 @@ class Worker(pb.Referenceable):
     # run a task
     def remote_run_task(self, key, args={}, subtask_key=None, workunit_key=None, available_workers=1):
         return self.run_task(key, args, subtask_key, workunit_key, available_workers)
+
+    def remote_stop_task(self):
+        return self.stop_task()
 
     # allows the master to request results
     def remote_receive_results(self, results, subtask_key, workunit_key):

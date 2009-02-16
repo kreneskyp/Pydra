@@ -271,13 +271,13 @@
             </thead>
 
             {% for task in running %}
-                <tr>
+                <tr id="{{task.id}}">
                     <td>{{task.task_key}}</td>
                     <td>{{tasks|task_description:task.task_key}}</td>
                     <td class="center">{{task.queued}}</td>
                     <td class="center">{{task.started}}</td>
                     <td class="center">
-                        <input type="button" value="Stop"/>
+                        <input class="button_cancel" type="button" value="Stop"/>
                     </td>
                 </tr>
             {% endfor %}

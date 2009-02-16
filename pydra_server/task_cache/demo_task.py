@@ -20,14 +20,15 @@
 from tasks import *
 import time
 
-"""
-Simple Task used for testing
 
-This task increments a counter and then sleeps 5 seconds.  it will repeat this 5 times.
-The counter is returned in a list of arguments so that the data can be passed to another task
-if this task is used in a sequence of tasks
-"""
 class TestTask(Task):
+    """
+    Simple Task used for testing
+
+    This task increments a counter and then sleeps 5 seconds.  it will repeat this 5 times.
+    The counter is returned in a list of arguments so that the data can be passed to another task
+    if this task is used in a sequence of tasks
+    """
     count = 0
     stop = 5
     description = 'A Demo task that counts to 5, taking a nap after each number'
@@ -35,50 +36,51 @@ class TestTask(Task):
     def __init__(self, msg='Demo Task'):
         Task.__init__(self, msg)
 
-    """
-    Does some simple 'work'
-    """
     def _work(self, **kwargs):
+        """
+        Does some simple 'work'
+        """
         self.count=0
-    
+
         if not (kwargs and kwargs.has_key('data')):
             value = 0
         else :
             value = kwargs['data']
 
-        while self.count < self.stop:
-            time.sleep(1)
+        while self.count < self.stop and not self.STOP_FLAG:
+            time.sleep(3)
             self.count += 1
             value += 1
             print 'value: %d   progress: %d%%' % (value , self.progress())
 
         return {'data':value}
 
-    """
-    returns progress as a number between 0 and 100
-    """
+
     def progress(self):
+        """
+        returns progress as a number between 0 and 100
+        """
         return 100*self.count/self.stop
 
-    """
-    Returns the status as a string
-    """
     def progressMessage(self):
+        """
+        Returns the status as a string
+        """
         return '%d of %d' % (self.count, self.stop)
 
-    """
-    Reset the task - set the counter back to zero
-    """
     def _reset(self):
+        """
+        Reset the task - set the counter back to zero
+        """
         self.count = 0
 
-"""
-Top level task for the test
 
-Extends TaskContainer only so that it can encapsulate the creation of its children
-"""
 class TestContainerTask(TaskContainer):
+    """
+    Top level task for the test
 
+    Extends TaskContainer only so that it can encapsulate the creation of its children
+    """
     description = 'A demo task that illustrates a ContainerTask.  This task runs 3 TestTasks sequentially'
 
     def __init__(self, msg=None):
@@ -89,11 +91,11 @@ class TestContainerTask(TaskContainer):
         self.addTask(TestTask('child 2'))
         self.addTask(TestTask('child 3'))
 
-"""
-Example class for running tests in parallel
-"""
-class TestParallelTask(ParallelTask):
 
+class TestParallelTask(ParallelTask):
+    """
+    Example class for running tests in parallel
+    """
     description = 'A demo task illustrating a Parallel task.  This task runs 5 TestTasks at the same time'
 
     _data = None

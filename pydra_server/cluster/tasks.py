@@ -58,6 +58,7 @@ class Task(object):
     __callback = None
     _callbackargs = None
     workunit = None
+    STOP_FLAG = False
 
     msg = None
     description = 'Default description about Task baseclass.'
@@ -105,12 +106,26 @@ class Task(object):
 
         return 1
 
-    """
-    Does the work of the task.  This is can be called directly for synchronous work or via start which
-    causes a workunit thread to be spawned and call this function.  this method will set flags properly and
-    delegate implementation specific work to _work(args)
-    """
+
+    def _stop(self):
+        """
+        Stop the task.  This consists of just setting the STOP_FLAG.  The Task implementation
+        will only stop if it honors the STOP_FLAG.  There is no safe way to kill the thread 
+        running the work function.  This is because the Task might have implementation specific
+        code for shutting down the task to enable a restart.  If we were to just kill the thread
+        (which would be hard in twisted) it would end all processing and might stop in a wierd
+        state.  Using the STOP_FLAG means you may have bad programs introduced to your cluster
+        but for the time being it is the only choice
+        """
+        self.STOP_FLAG=True
+
+
     def work(self, args, callback=None, callback_args={}):
+        """
+        Does the work of the task.  This is can be called directly for synchronous work or via start which
+        causes a workunit thread to be spawned and call this function.  this method will set flags properly and
+        delegate implementation specific work to _work(args)
+        """
         print '[debug] %s - Task - in Task.work()'  % self.get_worker().worker_key
         self._status = STATUS_RUNNING
         results = self._work(**args)
@@ -126,41 +141,45 @@ class Task(object):
 
         return results
 
-    """
-    Returns the status of this task.  Used as a function rather than member variable so this
-    function can be overridden
-    """
+
     def status(self):
+        """
+        Returns the status of this task.  Used as a function rather than member variable so this
+        function can be overridden
+        """
         return self._status
 
-    """
-    Requests a worker for a subtask from the tasks parent.  calling this on any task will
-    cause requests to bubble up to the root task whose parent will be the worker
-    running the task.
-    """
+
     def request_worker(self, task_key, args):
+        """
+        Requests a worker for a subtask from the tasks parent.  calling this on any task will
+        cause requests to bubble up to the root task whose parent will be the worker
+        running the task.
+        """
         self.parent.request_worker(self, task_key, args)
 
-    """
-    Retrieves the worker running this task.  This function is recursive and bubbles
-    up through the task tree till the worker is reached
-    """
+
     def get_worker(self):
+        """
+        Retrieves the worker running this task.  This function is recursive and bubbles
+        up through the task tree till the worker is reached
+        """
         return self.parent.get_worker()
 
 
-    """
-    Get the key that represents this task instance.  This key will give
-    the path required to find it if iterating from the root of the task.
-    This is used so that subtasks can be selected.
-    """
     def get_key(self):
+        """
+        Get the key that represents this task instance.  This key will give
+        the path required to find it if iterating from the root of the task.
+        This is used so that subtasks can be selected.
+        """
         return self._generate_key()
 
-    """
-    Generate the key for this task using a recursive algorithm.
-    """
+
     def _generate_key(self):
+        """
+        Generate the key for this task using a recursive algorithm.
+        """
         #check to see if this tasks parent is a ParallelTask
         # a ParallelTask can only have one child so the key is 
         # just the classname
@@ -190,11 +209,12 @@ class Task(object):
         self.key = key
         return key
 
-    """
-    Retrieves a subtask via task_path.  Task_path is the task_key
-    split into a list for easier iteration
-    """
+
     def get_subtask(self, task_path):
+        """
+        Retrieves a subtask via task_path.  Task_path is the task_key
+        split into a list for easier iteration
+        """
         #A Task can't have children,  if this is the last entry in the path
         # then this is the right tsk
         if len(task_path) == 1:
@@ -202,14 +222,14 @@ class Task(object):
         else:
             raise Exception("Task not found")
 
-"""
-TaskContainer - an extension of Task that contains other tasks
 
-TaskContainer does no work itself.  Its purpose is to allow a bigger job
-to be broken into discrete functions.  IE.  downloading and processing.
-"""
 class TaskContainer(Task):
+    """
+    TaskContainer - an extension of Task that contains other tasks
 
+    TaskContainer does no work itself.  Its purpose is to allow a bigger job
+    to be broken into discrete functions.  IE.  downloading and processing.
+    """
     def __init__(self, msg, sequential=True):
         Task.__init__(self, msg)
         self.subtasks = []
@@ -219,6 +239,9 @@ class TaskContainer(Task):
             task.parent = self
 
     def addTask(self, task, percentage=None):
+        """
+        Adds a task to the container
+        """
         subtask = SubTaskWrapper(task, percentage)
         self.subtasks.append(subtask)
         task.id = '%s-%d' % (self.id,len(self.subtasks))
@@ -235,8 +258,9 @@ class TaskContainer(Task):
         return self.subtasks[task_path[0]].get_subtask(task_path)
 
 
-    # Starts the task running all subtasks
+
     def _work(self, args=None):
+        # Starts the task running all subtasks
         self.reset()
 
         result = args
@@ -252,25 +276,35 @@ class TaskContainer(Task):
         return result
 
 
-    """
-    calculatePercentage - determines the percentage of work that each
-    child task accounts for.
+    def _stop(self):
+        """
+        Overridden to call stop on all children
+        """
+        Task._stop(self)
+        for subtask in self.subtasks:
+            subtask._stop()
 
-    TODO: take into account tasks that have had weighting manually set. 
-    """
+
     def calculatePercentage(self):
+        """
+        calculatePercentage - determines the percentage of work that each
+        child task accounts for.
+
+        TODO: take into account tasks that have had weighting manually set. 
+        """
         return float(1)/len(self.subtasks);
 
 
-    """
-    progress - returns the progress as a number 0-100.  
 
-    A container task's progress is a derivitive of its children.
-    the progress of the child counts for a certain percentage of the 
-    progress of the parent.  This weighting can be set manually or
-    divided evenly by calculatePercentage()
-    """
     def progress(self):
+        """
+        progress - returns the progress as a number 0-100.  
+
+        A container task's progress is a derivitive of its children.
+        the progress of the child counts for a certain percentage of the 
+        progress of the parent.  This weighting can be set manually or
+        divided evenly by calculatePercentage()
+        """
         progress = 0
         for subtask in self.subtasks:
             if subtask.percentage == None:
@@ -287,27 +321,29 @@ class TaskContainer(Task):
 
         return progress
 
-    """ 
-    returns a plain text status message
-    """
+
     def progressMessage(self):
+        """ 
+        returns a plain text status message
+        """
         for subtask in self.subtasks:
             if subtask.task._status == STATUS_RUNNING:
                 return subtask.task.progressMessage()
 
         return None
 
-    """
-    getStatus - returns status of this task.  A container task's status is 
-    a derivitive of its children.
 
-    failed - if any children failed, then the task failed
-    running - if any children are running then the task is running
-    paused - paused if no other children are running
-    complete - complete if all children are complete
-    stopped - default response if no other conditions are met
-    """
     def status(self):
+        """
+        getStatus - returns status of this task.  A container task's status is 
+        a derivitive of its children.
+
+        failed - if any children failed, then the task failed
+        running - if any children are running then the task is running
+        paused - paused if no other children are running
+        complete - complete if all children are complete
+        stopped - default response if no other conditions are met
+        """
         has_paused = False;
         has_unfinished = False;
 
@@ -343,10 +379,10 @@ class TaskContainer(Task):
         return STATUS_STOPPED
 
 
-"""
-ParallelTask - is a task that can be broken into discrete work units
-"""
 class ParallelTask(Task):
+    """
+    ParallelTask - is a task that can be broken into discrete work units
+    """
     _lock = None                # general lock
     _available_workers = 1      # number of workers available to this task
     _data = None                # list of data for this task
@@ -365,13 +401,14 @@ class ParallelTask(Task):
             value.parent = self
 
 
-    """
-    overridden to prevent early task cleanup.  ParallelTasl._work() returns immediately even though 
-    work is likely running in the background.  There appears to be no effective way to block without 
-    interupting twisted.Reactor.  The cleanup that normally happens in work() has been moved to
-    task_complete() which will be called when there is no more work remaining.
-    """
+
     def work(self, args, callback, callback_args={}):
+        """
+        overridden to prevent early task cleanup.  ParallelTasl._work() returns immediately even though 
+        work is likely running in the background.  There appears to be no effective way to block without 
+        interupting twisted.Reactor.  The cleanup that normally happens in work() has been moved to
+        task_complete() which will be called when there is no more work remaining.
+        """
         print 'in PTask.work()'
 
         self.__callback = callback
@@ -382,20 +419,30 @@ class ParallelTask(Task):
 
         return results
 
-    """
-    Should be called when all workunits have completed
-    """
+
+    def _stop(self):
+        """
+        Overridden to call stop on all children
+        """
+        Task._stop(self)
+        self.subtask._stop()
+
+
     def task_complete(self, results):
+        """
+        Should be called when all workunits have completed
+        """
         self._status = STATUS_COMPLETE
 
         #make a callback, if any
         if self.__callback:
             self.__callback(results)
 
-    """
-    Work function overridden to delegate workunits to other Workers.
-    """
+
     def _work(self, **kwargs):
+        """
+        Work function overridden to delegate workunits to other Workers.
+        """
 
         # save data, if any
         if kwargs and kwargs.has_key('data'):
@@ -431,16 +478,19 @@ class ParallelTask(Task):
     def more_work(self):
         # check to see if there is either work in progress or work left to process
             with self._lock:
-                #check for more work
-                if len(self._data_in_progress) or len(self._data):
-                    print '[debug] Paralleltask - still has more work: %s :  %s' % (self._data, self._data_in_progress)
-                    reactor.callLater(5, self.more_work)
+                if self.STOP_FLAG:
+                    self.task_complete(None)
 
-                #all work is done, call the task specific function to combine the results 
                 else:
-                    print '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1'
-                    results = self.work_complete()
-                    self.task_complete(results)
+                    #check for more work
+                    if len(self._data_in_progress) or len(self._data):
+                        print '[debug] Paralleltask - still has more work: %s :  %s' % (self._data, self._data_in_progress)
+                        reactor.callLater(5, self.more_work)
+
+                    #all work is done, call the task specific function to combine the results 
+                    else:
+                        results = self.work_complete()
+                        self.task_complete(results)
 
 
     def get_subtask(self, task_path):
@@ -451,20 +501,21 @@ class ParallelTask(Task):
         return self.subtask.get_subtask(task_path)
 
 
-    """
-    assign a unit of work to a Worker by requesting a worker from the compute cluster
-    """
     def _assign_work(self):
+        """
+        assign a unit of work to a Worker by requesting a worker from the compute cluster
+        """
         data, index = self.get_work_unit()
         print data, index
         if not data == None:
             print '[debug] Paralleltask - assigning remote work'
             self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
 
-    """
-    assign a unit of work to this Worker
-    """
+
     def _assign_work_local(self):
+        """
+        assign a unit of work to this Worker
+        """
         print '[debug] Paralleltask - assigning work locally'
         data, index = self.get_work_unit()
         if not data == None:
@@ -473,14 +524,15 @@ class ParallelTask(Task):
         else:
             print '[debug] Paralleltask - no worker retrieved, idling'
 
-    """
-    Get the next work unit, by default a ParallelTask expects a list of values/tuples.
-    When a arg is retrieved its removed from the list and placed in the in progress list.
-    The arg is saved so that if the node fails the args can be re-run on another node
 
-    This method *MUST* lock while it is altering the lists of data
-    """
     def get_work_unit(self):
+        """
+        Get the next work unit, by default a ParallelTask expects a list of values/tuples.
+        When a arg is retrieved its removed from the list and placed in the in progress list.
+        The arg is saved so that if the node fails the args can be re-run on another node
+
+        This method *MUST* lock while it is altering the lists of data
+        """
         print '[debug] Paralleltask - getting a workunit'
         data = None
         with self._lock:
@@ -496,13 +548,13 @@ class ParallelTask(Task):
         return data, self._workunit_count;
 
 
-    """
-    A work unit completed.  Handle the common management tasks to remove the data
-    from in_progress.  Also call task specific work_unit_complete(...)
-
-    This method *MUST* lock while it is altering the lists of data
-    """
     def _work_unit_complete(self, results, index):
+        """
+        A work unit completed.  Handle the common management tasks to remove the data
+        from in_progress.  Also call task specific work_unit_complete(...)
+
+        This method *MUST* lock while it is altering the lists of data
+        """
         print '[debug] Paralleltask - REMOTE Work unit completed'
         with self._lock:
             # run the task specific post process
@@ -519,13 +571,13 @@ class ParallelTask(Task):
             self._assign_work()
 
 
-    """
-    A work unit completed.  Handle the common management tasks to remove the data
-    from in_progress.  Also call task specific work_unit_complete(...)
-
-    This method *MUST* lock while it is altering the lists of data
-    """
     def _local_work_unit_complete(self, results, index):
+        """
+        A work unit completed.  Handle the common management tasks to remove the data
+        from in_progress.  Also call task specific work_unit_complete(...)
+
+        This method *MUST* lock while it is altering the lists of data
+        """
         print '[debug] Paralleltask - LOCAL work unit completed'
         with self._lock:
             # run the task specific post process
@@ -539,9 +591,9 @@ class ParallelTask(Task):
             self._assign_work_local()
 
 
-    """
-    A work unit failed.  re-add the data to the list
-    """
     def _work_unit_failed(self, data, results):
+        """
+        A work unit failed.  re-add the data to the list
+        """
         print '[error] Paralleltask - Work unit failed'
         pass

@@ -55,11 +55,13 @@ from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from task_manager import TaskManager
 
-"""
-Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code.
-This factory is specific to the master acting as a client of a Node.
-"""
+
 class NodeClientFactory(pb.PBClientFactory):
+    """
+    Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code.
+    This factory is specific to the master acting as a client of a Node.
+    """
+
     node = None
 
     def __init__(self, node, master):
@@ -76,11 +78,12 @@ class NodeClientFactory(pb.PBClientFactory):
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
 
 
-"""
-Master is the server that controls the cluster.  There must be one and only one master
-per cluster.  It will direct and delegate work taking place on the Nodes and Workers
-"""
+
 class Master(object):
+    """
+    Master is the server that controls the cluster.  There must be one and only one master
+    per cluster.  It will direct and delegate work taking place on the Nodes and Workers
+    """
 
     def __init__(self):
         print '[info] starting master'
@@ -118,10 +121,11 @@ class Master(object):
         self.host = 'localhost'
         self.port = 18800
 
-    """
-    Load node configuration from the database
-    """
+
     def load_nodes(self):
+        """
+        Load node configuration from the database
+        """
         print '[info] loading nodes'
         nodes = Node.objects.all()
         node_dict = {}
@@ -131,12 +135,12 @@ class Master(object):
         return node_dict
 
 
-    """
-    Make connections to all Nodes that are not connected.  This method is a single control 
-    for connecting to nodes.  individual nodes cannot be connected to.  This is to ensure that
-    only one attempt at a time is ever made to connect to a node.
-    """
     def connect(self):
+        """
+        Make connections to all Nodes that are not connected.  This method is a single control 
+        for connecting to nodes.  individual nodes cannot be connected to.  This is to ensure that
+        only one attempt at a time is ever made to connect to a node.
+        """
         #lock for two reasons:
         #  1) connect() cannot be called more than once at a time
         #  2) if a node fails while connecting the reconnect call will block till 
@@ -166,11 +170,12 @@ class Master(object):
             # Release the connection flag.
             self.connecting=False
 
-    """
-    Called with the results of all connection attempts.  Store connections and retrieve info from node.
-    The node will respond with info including how many workers it has.
-    """
+
     def nodes_connected(self, results):
+        """
+        Called with the results of all connection attempts.  Store connections and retrieve info from node.
+        The node will respond with info including how many workers it has.
+        """
         # process each connected node
         failures = False
 
@@ -210,12 +215,12 @@ class Master(object):
             self.reconnect_count = 0
 
 
-    """
-    Called to signal that a reconnection attempt is needed for one or more nodes.  This is the single control
-    for requested reconnection.  This single control is used to ensure at most 
-    one request for reconnection is pending.
-    """
     def reconnect_nodes(self, reset_counter=False):
+        """
+        Called to signal that a reconnection attempt is needed for one or more nodes.  This is the single control
+        for requested reconnection.  This single control is used to ensure at most 
+        one request for reconnection is pending.
+        """
         #lock - Blocking here ensures that connect() cannot happen while requesting
         #       a reconnect.
         with self._lock:
@@ -250,11 +255,12 @@ class Master(object):
                 print '[debug] reconnecting in %i seconds' % reconnect_delay
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
-    """
-    Process Node information.  Most will just be stored for later use.  Info will include
-    a list of workers.  The master will then connect to all Workers
-    """
+
     def add_node(self, info, node):
+        """
+        Process Node information.  Most will just be stored for later use.  Info will include
+        a list of workers.  The master will then connect to all Workers
+        """
 
         # save node's information in the database
         node.cores = info['cores']
@@ -276,57 +282,59 @@ class Master(object):
         #reactor.callLater(10, self.queue_task, 'TestTask');
         #reactor.callLater(3, self.run_task, 'TestParallelTask');
 
-    """ 
-    Called when a call to initialize a Node is successful
-    """
+
     def node_ready(self, result, node):
+        """ 
+        Called when a call to initialize a Node is successful
+        """
         print '[Info] node:%s - ready' % node
 
 
-    """
-    Add a worker avatar as worker available to the cluster.  There are two possible scenarios:
-       1) Only the worker was started/restarted, it is idle
-       2) Only master was restarted.  Workers previous status must be reestablished
-
-       The best way to determine the state of the worker is to ask it.  It will return its status
-       plus any relevent information for reestablishing it's status
-    """
     def add_worker(self, result, worker, worker_key):
-                # worker is working and it was the master for its task
-                if result[0] == WORKER_STATUS_WORKING:
-                    print '[info] worker:%s - is still working' % worker_key
-                    #record what the worker is working on
-                    #self._workers_working[worker_key] = task_key
+        """
+        Add a worker avatar as worker available to the cluster.  There are two possible scenarios:
+        1) Only the worker was started/restarted, it is idle
+        2) Only master was restarted.  Workers previous status must be reestablished
 
-                # worker is finished with a task
-                elif result[0] == WORKER_STATUS_FINISHED:
-                    print '[info] worker:%s - was finished, requesting results' % worker_key
-                    #record what the worker is working on
-                    #self._workers_working[worker_key] = task_key
+        The best way to determine the state of the worker is to ask it.  It will return its status
+        plus any relevent information for reestablishing it's status
+        """
+        # worker is working and it was the master for its task
+        if result[0] == WORKER_STATUS_WORKING:
+            print '[info] worker:%s - is still working' % worker_key
+            #record what the worker is working on
+            #self._workers_working[worker_key] = task_key
 
-                    #check if the Worker acting as master for this task is ready
-                    if (True):
-                        #TODO
-                        pass
+        # worker is finished with a task
+        elif result[0] == WORKER_STATUS_FINISHED:
+            print '[info] worker:%s - was finished, requesting results' % worker_key
+            #record what the worker is working on
+            #self._workers_working[worker_key] = task_key
 
-                    #else not ready to send the results
-                    else:
-                        #TODO
-                        pass
+            #check if the Worker acting as master for this task is ready
+            if (True):
+                #TODO
+                pass
 
-                #otherwise its idle
-                else:
-                    with self._lock:
-                        self.workers[worker_key] = worker
-                        # worker shouldn't already be in the idle queue but check anyway
-                        if not worker_key in self._workers_idle:
-                            self._workers_idle.append(worker_key)
-                            print '[info] worker:%s - added to idle workers' % worker_key
+            #else not ready to send the results
+            else:
+                #TODO
+                pass
 
-    """
-    Called when a worker disconnects
-    """
+        #otherwise its idle
+        else:
+            with self._lock:
+                self.workers[worker_key] = worker
+                # worker shouldn't already be in the idle queue but check anyway
+                if not worker_key in self._workers_idle:
+                    self._workers_idle.append(worker_key)
+                    print '[info] worker:%s - added to idle workers' % worker_key
+
+
     def remove_worker(self, worker_key):
+        """
+        Called when a worker disconnects
+        """
         with self._lock:
             # if idle, just remove it.  no need to do anything else
             if worker_key in self._workers_idle:
@@ -347,10 +355,11 @@ class Master(object):
                     #TODO
                     pass
 
-    """
-    Select a worker to use for running a task or subtask
-    """
+
     def select_worker(self, task_instance_id, task_key, args={}, subtask_key=None):
+        """
+        Select a worker to use for running a task or subtask
+        """
         #lock, selecting workers must be threadsafe
         with self._lock:
             if len(self._workers_idle):
@@ -364,12 +373,12 @@ class Master(object):
                 return None
 
 
-    """
-    Queue a task to be run.  All task requests come through this method.  It saves their
-    information in the database.  If the cluster has idle resources it will start the task
-    immediately, otherwise it will queue the task until it is ready.
-    """
     def queue_task(self, task_key, args={}, subtask_key=None):
+        """
+        Queue a task to be run.  All task requests come through this method.  It saves their
+        information in the database.  If the cluster has idle resources it will start the task
+        immediately, otherwise it will queue the task until it is ready.
+        """
         print '[info] Task:%s:%s - Queued' % (task_key, subtask_key)
 
         #create a TaskInstance instance and save it
@@ -394,25 +403,33 @@ class Master(object):
         send signals to all workers assigned to it to stop work immediately.
         """
         task_instance = TaskInstance.objects.get(id=task_id)
-
+        print '[info] Cancelling Task: %s' % task_id
         with self._lock_queue:
             if task_instance in self._queue:
                 #was still in queue
                 self._queue.remove(task_instance)
-                task_instance.completion_type=-1
-                task_instance.save()
-                return 1
-
+                print '[debug] Cancelling Task, was in queue: %s' % task_id
             else:
-                #not in queue, must be running
-                #self._running
-                pass
+                print '[debug] Cancelling Task, is running: %s' % task_id
+                #get all the workers to stop
+                for worker_key, worker_task in self._workers_working.items():
+                    if worker_task[0] == task_id:
+                        worker = self.workers[worker_key]
+                        print '[debug] signalling worker to stop: %s' % worker_key
+                        worker.remote.callRemote('stop_task')
 
-    """
-    Advances the queue.  If there is a task waiting it will be started, otherwise the cluster will idle.
-    This should be called whenever a resource becomes available or a new task is queued
-    """
+                self._running.remove(task_instance)
+
+            task_instance.completion_type=-1
+            task_instance.save()
+            return 1
+
+
     def advance_queue(self):
+        """
+        Advances the queue.  If there is a task waiting it will be started, otherwise the cluster will idle.
+        This should be called whenever a resource becomes available or a new task is queued
+        """
         print '[debug] advancing queue: %s' % self._queue
         with self._lock_queue:
             try:
@@ -428,9 +445,9 @@ class Master(object):
                 print '[info] Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key)
                 task_instance.started = time.strftime('%Y-%m-%d %H:%M:%S')
                 task_instance.save()
-                del self._queue[0]
 
-                self._running.append[task_instance]
+                del self._queue[0]
+                self._running.append(task_instance)
 
             else:
                 # cluster does not have idle resources.
@@ -439,16 +456,16 @@ class Master(object):
                 return False
 
 
-    """
-    Run the task specified by the task_key.  This shouldn't be called directly.  Tasks should
-    be queued with queue_task().  If the cluster has idle resources it will be run automatically
-
-    This function is used internally by the cluster for parallel processing work requests.  Work
-    requests are never queued.  If there is no resource available the main worker for the task
-    should be informed and it can readjust its count of available resources.  Any type of resource
-    sharing logic should be handled within select_worker() to keep the logic organized.
-    """
     def run_task(self, task_instance_id, task_key, args={}, subtask_key=None, workunit_key=None):
+        """
+        Run the task specified by the task_key.  This shouldn't be called directly.  Tasks should
+        be queued with queue_task().  If the cluster has idle resources it will be run automatically
+
+        This function is used internally by the cluster for parallel processing work requests.  Work
+        requests are never queued.  If there is no resource available the main worker for the task
+        should be informed and it can readjust its count of available resources.  Any type of resource
+        sharing logic should be handled within select_worker() to keep the logic organized.
+        """
 
         # get a worker for this task
         worker = self.select_worker(task_instance_id, task_key, args, subtask_key)
@@ -483,12 +500,13 @@ class Master(object):
             task_instance.worker = worker.name
             task_instance.save()
 
-    """
-    Called by workers when they have completed their task.
 
-        Tasks runtime and log should be saved in the database
-    """
     def send_results(self, worker_key, results, workunit_key):
+        """
+        Called by workers when they have completed their task.
+
+            Tasks runtime and log should be saved in the database
+        """
         print '[debug] Worker:%s - sent results: %s' % (worker_key, results)
         with self._lock:
             task_instance_id, task_key, args, subtask_key = self._workers_working[worker_key]
@@ -501,43 +519,86 @@ class Master(object):
             del self._workers_working[worker_key]
             self._workers_idle.append(worker_key)
 
+            #if this was the root task for the job then save info.  Ignore the fact that the task might have
+            #been canceled.  If its 100% complete, then mark it as such.
+            if not subtask_key:
+                with self._lock_queue:
+                    task_instance = TaskInstance.objects.get(id=task_instance_id)
+                    task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
+                    task_instance.completion_type = 1
+                    task_instance.save()
 
-        #if this was the root task for the job then save info
-        if not subtask_key:
+                    #remove task instance from running queue
+                    try:
+                        self._running.remove(task_instance)
+                    except ValueError:
+                        # was already removed by cancel
+                        pass
+
+
+            #check to make sure the task was still in the queue.  Its possible this call was made at the same
+            # time a task was being canceled.  Only worry about sending the reults back to the Task Head
+            # if the task is still running
             task_instance = TaskInstance.objects.get(id=task_instance_id)
-            task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
-            task_instance.completion_type = 1
-            task_instance.save()
-
-
-        #if this was a subtask the main task needs the results and to be informed
-        else:
-            task_instance = TaskInstance.objects.get(id=task_instance_id)
-            main_worker = self.workers[task_instance.worker]
-            print '[debug] Worker:%s - informed that subtask completed' % 'FOO'
-            main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
+            with self._lock_queue:
+                if task_instance in self._running:
+                    #if this was a subtask the main task needs the results and to be informed
+                    task_instance = TaskInstance.objects.get(id=task_instance_id)
+                    main_worker = self.workers[task_instance.worker]
+                    print '[debug] Worker:%s - informed that subtask completed' % 'FOO'
+                    main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
 
         #attempt to advance the queue
         self.advance_queue()
 
 
-    """
-    Called by workers running a Parallel task.  This is a request
-    for a worker in the cluster to process a workunit from a task
-    """
+    def worker_stopped(self, worker_key):
+        """
+        Called by workers when they have stopped due to a cancel task request.
+        """
+        with self._lock:
+            print '[info] Worker:%s - stopped' % worker_key
+
+            # release the worker back into the idle pool
+            # this must be done before informing the 
+            # main worker.  otherwise a new work request
+            # can be made before the worker is released
+            del self._workers_working[worker_key]
+            self._workers_idle.append(worker_key)
+
+        #attempt to advance the queue
+        self.advance_queue()
+
+
     def request_worker(self, workerAvatar, subtask_key, args, workunit_key):
+        """
+        Called by workers running a Parallel task.  This is a request
+        for a worker in the cluster to process a workunit from a task
+        """
+
         #get the task key and run the task.  The key is looked up
         #here so that a worker can only request a worker for the 
         #their current task.
         print self._workers_working
         worker = self._workers_working[workerAvatar.name]
+        task_instance = TaskInstance.objects.get(id=worker[0])
         print '[debug] Worker:%s - request for worker: %s:%s' % (workerAvatar.name, subtask_key, args)
-        self.run_task(worker[0], worker[1], args, subtask_key, workunit_key)
 
-"""
-Realm used by the Master server to assign avatars.
-"""
+        # lock queue and check status of task to ensure no lost workers
+        # due to a canceled task
+        with self._lock_queue:
+            if task_instance in self._running:
+                self.run_task(worker[0], worker[1], args, subtask_key, workunit_key)
+
+            else:
+                print '[debug] Worker:%s - request for worker failed, task is not running' % (workerAvatar.name)
+
+
+
 class MasterRealm:
+    """
+    Realm used by the Master server to assign avatars.
+    """
     implements(portal.IRealm)
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
@@ -560,10 +621,11 @@ class MasterRealm:
 
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
 
-"""
-Avatar used by Workers connecting to the Master.
-"""
+
 class WorkerAvatar(pb.Avatar):
+    """
+    Avatar used by Workers connecting to the Master.
+    """
     def __init__(self, name):
         self.name = name
 
@@ -575,59 +637,36 @@ class WorkerAvatar(pb.Avatar):
         self.server.remove_worker(self.name)
         self.remote = None
 
-    """
-    Called by workers when they have completed their task and need to report the results.
-       * Tasks runtime and log should be saved in the database
-    """
     def perspective_send_results(self, results, workunit_key):
+        """
+        Called by workers when they have completed their task and need to report the results.
+        * Tasks runtime and log should be saved in the database
+        """
         return self.server.send_results(self.name, results, workunit_key)
 
-    """
-    Called by workers running a Parallel task.  This is a request
-    for a worker in the cluster to process the args sent
-    """
+    def perspective_stopped(self):
+        """
+        Called by workers when they have stopped themselves because of a stop_task call
+        This response may be delayed because there is no guaruntee that the Task will
+        respect the STOP_FLAG.  Until this callback is made the Worker is still working
+        """
+        return self.server.worker_stopped(self.name)
+
     def perspective_request_worker(self, subtask_key, args, workunit_key):
+        """
+        Called by workers running a Parallel task.  This is a request
+        for a worker in the cluster to process the args sent
+        """
         return self.server.request_worker(self, subtask_key, args, workunit_key)
 
 
-"""
-Avatar used by Controllers connected to the Master
-"""
-class ControllerAvatar(pb.Avatar):
-    def __init__(self, name):
-        self.name = name
 
-    def attached(self, mind):
-        self.remote = mind
-
-    def detached(self, mind):
-        self.remote = None
-
-    """
-    Called when the controller wants an update of node statuses
-    """
-    def perspective_node_statuses(self):
-        return self.server.node_statuses()
-
-    """
-    Called to start a task
-    """
-    def perspective_run_task(self, subtask_key, args):
-        return self.server.request_worker(self, subtask_key, args)
-
-    """
-    Called to stop a task
-    """
-    def perspective_stop_task(self, task_instance_id, args):
-        return self.server.request_worker(self, subtask_key, args)
-
-
-"""
-Class used to authenticate the request.  This is a hack of a class but
-unfortunately required because there does not appear to be a better way
-to block until a deferred completes
-"""
 class AMFAuthenticator(object):
+    """
+    Class used to authenticate the request.  This is a hack of a class but
+    unfortunately required because there does not appear to be a better way
+    to block until a deferred completes
+    """
     def __init__(self, checker):
         self.result = False
         self.checker = checker
@@ -657,11 +696,11 @@ class AMFAuthenticator(object):
 
         return self.auth
 
-"""
-Interface for Controller.  This exposes functions to a controller.
-"""
-class AMFInterface(pb.Root):
 
+class AMFInterface(pb.Root):
+    """
+    Interface for Controller.  This exposes functions to a controller.
+    """
     def __init__(self, master, checker):
         self.master = master
         self.checker = checker
@@ -715,7 +754,7 @@ class AMFInterface(pb.Root):
         return self.master.task_manager.task_status()
 
     def cancel_task(self, _, task_id):
-        return self.master.cancel_task(task_id)
+        return self.master.cancel_task(int(task_id))
 
 
 if __name__ == "__main__":
