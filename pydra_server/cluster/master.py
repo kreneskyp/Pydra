@@ -21,19 +21,23 @@
 
 from __future__ import with_statement
 
-#
-# Setup django environment when run from the commandline
-#
-if __name__ == '__main__':
-    import sys
-    import os
+# ==========================================================
+# Setup django environment 
+# ==========================================================
 
-    #python magic to add the current directory to the pythonpath
-    sys.path.append(os.getcwd())
+import sys
+import os
 
-    #
-    if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
-        os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+#python magic to add the current directory to the pythonpath
+sys.path.append(os.getcwd())
+
+#
+if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+
+# ==========================================================
+# Done setting up django environment
+# ==========================================================
 
 
 import os, sys
@@ -45,6 +49,7 @@ from threading import Lock
 from zope.interface import implements
 from twisted.cred import portal, checkers
 from twisted.spread import pb
+from twisted.application import service, internet
 from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.web import server, resource
@@ -53,7 +58,7 @@ from django.utils import simplejson
 
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
-from task_manager import TaskManager
+from pydra_server.cluster.task_manager import TaskManager
 
 
 class NodeClientFactory(pb.PBClientFactory):
@@ -121,6 +126,36 @@ class Master(object):
         self.host = 'localhost'
         self.port = 18800
 
+    def get_services(self):
+        """
+        Get the service objects used by twistd
+        """
+        # setup cluster connections
+        realm = MasterRealm()
+        realm.server = self
+
+        #setup security 
+        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        realm.server.checker = checker
+        checker.addUser("controller", "1234")
+        p = portal.Portal(realm, [checker])
+
+        #setup controller connection via AMF gateway
+        # Place the namespace mapping into a TwistedGateway:
+        from pyamf.remoting.gateway.twisted import TwistedGateway
+        from pyamf.remoting import gateway
+        interface = AMFInterface(realm.server, checker)
+        gw = TwistedGateway({ 
+                        "controller": interface,
+                        }, authenticator=interface.auth)
+        # Publish the PyAMF gateway at the root URL:
+        root = resource.Resource()
+        root.putChild("", gw)
+
+        worker_service = internet.TCPServer(18801, server.Site(root))
+        controller_service = internet.TCPServer(18800, pb.PBServerFactory(p))
+
+        return worker_service, controller_service
 
     def load_nodes(self):
         """
@@ -757,32 +792,12 @@ class AMFInterface(pb.Root):
         return self.master.cancel_task(int(task_id))
 
 
-if __name__ == "__main__":
-    # setup cluster connections
-    realm = MasterRealm()
-    realm.server = Master()
-    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-    realm.server.checker = checker
-    checker.addUser("controller", "1234")
-    p = portal.Portal(realm, [checker])
-    reactor.listenTCP(18800, pb.PBServerFactory(p))
 
-    #setup controller connection via AMF gateway
-    # Place the namespace mapping into a TwistedGateway:
-    from pyamf.remoting.gateway.twisted import TwistedGateway
-    from pyamf.remoting import gateway
-    interface = AMFInterface(realm.server, checker)
-    gw = TwistedGateway({ 
-                    "controller": interface,
-                    }, authenticator=interface.auth)
-    # Publish the PyAMF gateway at the root URL:
-    root = resource.Resource()
-    root.putChild("", gw)
-    # Tell the twisted reactor to listen:
-    reactor.listenTCP(18801, server.Site(root))
+#setup application used by twistd
+master = Master()
 
-    #sr = gateway.ServiceRequest(None, gw.services['controller'], None)
-    #gw.authenticateRequest(sr, 'u', 'p')
+application = service.Application("Pydra Master")
 
-    #start the server
-    reactor.run()
+service1, service2 = master.get_services()
+service1.setServiceParent(application)
+service2.setServiceParent(application)

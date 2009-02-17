@@ -41,15 +41,17 @@ from zope.interface import implements
 from twisted.cred import portal, checkers
 from twisted.spread import pb
 from twisted.internet import reactor
+from twisted.application import service, internet
 import os
 from subprocess import Popen
 
-"""
-Node - A Node manages a server in your cluster.  There is one instance of Node running per server.
-      Node will spawn worker processes for each core available on your machine.  This allows some
-      central control over what happens on the node.
-"""
+
 class NodeServer:
+    """
+    Node - A Node manages a server in your cluster.  There is one instance of Node running per server.
+        Node will spawn worker processes for each core available on your machine.  This allows some
+        central control over what happens on the node.
+    """
     def __init__(self):
         self.workers = {}
         self.port_base = 11881
@@ -66,10 +68,26 @@ class NodeServer:
         print '[info] Node - starting server on port %s' % self.port_base
 
 
-    """
-    Builds a dictionary of useful information about this Node
-    """
+    def get_service(self):
+        """
+        Creates a service object that can be used by twistd init code to start the server
+        """
+        realm = ClusterRealm()
+        realm.server = self
+
+        #create security
+        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        checker.addUser("tester", "1234")
+        p = portal.Portal(realm, [checker])
+
+        factory = pb.PBServerFactory(p)
+        return internet.TCPServer(11890, factory)
+
+
     def determine_info(self):
+        """
+        Builds a dictionary of useful information about this Node
+        """
         cores = self.detect_cores()
 
         self.info = {
@@ -79,12 +97,12 @@ class NodeServer:
         }
 
 
-    """
-    Initializes the node so it ready for use.  Workers will not be started
-    until the master makes this call.  After a node is initialized workers
-    should be able to reconnect if a connection is lost
-    """
     def init_node(self, master_host, master_port, node_key):
+        """
+        Initializes the node so it ready for use.  Workers will not be started
+        until the master makes this call.  After a node is initialized workers
+        should be able to reconnect if a connection is lost
+        """
 
         # only initialize the node if it has not been initialized yet.
         # its possible for the server to be restarted without affecting
@@ -100,21 +118,20 @@ class NodeServer:
 
                 self.initialized = True
 
-    """
-    Starts all of the workers.  By default there will be one worker for each core
-    """
+
     def start_workers(self):
+        """
+        Starts all of the workers.  By default there will be one worker for each core
+        """
         self.pids = [
             Popen(["python", "pydra_server/cluster/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
             for i in range(self.info['cores'])
             ]
 
-    """
-    Detect the number of core's on this Node
-    """
+
     def detect_cores(self):
         """
-        Detects the number of cores on a system. Cribbed from pp.
+        Detect the number of core's on this Node
         """
         # Linux, Unix and MacOS:
         if hasattr(os, "sysconf"):
@@ -162,19 +179,22 @@ class MasterAvatar(pb.Avatar):
     def perspective_info(self):
         return self.server.info
 
-    """
-    Initializes a node.  The server sends its connection information and
-    credentials for the node
-    """
+
     def perspective_init(self, master_host, master_port, node_key):
+        """
+        Initializes a node.  The server sends its connection information and
+        credentials for the node
+        """
         self.server.init_node(master_host, master_port, node_key)
 
 
-realm = ClusterRealm()
-realm.server = NodeServer()
-checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-checker.addUser("tester", "1234")
-p = portal.Portal(realm, [checker])
 
-reactor.listenTCP(11890, pb.PBServerFactory(p))
-reactor.run()
+#root application object
+application = service.Application('Pydra Node')
+
+#create node server
+node_server = NodeServer()
+
+# attach service
+service = node_server.get_service()
+service.setServiceParent(application)
