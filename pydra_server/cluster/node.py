@@ -44,7 +44,7 @@ from twisted.internet import reactor
 from twisted.application import service, internet
 import os
 from subprocess import Popen
-
+from pydra_server.auth import *
 
 class NodeServer:
     """
@@ -56,6 +56,7 @@ class NodeServer:
         self.workers = {}
         self.port_base = 11881
         self.host='localhost'
+        self.password_file = 'node.password'
         self.node_key = None
         self.initialized = False
         self.__lock = Lock()
@@ -69,15 +70,18 @@ class NodeServer:
 
 
     def get_service(self):
+        from twisted.cred.checkers import AllowAnonymousAccess, FilePasswordDB
         """
         Creates a service object that can be used by twistd init code to start the server
         """
         realm = ClusterRealm()
         realm.server = self
 
-        #create security
-        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-        checker.addUser("tester", "1234")
+        # create security - We use the firstuser checker which allows master to connect
+        # and configure this node
+        checker = FirstUseChecker(self.password_file)
+
+        #checker = AllowAnonymousAccess()
         p = portal.Portal(realm, [checker])
 
         factory = pb.PBServerFactory(p)
@@ -97,7 +101,7 @@ class NodeServer:
         }
 
 
-    def init_node(self, master_host, master_port, node_key):
+    def init_node(self, master_host, master_port, node_key, node_priv_key):
         """
         Initializes the node so it ready for use.  Workers will not be started
         until the master makes this call.  After a node is initialized workers
@@ -113,10 +117,19 @@ class NodeServer:
                 self.master_port = master_port
                 self.node_key = node_key
 
+                # save the private key for the node, this allows the Master
+                # to authenticate using this key in the future
+                if node_priv_key:
+                    login_str = 'master:%s' % node_priv_key
+                    #create file if needed
+                    #os.path.exists(self.filename)
+                    file(self.password_file, 'w').write(login_str)
+
                 #start the workers
                 self.start_workers()
 
                 self.initialized = True
+
 
 
     def start_workers(self):
@@ -180,12 +193,12 @@ class MasterAvatar(pb.Avatar):
         return self.server.info
 
 
-    def perspective_init(self, master_host, master_port, node_key):
+    def perspective_init(self, master_host, master_port, node_key, node_priv_key):
         """
         Initializes a node.  The server sends its connection information and
         credentials for the node
         """
-        self.server.init_node(master_host, master_port, node_key)
+        self.server.init_node(master_host, master_port, node_key, node_priv_key)
 
 
 

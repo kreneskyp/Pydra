@@ -34,3 +34,5 @@ class NodeForm(ModelForm):
     cores           = forms.IntegerField(required=False)
     cpu_speed       = forms.IntegerField(required=False)
     memory          = forms.IntegerField(required=False)
+    priv_key        = forms.IntegerField(required=False)
+    pub_key         = forms.IntegerField(required=False)

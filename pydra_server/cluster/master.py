@@ -59,7 +59,7 @@ from django.utils import simplejson
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
-
+from pydra_server.auth import generate_keys
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -157,6 +157,7 @@ class Master(object):
 
         return worker_service, controller_service
 
+
     def load_nodes(self):
         """
         Load node configuration from the database
@@ -195,7 +196,22 @@ class Master(object):
                 if not node.ref:
                     factory = NodeClientFactory(node, self)
                     reactor.connectTCP(node.host, 11890, factory)
-                    deferred = factory.login(credentials.UsernamePassword("tester", "1234"), client=self)
+
+                    # generate keys if needed
+                    if not node.priv_key:
+                        node.priv_key, node.pub_key = generate_keys()
+                        node.save()
+
+                    # SSH authentication is currently supported with perspectiveBroker.
+                    # For now just use the ssh key as a password.  At least its a large random Strong
+                    #
+                    # Note that the first time connecting to the node will accept and register whatever
+                    # key is passed to it
+                    #
+                    #credential = credentials.SSHPrivateKey('master', 'RSA', node.priv_key, '', '')
+                    credential = credentials.UsernamePassword('master', node.priv_key)
+
+                    deferred = factory.login(credential, client=self)
                     connections.append(deferred)
                     self.attempts.append(node)
 
@@ -301,8 +317,14 @@ class Master(object):
         node.cores = info['cores']
         node.cpu_speed = info['cpu']
         node.memory = info['memory']
-        node.seen = True
         node.save()
+
+        if not node.seen:
+            priv_key = node.priv_key
+        else:
+            priv_key = None
+
+
 
         #add the Node's workers to the checker so they are allowed to connect
         node_key_str = '%s:%s' % (node.host, node.port)
@@ -310,7 +332,7 @@ class Master(object):
             self.checker.addUser('%s:%i' % (node_key_str, i), "1234")
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, self.port, node_key_str)
+        d = node.ref.callRemote('init', self.host, self.port, node_key_str, priv_key)
         d.addCallback(self.node_ready, node)
 
         #TODO Remove
@@ -323,6 +345,8 @@ class Master(object):
         Called when a call to initialize a Node is successful
         """
         print '[Info] node:%s - ready' % node
+        node.seen = True
+        node.save()
 
 
     def add_worker(self, result, worker, worker_key):
