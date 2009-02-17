@@ -36,6 +36,9 @@ try:
 except ProgrammingError:
     pass #table hasnt been created yet 
 
+
+
+
 """ ================================
 Models
 ================================ """
@@ -65,6 +68,11 @@ class Node(models.Model):
         ret = 1 if self.ref else 0
         return ret
 
+    class Meta:
+        permissions = (
+            ("can_edit_nodes", "Can create and edit nodes"),
+        )
+
 
 """
 Custom manager overridden to supply pre-made queryset for queued and running tasks
@@ -92,3 +100,9 @@ class TaskInstance(models.Model):
     completion_type = models.IntegerField(null=True)
 
     objects = TaskInstanceManager()
+
+    class Meta:
+        permissions = (
+            ("can_run", "Can run tasks on the cluster"),
+            ("can_stop_all", "Can stop anyone's tasks")
+        )

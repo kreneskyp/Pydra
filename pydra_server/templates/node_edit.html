@@ -1,25 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
+{% extends "base.html" %}
 
-<html>
-    <head>
-      
-        <style>
-        </style>
-
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
-        <script type="text/javascript">
-
-            $(document).ready(function() {
-                
-            });
-
-        </script>
-    </head>
-    <body>
-
-    {% include 'header.html' %}
-
+{% block content %}
     {% if form.errors %}
         <div id="errors">
         Please correct the following errors:
@@ -74,6 +55,4 @@
 
         </form>
     </div>
-    </body>
-</html>
-
+{% endblock %}

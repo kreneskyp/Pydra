@@ -20,15 +20,26 @@
 from django.conf.urls.defaults import *
 
 from views import *
+from django.contrib.auth.views import login, logout
 
 urlpatterns = patterns('',
+    #default
     (r'^$', jobs),
+
+    # node urls
     (r'^nodes/$', nodes),
     (r'^nodes/edit/(\d?)$', node_edit),
     (r'^nodes/status/$', node_status),
-    (r'^jobs/$', jobs),
+
+    # job urls
+   (r'^jobs/$', jobs),
     (r'^jobs/run/$', run_task),
     (r'^jobs/cancel/$', cancel_task),
+
+    #authentication
+    (r'^accounts/login/$', login),
+    (r'^accounts/logout/$', logout, {'next_page':'/jobs'}),
+    (r'^accounts/profile/$', jobs),
 )
 
 

@@ -17,12 +17,15 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth import authenticate, login
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import HttpResponseRedirect
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.utils import simplejson
 from django.http import HttpResponse
+
 
 import math
 
@@ -89,7 +92,7 @@ def nodes(request):
     }, context_instance=RequestContext(request, processors=[pydra_processor]))
 
 
-
+@user_passes_test(lambda u: u.has_perm('pydra_server.can_edit_nodes'))
 def node_edit(request, id=None):
     """
     Handler for creating and editing nodes
@@ -119,7 +122,6 @@ def node_edit(request, id=None):
     }, context_instance=RequestContext(request))
 
 
-
 def node_status(request):
     """
     Retrieves Status of nodes
@@ -128,7 +130,6 @@ def node_status(request):
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
     return HttpResponse(pydra_controller.remote_node_status(), mimetype='application/javascript')
-
 
 
 def jobs(request):
@@ -157,6 +158,7 @@ def task_progress(request):
     return HttpResponse(pydra_controller.remote_task_status(), mimetype='application/javascript')
 
 
+@user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
 def run_task(request):
     """
     handler for sending a run_task signal
@@ -169,6 +171,7 @@ def run_task(request):
     return HttpResponse(pydra_controller.remote_run_task(key), mimetype='application/javascript')
 
 
+@user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
 def cancel_task(request):
     """
     handler for sending a cancel_task signal

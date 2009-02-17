@@ -1,4 +1,5 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+{% extends "base.html" %}
+
 <!--
     Copyright 2009 Oregon State University
 
@@ -20,8 +21,8 @@
 
 {% load pydra_extras %}
 
-<html>
-    <head>
+{% block head %}
+    {{ block.super }}
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.progressbar.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/json2.js"></script>
@@ -200,11 +201,12 @@
             }
 
         </style>
-    </head>
-    <body>
-    {% include 'header.html' %}
-    <div id="content">
+{% endblock %}
 
+{% block submenu %}
+{% endblock %}
+
+{% block content %}
         <table id="tasks">
             <thead>
                 <tr><th colspan="100%">Available Tasks</th></tr>
@@ -224,8 +226,10 @@
                     <td class="center">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
                     <td class="center">[schedule]</td>
                     <td class="center">
-                        <input class="button_run" type="button" value="Run"/>
-                        <input type="button" value="Schedule"/>
+                        {% if perms.pydra_server.can_run_tasks %}
+                            <input class="button_run" type="button" value="Run"/>
+                            <input type="button" value="Schedule"/>
+                        {% endif %}
                         <input type="button" value="Log"/>
                     </td>
                 </tr>
@@ -250,9 +254,11 @@
                     <td>{{tasks|task_description:task.task_key}}</td>
                     <td class="center">{{task.queued}}</td>
                     <td>
-                        <input type="button" value="Up"/>
-                        <input type="button" value="Down"/>
-                        <input class="button_cancel" type="button" value="Cancel"/>
+                        {% if perms.pydra_server.can_manage_queue %}
+                            <input type="button" value="Up"/>
+                            <input type="button" value="Down"/>
+                        {% endif %}
+                        {% if perms.pydra_server.can_run_tasks %}<input class="button_cancel" type="button" value="Cancel"/>{% endif %}
                     </td>
                 </tr>
             {% endfor %}
@@ -277,13 +283,11 @@
                     <td class="center">{{task.queued}}</td>
                     <td class="center">{{task.started}}</td>
                     <td class="center">
-                        <input class="button_cancel" type="button" value="Stop"/>
+                        {% if perms.pydra_server.can_run_tasks %}<input class="button_cancel" type="button" value="Stop"/>{% endif %}
                     </td>
                 </tr>
             {% endfor %}
         </table>
 
     </div>
-
-    </body>
-</html>
+{% endblock %}

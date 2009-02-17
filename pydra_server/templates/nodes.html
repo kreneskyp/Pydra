@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
+
 <!--
     Copyright 2009 Oregon State University
 
@@ -18,11 +17,11 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 -->
-
+{% extends "base.html" %}
 {% load pydra_extras %}
 
-<html>
-    <head>
+    {% block head %}
+        {{ block.super }}
         <style>
             table {
                 width:90%;
@@ -130,13 +129,16 @@
             });
 
         </script>
-    </head>
-    <body>
+{% endblock %}
 
-    {% include 'header.html' %}
+{% block submenu %}
+    {% if nodes and perms.pydra_server.can_edit_nodes %}
+        <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/edit">Create Node</a></span>
+        <span class="menuitem lastmenuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/discover">Discover Nodes</a></span>
+    {% endif %}
+{% endblock %}
 
-    <div id="content">
-
+{% block content %}
     {% if not controller.is_alive %}
         <div id="master_errors">
             Master Node is not running. 
@@ -176,7 +178,13 @@
             {% for node in nodes.object_list %}
                 <tr>
                     <td id="node_{{node.id}}" class="status">Unknown</td>
-                    <td><a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a></td>
+                    <td>
+                        {% if perms.pydra_server.can_edit_nodes %}
+                            <a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a>
+                        {% else %}
+                            {{node.host}}
+                        {% endif %}
+                    </td>
                     <td class="port">{{node.port}}</td>
                     <td>[3 of 4 connected]</td>
                     <td>{{node|available_cores}}</td>
@@ -204,7 +212,5 @@
             {% endfor %}
         </tbody>
         </table>
-    </div>
-    </body>
-</html>
+{% endblock %}
 
