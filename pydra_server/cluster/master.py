@@ -60,6 +60,7 @@ from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
 from pydra_server.auth import generate_keys
+from pydra_server.cred.worker_checker import WorkerChecker
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -96,6 +97,8 @@ class Master(object):
         #locks
         self._lock = Lock()         #general lock, use when multiple shared resources are touched
         self._lock_queue = Lock()   #for access to _queue
+
+        self.load_crypto()
 
         #load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -138,7 +141,7 @@ class Master(object):
         checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
         realm.server.checker = checker
         checker.addUser("controller", "1234")
-        p = portal.Portal(realm, [checker])
+        p = portal.Portal(realm, [WorkerChecker()])
 
         #setup controller connection via AMF gateway
         # Place the namespace mapping into a TwistedGateway:
@@ -156,6 +159,39 @@ class Master(object):
         controller_service = internet.TCPServer(18800, pb.PBServerFactory(p))
 
         return worker_service, controller_service
+
+
+    def load_crypto(self):
+        """
+        Loads the private key used by the master to transmit encrypted messages
+        """
+        import os
+        from django.utils import simplejson
+        from Crypto.PublicKey import RSA
+        if not os.path.exists('./master.key'):
+            #local key does not exist, create and store
+            pub, priv = generate_keys()
+            try:
+                f = file('./master.key','w')
+                f.write(simplejson.dumps(priv))
+                os.chmod('./master.key', 0400)
+            finally:
+                if f:
+                    f.close()
+
+        else:
+            import fileinput
+            try:
+                key_file = fileinput.input('./master.key')
+                priv_raw = simplejson.loads(key_file[0])
+                priv = [long(x) for x in priv_raw]
+                pub = priv[:2]
+            finally:
+                if key_file:
+                    key_file.close()
+
+        self.pub_key = pub
+        self.priv_key = RSA.construct(priv)
 
 
     def load_nodes(self):
@@ -197,19 +233,17 @@ class Master(object):
                     factory = NodeClientFactory(node, self)
                     reactor.connectTCP(node.host, 11890, factory)
 
-                    # generate keys if needed
-                    if not node.priv_key:
-                        node.priv_key, node.pub_key = generate_keys()
-                        node.save()
-
-                    # SSH authentication is currently supported with perspectiveBroker.
-                    # For now just use the ssh key as a password.  At least its a large random Strong
+                    # SSH authentication is not currently supported with perspectiveBroker.
+                    # For now we'll perform a key handshake within the info/init handshake that already
+                    # occurs.  Prior to the handshake completing access will be limited to info which
+                    # is informational only.
                     #
-                    # Note that the first time connecting to the node will accept and register whatever
-                    # key is passed to it
+                    # Note: The first time connecting to the node will accept and register whatever
+                    # key is passed to it.  This is a small trade of in temporary insecurity to simplify
+                    # this can be avoided by manually generating and setting the keys
                     #
-                    #credential = credentials.SSHPrivateKey('master', 'RSA', node.priv_key, '', '')
-                    credential = credentials.UsernamePassword('master', node.priv_key)
+                    #credential = credentials.SSHPrivateKey('master', 'RSA', node.pub_key, '', '')
+                    credential = credentials.UsernamePassword('master', '1234')
 
                     deferred = factory.login(credential, client=self)
                     connections.append(deferred)
@@ -307,37 +341,51 @@ class Master(object):
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
 
-    def add_node(self, info, node):
+    def add_node(self, data, node):
         """
         Process Node information.  Most will just be stored for later use.  Info will include
-        a list of workers.  The master will then connect to all Workers
+        a list of workers.  The master will then connect to all Workers.
         """
 
         # save node's information in the database
+        info = data['info']
         node.cores = info['cores']
         node.cpu_speed = info['cpu']
         node.memory = info['memory']
         node.save()
 
-        if not node.seen:
-            priv_key = node.priv_key
-        else:
-            priv_key = None
-
-
-
-        #add the Node's workers to the checker so they are allowed to connect
+        #node key to be used by node and its workers
         node_key_str = '%s:%s' % (node.host, node.port)
-        for i in range(info['cores']):
-            self.checker.addUser('%s:%i' % (node_key_str, i), "1234")
+
+
+        # if there is a challenge from the Node it must be answered
+        # else it will not allow access to any of its functions
+        # The challenge will be encrypted with the masters key.
+        # it should be decrypted, and then re-encrypted with the nodes
+        # key and hashed
+        challenge_enc = data['challenge']
+        if challenge_enc:
+            import hashlib
+            pub_key = node.load_pub_key()
+            challenge_str = self.priv_key.decrypt(challenge_enc)
+            challenge_encode = pub_key.encrypt(challenge_str, None)
+            challenge_hash = hashlib.sha512(challenge_encode[0]).hexdigest()
+            pub_key = None
+        else:
+            challenge_hash = None
+            pub_key = self.pub_key
+            #twisted.bannana doesnt handle large ints very well
+            #we'll encode it with json and split it up into chunks
+            from django.utils import simplejson
+            import math
+            dumped = simplejson.dumps(pub_key)
+            chunk = 100
+            split = [dumped[i*chunk:i*chunk+chunk] for i in range(int(math.ceil(len(dumped)/(chunk*1.0))))]
+            pub_key = split
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, self.port, node_key_str, priv_key)
+        d = node.ref.callRemote('init', self.host, self.port, node_key_str, challenge_hash, pub_key)
         d.addCallback(self.node_ready, node)
-
-        #TODO Remove
-        #reactor.callLater(10, self.queue_task, 'TestTask');
-        #reactor.callLater(3, self.run_task, 'TestParallelTask');
 
 
     def node_ready(self, result, node):
@@ -345,8 +393,29 @@ class Master(object):
         Called when a call to initialize a Node is successful
         """
         print '[Info] node:%s - ready' % node
-        node.seen = True
-        node.save()
+
+        if result == -1:
+            #authentication failed
+            print '[ERROR] node:%s - rejected authentication' % node
+            pass
+
+
+        if result == 0:
+            # init was called before 'info'.  There was no challenge
+            # so the node will prevent a connection.  this is a defensive
+            # mechanism to ensure a challenge was created before you init
+            print '[warn] node:%s - init called before info, automatic rety' % node
+            d = node.ref.callRemote('info')
+            d.addCallback(self.add_node, node=node)
+
+
+        #if there is a public key from the node, unpack it and save it
+        if result:
+            dec = [self.priv_key.decrypt(chunk) for chunk in result]
+            json_key = ''.join(dec)
+            node.pub_key = json_key
+            node.seen = True
+            node.save()
 
 
     def add_worker(self, result, worker, worker_key):

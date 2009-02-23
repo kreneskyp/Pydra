@@ -42,6 +42,7 @@ from twisted.cred import portal, checkers
 from twisted.spread import pb
 from twisted.internet import reactor
 from twisted.application import service, internet
+from twisted.python.randbytes import secureRandom
 import os
 from subprocess import Popen
 from pydra_server.auth import *
@@ -60,6 +61,11 @@ class NodeServer:
         self.node_key = None
         self.initialized = False
         self.__lock = Lock()
+
+        #load crypto keys for authentication
+        self.load_node_crypto()
+        self.load_master_crypto()
+
         #load tasks that are cached locally
         self.available_tasks = {}
 
@@ -70,23 +76,112 @@ class NodeServer:
 
 
     def get_service(self):
-        from twisted.cred.checkers import AllowAnonymousAccess, FilePasswordDB
         """
         Creates a service object that can be used by twistd init code to start the server
         """
         realm = ClusterRealm()
         realm.server = self
 
-        # create security - We use the firstuser checker which allows master to connect
-        # and configure this node
-        checker = FirstUseChecker(self.password_file)
-
-        #checker = AllowAnonymousAccess()
+        # create security - Twisted does not support ssh in the pb so were doing our
+        # own authentication until it is implmented, leaving in the memory
+        # checker just so we dont have to rip out the authentication code
+        from twisted.cred.checkers import InMemoryUsernamePasswordDatabaseDontUse
+        checker =   InMemoryUsernamePasswordDatabaseDontUse()
+        checker.addUser('master','1234')
         p = portal.Portal(realm, [checker])
 
         factory = pb.PBServerFactory(p)
         return internet.TCPServer(11890, factory)
 
+
+    def load_node_crypto(self):
+        """
+        Loads the private key used by this node to receive encrypted messages 
+        from the master
+        """
+        import os
+        from django.utils import simplejson
+        from Crypto.PublicKey import RSA
+        if not os.path.exists('./node.key'):
+            #local key does not exist, create and store
+            pub, priv = generate_keys()
+            try:
+                f = file('./node.key','w')
+                f.write(simplejson.dumps(priv))
+                os.chmod('./node.key', 0400)
+            finally:
+                if f:
+                    f.close()
+
+        else:
+            import fileinput
+            try:
+                key_file = fileinput.input('./node.key')
+                priv_raw = simplejson.loads(key_file[0])
+                priv = [long(x) for x in priv_raw]
+                pub = priv[:2]
+
+            finally:
+                if key_file:
+                    key_file.close()
+
+        self.pub_key = pub
+        self.priv_key = RSA.construct(priv)
+
+
+    def load_master_crypto(self):
+        """
+        Loads the crypto key that will be used by this node to send encrypted
+        messages to the master node
+        """
+        import os
+        if not os.path.exists('./node.master.key'):
+            self.master_pub_key = None
+
+        else:
+            from django.utils import simplejson
+            from Crypto.PublicKey import RSA
+            import fileinput
+            try:
+                key_file = fileinput.input('./node.master.key')
+                try:
+                    pub = simplejson.loads(key_file[0])
+                except IndexError:
+                    #empty file
+                    self.master_pub_key = None
+                    return
+
+                self.master_pub_key = RSA.construct([long(x) for x in pub])
+
+            finally:
+                if key_file:
+                    key_file.close()
+
+
+    def create_challenge(self):
+        """
+        Creates a random, signed challenge string used to verify that the recipient 
+        is the master registered with this node.
+
+        If the node has not exchanged keys yet the challenge is None
+        """
+        import hashlib
+        if not self.master_pub_key:
+            return None, None
+
+        challenge = secureRandom(512)
+
+        # encode using master's key, only the matching private
+        # key will be able to decode this message
+        encode = self.master_pub_key.encrypt(challenge, None)
+
+        # now encode and hash the challenge string so it is not stored 
+        # plaintext.  It will be received in this same form so it will be 
+        # easier to compare
+        challenge = self.priv_key.encrypt(challenge, None)
+        challenge = hashlib.sha512(challenge[0]).hexdigest()
+
+        return challenge, encode
 
     def determine_info(self):
         """
@@ -101,7 +196,7 @@ class NodeServer:
         }
 
 
-    def init_node(self, master_host, master_port, node_key, node_priv_key):
+    def init_node(self, master_host, master_port, node_key, master_pub_key=None):
         """
         Initializes the node so it ready for use.  Workers will not be started
         until the master makes this call.  After a node is initialized workers
@@ -117,16 +212,42 @@ class NodeServer:
                 self.master_port = master_port
                 self.node_key = node_key
 
+                # if this is the first time the master has connected this server will need to
+                # exchange keys
+                #
                 # save the private key for the node, this allows the Master
-                # to authenticate using this key in the future
-                if node_priv_key:
-                    login_str = 'master:%s' % node_priv_key
-                    #create file if needed
-                    #os.path.exists(self.filename)
-                    file(self.password_file, 'w').write(login_str)
+                # to authenticate in the future using using a keypair handshake
+                if master_pub_key:
+                    from django.utils import simplejson
+                    from Crypto.PublicKey import RSA
+                    import math
+                    #try:
+                    key_file = file('./node.master.key', 'w')
+                    #reconstruct key array, it was already encoded
+                    #with json so no need to encode it here
+                    key = ''.join(master_pub_key)
+                    key_file = key_file.write(key)
+                    os.chmod('./node.master.key', 0400)
+                    key = simplejson.loads(key)
+                    key = [long(x) for x in key]
+                    self.master_pub_key = RSA.construct(key)
+                    #except:
+                    #    if key_file:
+                    #        key_file.close()
+
+                    #send the nodes public key.  serialize it and encrypt it
+                    #the key must be broken into chunks for it to be signed
+                    #for ease recompiling it we'll store the chunks as a list
+                    json_key = simplejson.dumps(self.pub_key)
+                    key_chunks = []
+                    chunk = 128
+                    for i in range(int(math.ceil(len(json_key)/(chunk*1.0)))):
+                        enc = self.master_pub_key.encrypt(json_key[i*chunk:i*chunk+chunk], None)
+                        key_chunks.append(enc[0])
+                    return key_chunks
 
                 #start the workers
-                self.start_workers()
+                #self.start_workers()
 
                 self.initialized = True
 
@@ -174,14 +295,30 @@ class ClusterRealm:
 
 
 class MasterAvatar(pb.Avatar):
+    """
+    Avatar that exposes and controls what a Master can do on this Node
+
+    Due to the limitations in the twisted.pb authentication system this
+    class is involved in a key authentication handshake.  the authenticated
+    flag is used to prevent access prior to verifying the user
+
+    Note that a new instance of this class will be created for each connection
+    even if it is the same Master re-connecting
+    """
     def __init__(self, name):
         self.name = name
-        print '[info] master connected to node'
+        self.authenticated = False
+        self.challenged = False
+        self.challenge = None
+        print '[info] Master connected to node'
 
     def attached(self, mind):
         self.remote = mind
 
     def detached(self, mind):
+        """
+        called when the Master disconnects.
+        """
         self.remote = None
 
     # returns the status of this node
@@ -190,15 +327,43 @@ class MasterAvatar(pb.Avatar):
 
     # Returns a dictionary of useful information about this node
     def perspective_info(self):
-        return self.server.info
+        self.challenge, encoded = self.server.create_challenge()
+        self.challenged = True
+        return {'challenge':encoded, 'info':self.server.info}
 
-
-    def perspective_init(self, master_host, master_port, node_key, node_priv_key):
+    def perspective_init(self, master_host, master_port, node_key, challenge_response, master_pub_key=None):
         """
         Initializes a node.  The server sends its connection information and
         credentials for the node
         """
-        self.server.init_node(master_host, master_port, node_key, node_priv_key)
+
+        # the avatar has not been challenged yet, do not let it continue
+        # this is required to prevent 'init' from being called before 'info'
+        # that would result in an empty challenge every time.  The only time the challenge
+        # should be None is if the key hasn't been received yet.
+        if not self.challenged:
+            return 0
+
+        # if there is a challenge, it must be verified before the server will allow init to continue
+        if self.challenge:
+            verified = self.challenge == challenge_response
+            # reset the challenge after checking it once.  This prevents brute force attempts
+            # to determine the correct response
+            self.challenge = None
+            self.challenged = False
+            if not verified:
+                #challenge failed, return error code
+                print '[ERROR] Master failed authentication challenge'
+                return -1
+
+            print '[Info] Master verified'
+
+        else:
+            # no challenge, this is the first time the master is connectig.  Allow the the user past
+            print '[Info] first time master has connected, allowing access without verification'
+
+        self.authenticated = True
+        return self.server.init_node(master_host, master_port, node_key, master_pub_key)
 
 
 
