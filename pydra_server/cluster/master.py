@@ -59,7 +59,7 @@ from django.utils import simplejson
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
-from pydra_server.auth import generate_keys
+from pydra_server.auth import load_crypto
 from pydra_server.cred.worker_checker import WorkerChecker
 
 class NodeClientFactory(pb.PBClientFactory):
@@ -98,7 +98,7 @@ class Master(object):
         self._lock = Lock()         #general lock, use when multiple shared resources are touched
         self._lock_queue = Lock()   #for access to _queue
 
-        self.load_crypto()
+        self.pub_key, self.priv_key = load_crypto('./master.key')
 
         #load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -159,39 +159,6 @@ class Master(object):
         controller_service = internet.TCPServer(18800, pb.PBServerFactory(p))
 
         return worker_service, controller_service
-
-
-    def load_crypto(self):
-        """
-        Loads the private key used by the master to transmit encrypted messages
-        """
-        import os
-        from django.utils import simplejson
-        from Crypto.PublicKey import RSA
-        if not os.path.exists('./master.key'):
-            #local key does not exist, create and store
-            pub, priv = generate_keys()
-            try:
-                f = file('./master.key','w')
-                f.write(simplejson.dumps(priv))
-                os.chmod('./master.key', 0400)
-            finally:
-                if f:
-                    f.close()
-
-        else:
-            import fileinput
-            try:
-                key_file = fileinput.input('./master.key')
-                priv_raw = simplejson.loads(key_file[0])
-                priv = [long(x) for x in priv_raw]
-                pub = priv[:2]
-            finally:
-                if key_file:
-                    key_file.close()
-
-        self.pub_key = pub
-        self.priv_key = RSA.construct(priv)
 
 
     def load_nodes(self):

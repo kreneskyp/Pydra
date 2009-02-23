@@ -63,8 +63,8 @@ class NodeServer:
         self.__lock = Lock()
 
         #load crypto keys for authentication
-        self.load_node_crypto()
-        self.load_master_crypto()
+        self.pub_key, self.priv_key = load_crypto('./node.key')
+        self.master_pub_key = load_crypto('./node.master.key', False)
 
         #load tasks that are cached locally
         self.available_tasks = {}
@@ -94,70 +94,6 @@ class NodeServer:
         return internet.TCPServer(11890, factory)
 
 
-    def load_node_crypto(self):
-        """
-        Loads the private key used by this node to receive encrypted messages 
-        from the master
-        """
-        import os
-        from django.utils import simplejson
-        from Crypto.PublicKey import RSA
-        if not os.path.exists('./node.key'):
-            #local key does not exist, create and store
-            pub, priv = generate_keys()
-            try:
-                f = file('./node.key','w')
-                f.write(simplejson.dumps(priv))
-                os.chmod('./node.key', 0400)
-            finally:
-                if f:
-                    f.close()
-
-        else:
-            import fileinput
-            try:
-                key_file = fileinput.input('./node.key')
-                priv_raw = simplejson.loads(key_file[0])
-                priv = [long(x) for x in priv_raw]
-                pub = priv[:2]
-
-            finally:
-                if key_file:
-                    key_file.close()
-
-        self.pub_key = pub
-        self.priv_key = RSA.construct(priv)
-
-
-    def load_master_crypto(self):
-        """
-        Loads the crypto key that will be used by this node to send encrypted
-        messages to the master node
-        """
-        import os
-        if not os.path.exists('./node.master.key'):
-            self.master_pub_key = None
-
-        else:
-            from django.utils import simplejson
-            from Crypto.PublicKey import RSA
-            import fileinput
-            try:
-                key_file = fileinput.input('./node.master.key')
-                try:
-                    pub = simplejson.loads(key_file[0])
-                except IndexError:
-                    #empty file
-                    self.master_pub_key = None
-                    return
-
-                self.master_pub_key = RSA.construct([long(x) for x in pub])
-
-            finally:
-                if key_file:
-                    key_file.close()
-
-
     def create_challenge(self):
         """
         Creates a random, signed challenge string used to verify that the recipient 
@@ -169,7 +105,7 @@ class NodeServer:
         if not self.master_pub_key:
             return None, None
 
-        challenge = secureRandom(512)
+        challenge = secureRandom(256)
 
         # encode using master's key, only the matching private
         # key will be able to decode this message

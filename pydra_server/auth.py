@@ -30,6 +30,50 @@ def generate_keys():
         return pub_l, pri_l
 
 
+def load_crypto(path, create=True):
+        """
+        Loads RSA keys from the specified path, optionally creating
+        new keys.  It automatically detects whether it is a keypair
+        or just the public key
+        """
+        import os
+        from django.utils import simplejson
+        from Crypto.PublicKey import RSA
+        if not os.path.exists(path):
+            if create:
+                #local key does not exist, create and store
+                pub, priv = generate_keys()
+                try:
+                    f = file(path,'w')
+                    f.write(simplejson.dumps(priv))
+                    os.chmod(path, 0400)
+                finally:
+                    if f:
+                        f.close()
+
+                return pub, RSA.construct(priv)
+
+        else:
+            import fileinput
+            try:
+                key_file = fileinput.input(path)
+                priv_raw = simplejson.loads(key_file[0])
+                key_all = [long(x) for x in priv_raw]
+
+                if len(key_all) > 2:
+                    # file contains both keys
+                    pub = key_all[:2]
+                    return pub, RSA.construct(key_all)
+
+                #file had pub key only
+                return RSA.construct(key_all)
+
+            finally:
+                if key_file:
+                    key_file.close()
+
+        return None
+
 
 from twisted.internet import defer
 from twisted.python import failure, log
