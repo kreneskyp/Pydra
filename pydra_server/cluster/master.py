@@ -249,8 +249,8 @@ class Master(object):
                 print '[info] node:%s:%s - connected' % (node.host, node.port)
 
                 #Initialize the node, this will result in it sending its info
-                d = node.ref.callRemote('info')
-                d.addCallback(self.add_node, node=node)
+                d = node.ref.callRemote('node_authorization')
+                d.addCallback(self.node_authorization, node=node)
 
             #failures
             else:
@@ -308,14 +308,63 @@ class Master(object):
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
 
-    def add_node(self, data, node):
+    def node_authorization(self, challenge, node):
+        """
+        Callback for a request for authorization challenge.  This callback
+        will decode and respond to the string passed in.
+
+         if there is a challenge from the Node it must be answered
+         else it will not allow access to any of its functions
+         The challenge will be encrypted with the masters key.
+         it should be decrypted, and then re-encrypted with the nodes
+         key and hashed
+
+        """
+        import hashlib
+        if challenge:
+            #decrypt challenge
+            challenge_str = self.priv_key.decrypt(challenge)
+
+            #re-encrypt using node's key and then sha hash it.
+            pub_key = node.load_pub_key()
+            challenge_encode = pub_key.encrypt(challenge_str, None)
+            challenge_hash = hashlib.sha512(challenge_encode[0]).hexdigest()
+        else:
+            challenge_hash = None
+
+        d = node.ref.callRemote('authorization_response', response=challenge_hash)
+        d.addCallback(self.node_authorization_result, node=node)
+
+
+    def node_authorization_result(self, result, node):
+        """
+        Callback that handles the response from the challenge response handshake
+        """
+        if result == -1:
+            #authentication failed
+            print '[ERROR] node:%s - rejected authentication' % node
+            return
+
+        if result == 0:
+            # init was called before 'info'.  There was no challenge
+            # so the node will prevent a connection.  this is a defensive
+            # mechanism to ensure a challenge was created before you init
+            print '[warn] node:%s - called before request, automatic rety' % node
+            d = node.ref.callRemote('node_authorization')
+            d.addCallback(self.node_authorization, node=node)
+
+        #successful! begin init'ing the node.
+        d = node.ref.callRemote('info')
+        d.addCallback(self.add_node, node=node)
+
+
+    def add_node(self, info, node):
         """
         Process Node information.  Most will just be stored for later use.  Info will include
         a list of workers.  The master will then connect to all Workers.
         """
 
         # save node's information in the database
-        info = data['info']
         node.cores = info['cores']
         node.cpu_speed = info['cpu']
         node.memory = info['memory']
@@ -325,21 +374,10 @@ class Master(object):
         node_key_str = '%s:%s' % (node.host, node.port)
 
 
-        # if there is a challenge from the Node it must be answered
-        # else it will not allow access to any of its functions
-        # The challenge will be encrypted with the masters key.
-        # it should be decrypted, and then re-encrypted with the nodes
-        # key and hashed
-        challenge_enc = data['challenge']
-        if challenge_enc:
-            import hashlib
-            pub_key = node.load_pub_key()
-            challenge_str = self.priv_key.decrypt(challenge_enc)
-            challenge_encode = pub_key.encrypt(challenge_str, None)
-            challenge_hash = hashlib.sha512(challenge_encode[0]).hexdigest()
-            pub_key = None
-        else:
-            challenge_hash = None
+        # if the node has never been 'seen' before it needs the Master's key
+        # encrypt it and send it the key
+        if not node.seen:
+            print '[Info] Node has not been seen before, sending it the Master Pub Key'
             pub_key = self.pub_key
             #twisted.bannana doesnt handle large ints very well
             #we'll encode it with json and split it up into chunks
@@ -350,8 +388,11 @@ class Master(object):
             split = [dumped[i*chunk:i*chunk+chunk] for i in range(int(math.ceil(len(dumped)/(chunk*1.0))))]
             pub_key = split
 
+        else:
+            pub_key = None
+
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, self.port, node_key_str, challenge_hash, pub_key)
+        d = node.ref.callRemote('init', self.host, self.port, node_key_str, pub_key)
         d.addCallback(self.node_ready, node)
 
 
@@ -361,22 +402,7 @@ class Master(object):
         """
         print '[Info] node:%s - ready' % node
 
-        if result == -1:
-            #authentication failed
-            print '[ERROR] node:%s - rejected authentication' % node
-            pass
-
-
-        if result == 0:
-            # init was called before 'info'.  There was no challenge
-            # so the node will prevent a connection.  this is a defensive
-            # mechanism to ensure a challenge was created before you init
-            print '[warn] node:%s - init called before info, automatic rety' % node
-            d = node.ref.callRemote('info')
-            d.addCallback(self.add_node, node=node)
-
-
-        #if there is a public key from the node, unpack it and save it
+        # if there is a public key from the node, unpack it and save it
         if result:
             dec = [self.priv_key.decrypt(chunk) for chunk in result]
             json_key = ''.join(dec)

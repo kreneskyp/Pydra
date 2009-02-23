@@ -105,11 +105,11 @@ class NodeServer:
         if not self.master_pub_key:
             return None, None
 
-        challenge = secureRandom(256)
+        challenge = secureRandom(10)
 
         # encode using master's key, only the matching private
         # key will be able to decode this message
-        encode = self.master_pub_key.encrypt(challenge, None)
+        encode = self.master_pub_key.encrypt(challenge, None)[0]
 
         # now encode and hash the challenge string so it is not stored 
         # plaintext.  It will be received in this same form so it will be 
@@ -257,22 +257,18 @@ class MasterAvatar(pb.Avatar):
         """
         self.remote = None
 
-    # returns the status of this node
-    def perspective_status(self):
-        pass
 
-    # Returns a dictionary of useful information about this node
-    def perspective_info(self):
+    def perspective_node_authorization(self):
+        """
+        Remote method for requesting to begin the challenge/response
+        Authorization handshake
+        """
         self.challenge, encoded = self.server.create_challenge()
         self.challenged = True
-        return {'challenge':encoded, 'info':self.server.info}
 
-    def perspective_init(self, master_host, master_port, node_key, challenge_response, master_pub_key=None):
-        """
-        Initializes a node.  The server sends its connection information and
-        credentials for the node
-        """
+        return encoded
 
+    def perspective_authorization_response(self, response):
         # the avatar has not been challenged yet, do not let it continue
         # this is required to prevent 'init' from being called before 'info'
         # that would result in an empty challenge every time.  The only time the challenge
@@ -282,7 +278,7 @@ class MasterAvatar(pb.Avatar):
 
         # if there is a challenge, it must be verified before the server will allow init to continue
         if self.challenge:
-            verified = self.challenge == challenge_response
+            verified = self.challenge == response
             # reset the challenge after checking it once.  This prevents brute force attempts
             # to determine the correct response
             self.challenge = None
@@ -299,7 +295,28 @@ class MasterAvatar(pb.Avatar):
             print '[Info] first time master has connected, allowing access without verification'
 
         self.authenticated = True
-        return self.server.init_node(master_host, master_port, node_key, master_pub_key)
+
+
+    # returns the status of this node
+    def perspective_status(self):
+        if self.authenticated:
+            pass
+
+
+    # Returns a dictionary of useful information about this node
+    def perspective_info(self):
+        if self.authenticated:
+            return self.server.info
+
+
+
+    def perspective_init(self, master_host, master_port, node_key, master_pub_key=None):
+        """
+        Initializes a node.  The server sends its connection information and
+        credentials for the node
+        """
+        if self.authenticated:
+            return self.server.init_node(master_host, master_port, node_key, master_pub_key)
 
 
 
