@@ -61,6 +61,7 @@ from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
 from pydra_server.auth import load_crypto
 from pydra_server.cred.worker_checker import WorkerChecker
+from pydra_server.cluster.auth.rsa_auth import RSAClient
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -98,7 +99,9 @@ class Master(object):
         self._lock = Lock()         #general lock, use when multiple shared resources are touched
         self._lock_queue = Lock()   #for access to _queue
 
+        #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('./master.key')
+        self.rsa_client = RSAClient(self.priv_key, callback=self.init_node)
 
         #load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -137,17 +140,18 @@ class Master(object):
         realm = MasterRealm()
         realm.server = self
 
-        #setup security 
-        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-        realm.server.checker = checker
-        checker.addUser("controller", "1234")
+        # setup worker security
         p = portal.Portal(realm, [WorkerChecker()])
+
+        #setup AMF gateway security 
+        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        checker.addUser("controller", "1234")
 
         #setup controller connection via AMF gateway
         # Place the namespace mapping into a TwistedGateway:
         from pyamf.remoting.gateway.twisted import TwistedGateway
         from pyamf.remoting import gateway
-        interface = AMFInterface(realm.server, checker)
+        interface = AMFInterface(self, checker)
         gw = TwistedGateway({ 
                         "controller": interface,
                         }, authenticator=interface.auth)
@@ -155,10 +159,11 @@ class Master(object):
         root = resource.Resource()
         root.putChild("", gw)
 
-        worker_service = internet.TCPServer(18801, server.Site(root))
-        controller_service = internet.TCPServer(18800, pb.PBServerFactory(p))
+        #setup services
+        controller_service = internet.TCPServer(18801, server.Site(root))
+        worker_service = internet.TCPServer(18800, pb.PBServerFactory(p))
 
-        return worker_service, controller_service
+        return controller_service,  worker_service
 
 
     def load_nodes(self):
@@ -186,10 +191,6 @@ class Master(object):
         #     connections are finished
         with self._lock:
             self.connecting=True
-
-            #clear the reconnect id, its already been called if it reached this far
-            #if self.reconnect_call_ID:
-            #    self.reconnect_call_ID = None
 
             "Begin the connection process"
             connections = []
@@ -238,19 +239,12 @@ class Master(object):
                 # save reference for remote calls
                 node.ref = result[1]
 
-                # Generate a node_key unique to this node instance, it will be used as
-                # a base for the worker_key unique to the worker instance.  The
-                # key will be used by its workers as identification and verification
-                # that they really belong to the cluster.  This does not need to be 
-                # extremely secure because workers only process data, they can't modify
-                # anything anywhere else in the network.  The worst they should be able to
-                # do is cause invalid results
-                #node_key = '%s:%s' % (node.host, node.port)
+
                 print '[info] node:%s:%s - connected' % (node.host, node.port)
 
-                #Initialize the node, this will result in it sending its info
-                d = node.ref.callRemote('node_authorization')
-                d.addCallback(self.node_authorization, node=node)
+                # Authenticate with the node
+                pub_key = node.load_pub_key()
+                self.rsa_client.auth(node.ref, pub_key.encrypt, node=node)
 
             #failures
             else:
@@ -308,52 +302,11 @@ class Master(object):
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
 
-    def node_authorization(self, challenge, node):
+    def init_node(self, node):
         """
-        Callback for a request for authorization challenge.  This callback
-        will decode and respond to the string passed in.
-
-         if there is a challenge from the Node it must be answered
-         else it will not allow access to any of its functions
-         The challenge will be encrypted with the masters key.
-         it should be decrypted, and then re-encrypted with the nodes
-         key and hashed
-
+        Start the initialization sequence with the node.  The first
+        step is to query it for its information.
         """
-        import hashlib
-        if challenge:
-            #decrypt challenge
-            challenge_str = self.priv_key.decrypt(challenge)
-
-            #re-encrypt using node's key and then sha hash it.
-            pub_key = node.load_pub_key()
-            challenge_encode = pub_key.encrypt(challenge_str, None)
-            challenge_hash = hashlib.sha512(challenge_encode[0]).hexdigest()
-        else:
-            challenge_hash = None
-
-        d = node.ref.callRemote('authorization_response', response=challenge_hash)
-        d.addCallback(self.node_authorization_result, node=node)
-
-
-    def node_authorization_result(self, result, node):
-        """
-        Callback that handles the response from the challenge response handshake
-        """
-        if result == -1:
-            #authentication failed
-            print '[ERROR] node:%s - rejected authentication' % node
-            return
-
-        if result == 0:
-            # init was called before 'info'.  There was no challenge
-            # so the node will prevent a connection.  this is a defensive
-            # mechanism to ensure a challenge was created before you init
-            print '[warn] node:%s - called before request, automatic rety' % node
-            d = node.ref.callRemote('node_authorization')
-            d.addCallback(self.node_authorization, node=node)
-
-        #successful! begin init'ing the node.
         d = node.ref.callRemote('info')
         d.addCallback(self.add_node, node=node)
 
@@ -827,7 +780,7 @@ class AMFInterface(pb.Root):
         self.checker = checker
 
     def auth(self, user, password):
-        authenticator = AMFAuthenticator(checker)
+        authenticator = AMFAuthenticator(self.checker)
         return authenticator.auth(user, password)
 
     def is_alive(self, _):

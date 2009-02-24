@@ -42,10 +42,12 @@ from twisted.cred import portal, checkers
 from twisted.spread import pb
 from twisted.internet import reactor
 from twisted.application import service, internet
-from twisted.python.randbytes import secureRandom
+
+
 import os
 from subprocess import Popen
 from pydra_server.auth import *
+from pydra_server.cluster.auth.master_avatar import MasterAvatar
 
 class NodeServer:
     """
@@ -224,100 +226,9 @@ class ClusterRealm:
     implements(portal.IRealm)
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
-        avatar = MasterAvatar(avatarID)
-        avatar.server = self.server
+        avatar = MasterAvatar(avatarID, self.server)
         avatar.attached(mind)
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
-
-
-class MasterAvatar(pb.Avatar):
-    """
-    Avatar that exposes and controls what a Master can do on this Node
-
-    Due to the limitations in the twisted.pb authentication system this
-    class is involved in a key authentication handshake.  the authenticated
-    flag is used to prevent access prior to verifying the user
-
-    Note that a new instance of this class will be created for each connection
-    even if it is the same Master re-connecting
-    """
-    def __init__(self, name):
-        self.name = name
-        self.authenticated = False
-        self.challenged = False
-        self.challenge = None
-        print '[info] Master connected to node'
-
-    def attached(self, mind):
-        self.remote = mind
-
-    def detached(self, mind):
-        """
-        called when the Master disconnects.
-        """
-        self.remote = None
-
-
-    def perspective_node_authorization(self):
-        """
-        Remote method for requesting to begin the challenge/response
-        Authorization handshake
-        """
-        self.challenge, encoded = self.server.create_challenge()
-        self.challenged = True
-
-        return encoded
-
-    def perspective_authorization_response(self, response):
-        # the avatar has not been challenged yet, do not let it continue
-        # this is required to prevent 'init' from being called before 'info'
-        # that would result in an empty challenge every time.  The only time the challenge
-        # should be None is if the key hasn't been received yet.
-        if not self.challenged:
-            return 0
-
-        # if there is a challenge, it must be verified before the server will allow init to continue
-        if self.challenge:
-            verified = self.challenge == response
-            # reset the challenge after checking it once.  This prevents brute force attempts
-            # to determine the correct response
-            self.challenge = None
-            self.challenged = False
-            if not verified:
-                #challenge failed, return error code
-                print '[ERROR] Master failed authentication challenge'
-                return -1
-
-            print '[Info] Master verified'
-
-        else:
-            # no challenge, this is the first time the master is connectig.  Allow the the user past
-            print '[Info] first time master has connected, allowing access without verification'
-
-        self.authenticated = True
-
-
-    # returns the status of this node
-    def perspective_status(self):
-        if self.authenticated:
-            pass
-
-
-    # Returns a dictionary of useful information about this node
-    def perspective_info(self):
-        if self.authenticated:
-            return self.server.info
-
-
-
-    def perspective_init(self, master_host, master_port, node_key, master_pub_key=None):
-        """
-        Initializes a node.  The server sends its connection information and
-        credentials for the node
-        """
-        if self.authenticated:
-            return self.server.init_node(master_host, master_port, node_key, master_pub_key)
-
 
 
 #root application object
