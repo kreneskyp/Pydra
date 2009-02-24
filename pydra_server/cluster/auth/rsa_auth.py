@@ -19,6 +19,7 @@
 
 from twisted.spread import pb
 from twisted.python.randbytes import secureRandom
+from twisted.conch.ssh.keys import Key
 from twisted.internet import threads
 import hashlib
 
@@ -68,8 +69,7 @@ class RSAAvatar(pb.Avatar):
             else:
                 return -1
 
-        challenge = secureRandom(256)
-        print '[debug] Challenge: %s' % challenge
+        challenge = secureRandom(128)
 
         # encode using master's key, only the matching private
         # key will be able to decode this message
@@ -190,3 +190,68 @@ class RSAClient(object):
         #successful! begin init'ing the node.
         if self.callback:
             threads.deferToThread(self.callback, **kwargs)
+
+
+def generate_keys():
+        """
+        Generates an RSA key pair used for connecting to a node.
+        keys are returned as the list of values required to serialize/deserilize the keys
+
+        Keys can be reconstructed by RSA.construct(list)
+        """
+        print "[info] Generating RSA keypair"
+        from Crypto.PublicKey import RSA
+        KEY_LENGTH = 4096
+        rsa_key = RSA.generate(KEY_LENGTH, secureRandom)
+
+        data = Key(rsa_key).data()
+
+        pub_l = [data['n'], data['e']]
+        pri_l = [data['n'], data['e'], data['d'], data['q'], data['p']]
+
+        return pub_l, pri_l
+
+
+def load_crypto(path, create=True):
+        """
+        Loads RSA keys from the specified path, optionally creating
+        new keys.  It automatically detects whether it is a keypair
+        or just the public key
+        """
+        import os
+        from django.utils import simplejson
+        from Crypto.PublicKey import RSA
+        if not os.path.exists(path):
+            if create:
+                #local key does not exist, create and store
+                pub, priv = generate_keys()
+                try:
+                    f = file(path,'w')
+                    f.write(simplejson.dumps(priv))
+                    os.chmod(path, 0400)
+                finally:
+                    if f:
+                        f.close()
+
+                return pub, RSA.construct(priv)
+
+        else:
+            import fileinput
+            try:
+                key_file = fileinput.input(path)
+                priv_raw = simplejson.loads(key_file[0])
+                key_all = [long(x) for x in priv_raw]
+
+                if len(key_all) > 2:
+                    # file contains both keys
+                    pub = key_all[:2]
+                    return pub, RSA.construct(key_all)
+
+                #file had pub key only
+                return RSA.construct(key_all)
+
+            finally:
+                if key_file:
+                    key_file.close()
+
+        return None

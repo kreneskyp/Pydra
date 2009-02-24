@@ -46,7 +46,7 @@ from twisted.application import service, internet
 
 import os
 from subprocess import Popen
-from pydra_server.auth import *
+from pydra_server.cluster.auth.rsa_auth import load_crypto
 from pydra_server.cluster.auth.master_avatar import MasterAvatar
 
 class NodeServer:

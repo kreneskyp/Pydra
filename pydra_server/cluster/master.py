@@ -59,9 +59,8 @@ from django.utils import simplejson
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
-from pydra_server.auth import load_crypto
 from pydra_server.cred.worker_checker import WorkerChecker
-from pydra_server.cluster.auth.rsa_auth import RSAClient
+from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 
 class NodeClientFactory(pb.PBClientFactory):
     """
