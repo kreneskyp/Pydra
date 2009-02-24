@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<!--
+    Copyright 2009 Oregon State University
+
+    This file is part of Pydra.
+
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+    <head>
+    {% block head %}
+        <link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}/css/main.css" />
+        <style>
+            * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; font-color: #444; line-height: 25px; padding: 0px; margin: 0px; }
+
+            div#headerContainer {
+                padding:0px;
+                text-align:center;
+                margin-bottom:10px;
+            }
+
+            div#mainmenu { 
+                color:white;
+                background-color:#1854d0;
+                padding:0px;
+                margin:0px;
+            }
+
+            div#submenu { 
+                background-color:#707070;
+                padding:0px;
+                margin:0px;
+            }
+
+            span.menuitem {
+                margin: 0px;
+                padding-left: 5px;
+                padding-right:5px;
+                border-style: solid;
+                border-width: 0px 1px 0px 0px;
+                border-color:black;
+            }
+
+            span.lastmenuitem {
+                border: 0px;
+            }
+
+            span.results {
+                position:absolute;
+                left:20px;
+                font-weight:bold;
+            }
+
+            a.mainmenuitem {
+                font-size:14px;
+            }
+
+            a:link { 
+                color:white; 
+                text-decoration:none; 
+            }
+            a.menuitem                   { color:white; text-decoration:none; }
+            a.menuitme:visited           { color:white; text-decoration:none; }
+            a.menuitme:hover             { color:white; text-decoration:underline; }
+            a.menuitme:active            { color:white; text-decoration:none;}
+
+            a.mainmenuitem                   { color:white; text-decoration:none; }
+            a.mainmenuitem:visited           { color:white; text-decoration:none; }
+            a.mainmenuitem:hover             { color:white; text-decoration:underline; }
+            a.mainmenuitem:active            { color:white; text-decoration:none;}
+        </style>
+    {% endblock %}
+    <head>
+
+    <div id="headerContainer">
+    {% block header %}
+        <div id="mainmenu">
+            <span class="menuitem "><a class="mainmenuitem" href="{{SITE_ROOT}}/nodes">Nodes</a></span>
+            <span class="menuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/jobs">Jobs</a></span>
+            {% if user.is_authenticated %}
+                <span class="menuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/logout">Logout</a></span>
+            {% else %}
+                <span class="menuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/login">Login</a></span>
+            {% endif %}
+        </div>
+         <div id="submenu">
+            {% block submenu %}
+            {% endblock %}
+        </div>
+    {% endblock %}
+    </div>
+
+    <div id="content">
+        {% block content %}
+        {% endblock %}
+    </div>
+</body>
+</html>
