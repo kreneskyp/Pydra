@@ -42,6 +42,7 @@ from twisted.cred import credentials
 from twisted.internet.protocol import ReconnectingClientFactory
 from threading import Lock
 
+from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from task_manager import TaskManager
 from constants import *
 
@@ -88,6 +89,12 @@ class Worker(pb.Referenceable):
         self.worker_key = worker_key
         self.reconnect_count = 0
 
+        # load crypto for authentication
+        # workers use the same keys as their parent Node
+        self.pub_key, self.priv_key = load_crypto('./node.key')
+        self.master_pub_key = load_crypto('./node.master.key', False)
+        self.rsa_client = RSAClient(self.priv_key)
+
         #load tasks that are cached locally
         self.task_manager = TaskManager()
         self.task_manager.autodiscover()
@@ -100,10 +107,13 @@ class Worker(pb.Referenceable):
         """
         Make initial connections to all Nodes
         """
+        import fileinput
+
         print '[info] worker:%s - connecting to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
         factory = MasterClientFactory(self.reconnect)
         reactor.connectTCP(self.master_host, self.master_port, factory)
-        deferred = factory.login(credentials.UsernamePassword(self.worker_key, "1234"), client=self)
+
+        deferred = factory.login(credentials.UsernamePassword(self.worker_key, '1234'), client=self)
         deferred.addCallbacks(self.connected, self.reconnect, errbackArgs=("Failed to Connect"))
 
     def reconnect(self, *arg, **kw):
@@ -123,7 +133,11 @@ class Worker(pb.Referenceable):
         with self.__lock_connection:
             self.master = result
         self.reconnect_count = 0
+
         print '[info] worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port)
+
+        # Authenticate with the master
+        self.rsa_client.auth(result, self.master_pub_key.encrypt)
 
 
     def connect_failed(self, result):

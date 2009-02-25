@@ -96,31 +96,6 @@ class NodeServer:
         return internet.TCPServer(11890, factory)
 
 
-    def create_challenge(self):
-        """
-        Creates a random, signed challenge string used to verify that the recipient 
-        is the master registered with this node.
-
-        If the node has not exchanged keys yet the challenge is None
-        """
-        import hashlib
-        if not self.master_pub_key:
-            return None, None
-
-        challenge = secureRandom(10)
-
-        # encode using master's key, only the matching private
-        # key will be able to decode this message
-        encode = self.master_pub_key.encrypt(challenge, None)[0]
-
-        # now encode and hash the challenge string so it is not stored 
-        # plaintext.  It will be received in this same form so it will be 
-        # easier to compare
-        challenge = self.priv_key.encrypt(challenge, None)
-        challenge = hashlib.sha512(challenge[0]).hexdigest()
-
-        return challenge, encode
-
     def determine_info(self):
         """
         Builds a dictionary of useful information about this Node
@@ -185,7 +160,7 @@ class NodeServer:
                     return key_chunks
 
                 #start the workers
-                #self.start_workers()
+                self.start_workers()
 
                 self.initialized = True
 

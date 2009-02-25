@@ -59,8 +59,8 @@ from django.utils import simplejson
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.task_manager import TaskManager
-from pydra_server.cred.worker_checker import WorkerChecker
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
+from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -139,10 +139,14 @@ class Master(object):
         realm = MasterRealm()
         realm.server = self
 
-        # setup worker security
-        p = portal.Portal(realm, [WorkerChecker()])
+        # setup worker security - using this checker just because we need
+        # _something_ that returns an avatarID.  Its extremely vulnerable
+        # but thats ok because the real authentication takes place after
+        # the worker has connected
+        self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        p = portal.Portal(realm, [self.worker_checker])
 
-        #setup AMF gateway security 
+        #setup AMF gateway security
         checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
         checker.addUser("controller", "1234")
 
@@ -343,6 +347,13 @@ class Master(object):
         else:
             pub_key = None
 
+
+        # add all workers
+        for i in range(node.cores):
+            worker_key = '%s:%i' % (node_key_str, i)
+            self.worker_checker.addUser(worker_key, '1234')
+
+
         # we have allowed access for all the workers, tell the node to init
         d = node.ref.callRemote('init', self.host, self.port, node_key_str, pub_key)
         d.addCallback(self.node_ready, node)
@@ -361,6 +372,15 @@ class Master(object):
             node.pub_key = json_key
             node.seen = True
             node.save()
+
+
+    def worker_authenticated(self, worker_avatar):
+        """
+        Callback when a worker has been successfully authenticated
+        """
+        #request status to determine what this worker was doing
+        deferred = worker_avatar.remote.callRemote('status')
+        deferred.addCallback(self.add_worker, worker=worker_avatar, worker_key=worker_avatar.name)
 
 
     def add_worker(self, result, worker, worker_key):
@@ -683,55 +703,13 @@ class MasterRealm:
             print '[info] controller:%s - connected' % avatarID
 
         else:
-            avatar = WorkerAvatar(avatarID)
-            avatar.server = self.server
+            key_split = avatarID.split(':')
+            node = Node.objects.get(host=key_split[0], port=key_split[1])
+            avatar = WorkerAvatar(avatarID, self.server, node)
             avatar.attached(mind)
             print '[info] worker:%s - connected' % avatarID
 
-            #request status to determine what this worker was doing
-            deferred = avatar.remote.callRemote('status')
-            deferred.addCallback(self.server.add_worker, worker=avatar, worker_key=avatarID)
-
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
-
-
-class WorkerAvatar(pb.Avatar):
-    """
-    Avatar used by Workers connecting to the Master.
-    """
-    def __init__(self, name):
-        self.name = name
-
-    def attached(self, mind):
-        self.remote = mind
-
-    def detached(self, mind):
-        print '[info] worker:%s - disconnected' % self.name
-        self.server.remove_worker(self.name)
-        self.remote = None
-
-    def perspective_send_results(self, results, workunit_key):
-        """
-        Called by workers when they have completed their task and need to report the results.
-        * Tasks runtime and log should be saved in the database
-        """
-        return self.server.send_results(self.name, results, workunit_key)
-
-    def perspective_stopped(self):
-        """
-        Called by workers when they have stopped themselves because of a stop_task call
-        This response may be delayed because there is no guaruntee that the Task will
-        respect the STOP_FLAG.  Until this callback is made the Worker is still working
-        """
-        return self.server.worker_stopped(self.name)
-
-    def perspective_request_worker(self, subtask_key, args, workunit_key):
-        """
-        Called by workers running a Parallel task.  This is a request
-        for a worker in the cluster to process the args sent
-        """
-        return self.server.request_worker(self, subtask_key, args, workunit_key)
-
 
 
 class AMFAuthenticator(object):

@@ -30,7 +30,7 @@ class MasterAvatar(RSAAvatar):
         node_encrypt = server.priv_key.encrypt if server.priv_key else None
         master_encrypt = server.master_pub_key.encrypt if server.master_pub_key else None
 
-        RSAAvatar.__init__(self, node_encrypt, master_encrypt, True)
+        RSAAvatar.__init__(self, node_encrypt, master_encrypt, no_key_first_use=True)
         print '[info] Master connected to node'
 
 

@@ -32,10 +32,11 @@ class RSAAvatar(pb.Avatar):
     This handshake should be built in as a checker but the PerspectiveBroker
     api does not suuport ISSHKey credentials for authorization
     """
-    def __init__(self, server_key_encrypt, client_key_encrypt, no_key_first_use=False):
+    def __init__(self, server_key_encrypt, client_key_encrypt, authenticated_callback=None, no_key_first_use=False):
         self.no_key_first_use = no_key_first_use
         self.server_key_encrypt = server_key_encrypt
         self.client_key_encrypt = client_key_encrypt
+        self.authenticated_callback = authenticated_callback
 
         self.authenticated = False
         self.challenged = False
@@ -104,10 +105,10 @@ class RSAAvatar(pb.Avatar):
             self.challenged = False
             if not verified:
                 #challenge failed, return error code
-                print '[ERROR] Master failed authentication challenge'
+                print '[ERROR] failed authentication challenge'
                 return -1
 
-            print '[Info] Master verified'
+            print '[Info] verified'
 
         else:
             # no challenge, this is the first time the client is connectig. 
@@ -116,6 +117,8 @@ class RSAAvatar(pb.Avatar):
             print '[Info] first time client has connected, allowing access without verification'
 
         self.authenticated = True
+        if self.authenticated_callback:
+            self.authenticated_callback(self)
 
 
 class RSAClient(object):
