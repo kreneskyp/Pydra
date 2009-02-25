@@ -436,10 +436,22 @@ class Master(object):
 
             #worker was working on a task, need to clean it up
             else:
+                removed_worker = self._workers_working[worker_key]
+
                 #worker was working on a subtask, return unfinished work to main worker
-                if self._workers_working[worker_key][3]:
-                    #TODO
-                    pass
+                if removed_worker[3]:
+                    print '[warning] %s failed during task, returning work unit' % worker_key
+                    task_instance = TaskInstance.objects.get(id=removed_worker[0])
+                    main_worker = self.workers[task_instance.worker]
+                    if main_worker:
+                        d = main_worker.remote.callRemote('return_work', removed_worker[3], removed_worker[4])
+                        d.addCallback(self.return_work_success, worker_key)
+                        d.addErrback(self.return_work_failed, worker_key)
+
+                    else:
+                        #if we don't have a main worker listed it probably already was disconnected
+                        #just call successful to clean up the worker
+                        self.return_work_success(None, worker_key)
 
                 #worker was main worker for a task.  cancel the task and tell any
                 #workers working on subtasks to stop.  Cannot recover from the 
@@ -449,7 +461,22 @@ class Master(object):
                     pass
 
 
-    def select_worker(self, task_instance_id, task_key, args={}, subtask_key=None):
+    def return_work_success(self, results, worker_key):
+        """
+        Work was sucessful returned to the main worker
+        """
+        with self._lock:
+            del self._workers_working[worker_key]
+
+
+    def return_work_failed(self, results, worker_key):
+        """
+        A worker disconnected and the method call to return the work failed
+        """
+        pass
+
+
+    def select_worker(self, task_instance_id, task_key, args={}, subtask_key=None, workunit_key=None):
         """
         Select a worker to use for running a task or subtask
         """
@@ -458,7 +485,7 @@ class Master(object):
             if len(self._workers_idle):
                 #move the first worker to the working state storing the task its working on
                 worker_key = self._workers_idle.pop(0)
-                self._workers_working[worker_key] = (task_instance_id, task_key, args, subtask_key)
+                self._workers_working[worker_key] = (task_instance_id, task_key, args, subtask_key, workunit_key)
 
                 #return the worker object, not the key
                 return self.workers[worker_key]
@@ -561,8 +588,7 @@ class Master(object):
         """
 
         # get a worker for this task
-        worker = self.select_worker(task_instance_id, task_key, args, subtask_key)
-
+        worker = self.select_worker(task_instance_id, task_key, args, subtask_key, workunit_key)
         # determine how many workers are available for this task
         available_workers = len(self._workers_idle)+1
 
@@ -602,7 +628,7 @@ class Master(object):
         """
         print '[debug] Worker:%s - sent results: %s' % (worker_key, results)
         with self._lock:
-            task_instance_id, task_key, args, subtask_key = self._workers_working[worker_key]
+            task_instance_id, task_key, args, subtask_key, workunit_key = self._workers_working[worker_key]
             print '[info] Worker:%s - completed: %s:%s (%s)' % (worker_key, task_key, subtask_key, workunit_key)
 
             # release the worker back into the idle pool

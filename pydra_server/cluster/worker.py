@@ -163,7 +163,6 @@ class Worker(pb.Referenceable):
         self.available_workers = available_workers
 
         print '[info] Worker:%s - starting task: %s:%s' % (self.worker_key, key,subtask_key)
-
         #create an instance of the requested task
         self.__task_instance = object.__new__(self.available_tasks[key])
         self.__task_instance.__init__()
@@ -284,30 +283,38 @@ class Worker(pb.Referenceable):
         deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
 
 
+    def return_work(self, subtask_key, workunit_key):
+        subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
+        subtask.parent._work_unit_failed(workunit_key)
+
+
     def get_worker(self):
         """
         Recursive function so tasks can find this worker
         """
         return self
 
-    # returns the status of this node
     def remote_status(self):
         return self.status()
 
-    # returns the list of available tasks
     def remote_task_list(self):
         return self.available_tasks.keys()
 
-    # run a task
     def remote_run_task(self, key, args={}, subtask_key=None, workunit_key=None, available_workers=1):
         return self.run_task(key, args, subtask_key, workunit_key, available_workers)
 
     def remote_stop_task(self):
         return self.stop_task()
 
-    # allows the master to request results
     def remote_receive_results(self, results, subtask_key, workunit_key):
         return self.receive_results(results, subtask_key, workunit_key)
+
+    def remote_return_work(self, subtask_key, workunit_key):
+        """
+        Called by the Master when a Worker disconnected while working on a task.
+        The work unit is returned so another worker can finish it.
+        """
+        return self.return_work(subtask_key, workunit_key)
 
 if __name__ == "__main__":
     master_host = sys.argv[1]
@@ -315,13 +322,5 @@ if __name__ == "__main__":
     node_key    = sys.argv[3]
     worker_key  = sys.argv[4]
 
-    '''realm = ClusterRealm()
-    realm.server = Worker('%s:%s' % (host,port))
-    checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-    checker.addUser("tester", "456")
-    p = portal.Portal(realm, [checker])
-
-    reactor.listenTCP(port, pb.PBServerFactory(p))
-    '''
     worker = Worker(master_host, master_port, node_key, worker_key)
     reactor.run()

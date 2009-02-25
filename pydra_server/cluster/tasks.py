@@ -591,9 +591,16 @@ class ParallelTask(Task):
             self._assign_work_local()
 
 
-    def _work_unit_failed(self, data, results):
+    def _work_unit_failed(self, index):
         """
         A work unit failed.  re-add the data to the list
         """
-        print '[error] Paralleltask - Work unit failed'
-        pass
+        print '[warning] Paralleltask - Worker failure during workunit'
+        with self._lock:
+
+            #remove data from in progress
+            data = self._data_in_progress[index]
+            del self._data_in_progress[index]
+
+            #add data to the end of the list
+            self._data.append(data)
