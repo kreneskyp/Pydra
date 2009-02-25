@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from tasks import *
+from pydra_server.cluster.tasks import *
 from pydra_server.models import TaskInstance
 
 """ TaskManager - Class that tracks and controls tasks
@@ -183,19 +183,19 @@ class TaskManager():
                 class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
 
                 for key, task_class in tasks.__dict__.items():
+
                     # Add any classes that a runnable task.
                     # TODO: filter out subtasks not marked as standalone
                     if inspect.isclass(task_class) and key not in class_exclusions and issubclass(task_class, (Task,)):
 
-                        #try:
+                        try:
                             #generate a unique key for this 
                             task_key = key
 
                             self.register(task_key, task_class)
                             print '[info] Loaded task: %s' % key
-                        #except :
-                        #    print 'ERROR Loading task: %s' % key
-
+                        except:
+                            print 'ERROR Loading task: %s' % key
 
 
 
