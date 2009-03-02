@@ -40,9 +40,8 @@ class TaskManager():
     """ deregisters a task, stopping it and removing it from the manager
 
     @param key: key for task
-    @param task: task instance
     """
-    def deregister(self, key, task):
+    def deregister(self, key):
         # stop the task in case its running
         task.stop()
 
