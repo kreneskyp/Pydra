@@ -32,11 +32,12 @@ class RSAAvatar(pb.Avatar):
     This handshake should be built in as a checker but the PerspectiveBroker
     api does not suuport ISSHKey credentials for authorization
     """
-    def __init__(self, server_key_encrypt, client_key_encrypt, authenticated_callback=None, no_key_first_use=False):
+    def __init__(self, server_key_encrypt, client_key_encrypt, authenticated_callback=None, no_key_first_use=False, key_size=4096):
         self.no_key_first_use = no_key_first_use
         self.server_key_encrypt = server_key_encrypt
         self.client_key_encrypt = client_key_encrypt
         self.authenticated_callback = authenticated_callback
+        self.key_size = key_size
 
         self.authenticated = False
         self.challenged = False
@@ -70,7 +71,7 @@ class RSAAvatar(pb.Avatar):
             else:
                 return -1
 
-        challenge = secureRandom(128)
+        challenge = secureRandom(self.key_size/16)
 
         # encode using master's key, only the matching private
         # key will be able to decode this message
@@ -195,7 +196,7 @@ class RSAClient(object):
             threads.deferToThread(self.callback, **kwargs)
 
 
-def generate_keys():
+def generate_keys(size=4096):
         """
         Generates an RSA key pair used for connecting to a node.
         keys are returned as the list of values required to serialize/deserilize the keys
@@ -204,7 +205,7 @@ def generate_keys():
         """
         print "[info] Generating RSA keypair"
         from Crypto.PublicKey import RSA
-        KEY_LENGTH = 4096
+        KEY_LENGTH = size
         rsa_key = RSA.generate(KEY_LENGTH, secureRandom)
 
         data = Key(rsa_key).data()
@@ -215,7 +216,7 @@ def generate_keys():
         return pub_l, pri_l
 
 
-def load_crypto(path, create=True):
+def load_crypto(path, create=True, key_size=4096):
         """
         Loads RSA keys from the specified path, optionally creating
         new keys.  It automatically detects whether it is a keypair
@@ -227,7 +228,7 @@ def load_crypto(path, create=True):
         if not os.path.exists(path):
             if create:
                 #local key does not exist, create and store
-                pub, priv = generate_keys()
+                pub, priv = generate_keys(size=key_size)
                 try:
                     f = file(path,'w')
                     f.write(simplejson.dumps(priv))

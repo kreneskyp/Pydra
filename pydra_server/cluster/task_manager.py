@@ -139,21 +139,6 @@ class TaskManager():
 
         return message
 
-    """ Starts a task
-
-    @param key: key to the task to start
-    """
-    def start(self, key):
-        self.registry[key].start()
-        return '1'
-
-    """ Stops a task
-
-    @param key: key to the task to stop
-    """
-    def stop(self, key):
-        self.registry[key].stop()
-        return '1'
 
     """
     Auto-discover any tasks that are in the tasks directory
