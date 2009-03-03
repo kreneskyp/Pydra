@@ -28,11 +28,19 @@ STATUS_RUNNING = 1;
 STATUS_PAUSED = 2;
 STATUS_COMPLETE = 3;
 
+class TaskNotFoundException(Exception):
+    def __init__(self, value):
+        self.parameter = value
+
+    def __str__(self):
+        return repr(self.parameter)
 
 class SubTaskWrapper():
     """
     SubTaskWrapper - class used to store additional information
     about the relationship between a container and a subtask.
+
+    This class acts as a proxy for all Task methods
 
         percentage - the percentage of work the task accounts for.
     """
@@ -40,11 +48,10 @@ class SubTaskWrapper():
         self.task = task
         self.percentage = percentage
 
+    def get_subtask(self, task_path):
+        return self.task.get_subtask(task_path)
+
     def __repr__(self):
-        """
-        proxy to wrapped task's __repr__() function. comparing a wrapper against
-        the contained task should result in True
-        """
         return self.task.__repr__()
 
 
@@ -225,11 +232,11 @@ class Task(object):
         split into a list for easier iteration
         """
         #A Task can't have children,  if this is the last entry in the path
-        # then this is the right tsk
-        if len(task_path) == 1:
+        # then this is the right task
+        if len(task_path) == 1 and task_path[0] == self.__class__.__name__:
             return self
         else:
-            raise Exception("Task not found")
+            raise TaskNotFoundException("Task not found")
 
 
     def __eq__(self, val):
@@ -264,11 +271,33 @@ class TaskContainer(Task):
             subtask.task.reset()
 
     def get_subtask(self, task_path):
-        #pop this classes name off the list
+        """
+        Overridden to deal with the oddity of how ContainerTask children are indicated
+        in keys.  Children are indicated as integer indexes because there may be
+        more than one of the same class.  Task.get_subtask(...) will break if the first
+        element in the task_path is an integer.  If the task_path indicates the child
+        of a ContainerTask the index will be replaced with the actual class before
+        being passed on to the child
+        """
+        if len(task_path) == 1:
+            if task_path[0] == self.__class__.__name__:
+                return self
+            else:
+                raise TaskNotFoundException("Task not found")
+
+        # pop this classes name off the list
         task_path.pop(0)
 
-        #recurse down into the child
-        return self.subtasks[task_path[0]].get_subtask(task_path)
+        # get index then swap index and class name
+        try:
+            index = int(task_path[0])
+            child_class = self.subtasks[index].task.__class__.__name__
+        except (ValueError, IndexError):
+            raise TaskNotFoundException("Task not found")
+        task_path[0] = child_class
+
+        # recurse down into the child
+        return self.subtasks[index].get_subtask(task_path)
 
 
     def _work(self, args=None):
@@ -506,6 +535,12 @@ class ParallelTask(Task):
 
 
     def get_subtask(self, task_path):
+        if len(task_path) == 1:
+            if task_path[0] == self.__class__.__name__:
+                return self
+            else:
+                raise TaskNotFoundException("Task not found")
+
         #pop this class off the list
         task_path.pop(0)
 
