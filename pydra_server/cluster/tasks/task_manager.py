@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.tasks import *
+from pydra_server.cluster.tasks.tasks import *
 from pydra_server.models import TaskInstance
 
 """ TaskManager - Class that tracks and controls tasks
@@ -42,11 +42,8 @@ class TaskManager():
     @param key: key for task
     """
     def deregister(self, key):
-        # stop the task in case its running
-        task.stop()
-
         # remove the task from the registry
-        del registry[key]
+        del self.registry[key]
 
 
     """ Iterates through a task and its children to build an array display information
@@ -96,7 +93,7 @@ class TaskManager():
         return tasklist
 
 
-    """ 
+    """
     listTasks - builds a list of tasks
     @param keys: filters list to include only these tasks
     """
@@ -108,7 +105,7 @@ class TaskManager():
 
         for key in keys:
             try:
-                last_run_instance = TaskInstance.objects.exclude(completed=None).order_by('-completed').values('completed')[0]
+                last_run_instance = TaskInstance.objects.filter(task_key=key).exclude(completed=None).order_by('-completed').values_list('completed','task_key')[0]
                 last_run = last_run_instance[0]
             #no instances
             except (KeyError, IndexError):
@@ -118,7 +115,7 @@ class TaskManager():
 
         return message
 
-    """  
+    """
     builds a dictionary of progresses for tasks
     @param keys: filters list to include only these tasks
     """

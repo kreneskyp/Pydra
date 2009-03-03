@@ -19,16 +19,14 @@
 
 import unittest
 
-from pydra_server.cluster.auth.tests import suite as auth_suite
-from pydra_server.cluster.tasks.tests import suite as tasks_suite
+from pydra_server.cluster.tasks.tests.task_manager import suite as task_manager_suite
 
 
 def suite():
     """
-    Build a test suite from all the test suites in cluster
+    Build a test suite from all the test suites in auth
     """
-    cluster_suite = unittest.TestSuite()
-    cluster_suite.addTest(auth_suite())
-    cluster_suite.addTest(tasks_suite())
+    tasks_suite = unittest.TestSuite()
+    tasks_suite.addTest(task_manager_suite())
 
-    return cluster_suite
+    return tasks_suite

@@ -19,7 +19,6 @@
 
 from __future__ import with_statement
 from threading import Thread, Lock
-from abstract import *
 from twisted.internet import reactor, threads
 import time
 

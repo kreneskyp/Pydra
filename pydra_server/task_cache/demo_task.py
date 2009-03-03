@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.tasks import *
+from pydra_server.cluster.tasks.tasks import *
 import time
 
 
