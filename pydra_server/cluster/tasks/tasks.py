@@ -28,30 +28,37 @@ STATUS_RUNNING = 1;
 STATUS_PAUSED = 2;
 STATUS_COMPLETE = 3;
 
-"""
-SubTaskWrapper - class used to store additional information
-about the relationship between a container and a subtask.
 
-    percentage - the percentage of work the task accounts for.
-"""
 class SubTaskWrapper():
+    """
+    SubTaskWrapper - class used to store additional information
+    about the relationship between a container and a subtask.
+
+        percentage - the percentage of work the task accounts for.
+    """
     def __init__(self, task, percentage):
         self.task = task
         self.percentage = percentage
 
+    def __repr__(self):
+        """
+        proxy to wrapped task's __repr__() function. comparing a wrapper against
+        the contained task should result in True
+        """
+        return self.task.__repr__()
 
-"""
-Task - class that wraps a set of functions as a runnable unit of work.  Once
-wrapped the task allows functions to be managed and tracked in a uniform way.
 
-This is an abstract class and requires the following functions to be implemented:
-    * _work  -  does the work of the task
-    * _reset - resets the state of the task when stopped
-    * progress - returns the state of the task as an integer from 0 to 100
-    * progressMessage - returns the state of the task as a readable string
-"""
 class Task(object):
+    """
+    Task - class that wraps a set of functions as a runnable unit of work.  Once
+    wrapped the task allows functions to be managed and tracked in a uniform way.
 
+    This is an abstract class and requires the following functions to be implemented:
+        * _work  -  does the work of the task
+        * _reset - resets the state of the task when stopped
+        * progress - returns the state of the task as an integer from 0 to 100
+        * progressMessage - returns the state of the task as a readable string
+    """
     parent = None
     _status = STATUS_STOPPED
     __callback = None
@@ -65,25 +72,28 @@ class Task(object):
     def __init__(self, msg=None):
         self.msg = msg
 
-        _work = AbstractMethod('_work')
-        progress = AbstractMethod('progress')
-        progressMessage = AbstractMethod('progressMessage')
-        _reset = AbstractMethod('_reset')
+        # TODO ticket #55 - replace with zope interface
+        #_work = AbstractMethod('_work')
+        #progress = AbstractMethod('progress')
+        #progressMessage = AbstractMethod('progressMessage')
+        #_reset = AbstractMethod('_reset')
 
         self.id = 1
 
-    """
-    Resets the task, including setting the flags properly,  delegates implementation
-    specific work to _reset()
-    """
+
     def reset(self):
+        """
+        Resets the task, including setting the flags properly,  delegates implementation
+        specific work to _reset()
+        """
         self._status = STATUS_STOPPED
         self._reset()
 
-    """
-    starts the task.  This will spawn the work in a workunit thread.
-    """
     def start(self, args={}, subtask_key=None, callback=None, callback_args={}):
+        """
+        starts the task.  This will spawn the work in a workunit thread.
+        """
+
         # only start if not already running
         if self._status == STATUS_RUNNING:
             return
@@ -222,6 +232,9 @@ class Task(object):
             raise Exception("Task not found")
 
 
+    def __eq__(self, val):
+        return self.__repr__() == val.__repr__()
+
 class TaskContainer(Task):
     """
     TaskContainer - an extension of Task that contains other tasks
@@ -243,6 +256,7 @@ class TaskContainer(Task):
         """
         subtask = SubTaskWrapper(task, percentage)
         self.subtasks.append(subtask)
+        task.parent=self
         task.id = '%s-%d' % (self.id,len(self.subtasks))
 
     def reset(self):
@@ -255,7 +269,6 @@ class TaskContainer(Task):
 
         #recurse down into the child
         return self.subtasks[task_path[0]].get_subtask(task_path)
-
 
 
     def _work(self, args=None):
