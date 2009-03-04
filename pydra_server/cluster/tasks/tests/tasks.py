@@ -19,6 +19,7 @@
 
 import unittest
 from pydra_server.cluster.tasks.tasks import *
+from pydra_server.cluster.worker import Worker
 from pydra_server.task_cache.demo_task import *
 
 def suite():
@@ -41,8 +42,22 @@ def suite():
     tasks_suite.addTest(Task_Test('test_get_subtask_containertask_child'))
     tasks_suite.addTest(Task_Test('test_get_subtask_paralleltask_child'))
 
+    # worker lookup
+    tasks_suite.addTest(Task_Test('test_get_worker_task'))
+    tasks_suite.addTest(Task_Test('test_get_worker_containertask'))
+    tasks_suite.addTest(Task_Test('test_get_worker_paralleltask'))
+    tasks_suite.addTest(Task_Test('test_get_worker_containertask_child'))
+    tasks_suite.addTest(Task_Test('test_get_worker_paralleltask_child'))
+
     return tasks_suite
 
+
+class WorkerProxy():
+    """
+    Class for proxying worker functions
+    """
+    def get_worker(self):
+        return self
 
 class Task_Test(unittest.TestCase):
     """
@@ -52,6 +67,11 @@ class Task_Test(unittest.TestCase):
         self.task = TestTask()
         self.container_task = TestContainerTask()
         self.parallel_task = TestParallelTask()
+
+        self.worker = WorkerProxy()
+        self.task.parent = self.worker
+        self.container_task.parent = self.worker
+        self.parallel_task.parent = self.worker
 
     def tearDown(self):
         pass
@@ -186,3 +206,48 @@ class Task_Test(unittest.TestCase):
         # incorrect Key
         key = 'TestParallelTask.FakeTaskThatDoesNotExist'
         self.assertRaises(TaskNotFoundException, self.parallel_task.get_subtask, key.split('.'))
+
+
+    def test_get_worker_task(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        returned = self.task.get_worker()
+        self.assert_(returned, 'no worker was returned')
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+    def test_get_worker_containertask(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        returned = self.container_task.get_worker()
+        self.assert_(returned, 'no worker was returned')
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+
+    def test_get_worker_paralleltask(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        returned = self.parallel_task.get_worker()
+        self.assert_(returned, 'no worker was returned')
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+
+    def test_get_worker_containertask_child(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        for i in range(len(self.container_task.subtasks)):
+            returned = self.container_task.subtasks[i].task.get_worker()
+            self.assert_(returned, 'no worker was returned')
+            self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+
+    def test_get_worker_paralleltask_child(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        returned = self.parallel_task.subtask.get_worker()
+        self.assert_(returned, 'no worker was returned')
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')

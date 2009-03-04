@@ -43,7 +43,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from threading import Lock
 
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
-from task_manager import TaskManager
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from constants import *
 
 
@@ -235,7 +235,7 @@ class Worker(pb.Referenceable):
             if self.master:
                 # reconnected, just resend the call.  The call is recursive from this point
                 # if by some odd chance it disconnects again while sending
-                print 'RESULTS FAILED BUT MASTER STILL HERE'
+                print '[error] results failed to send by master is still here'
                 #deferred = self.master.callRemote("send_results", task_results, task_results)
                 #deferred.addErrback(self.send_results_failed, task_results, task_results)
 
