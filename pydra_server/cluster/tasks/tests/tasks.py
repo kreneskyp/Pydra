@@ -131,7 +131,6 @@ class Task_TwistedTest(twisted_unittest.TestCase):
 
     def setUp(self):
         #reactor.run()
-        print reactor.running
         pass
 
     def tearDown(self):
@@ -139,15 +138,11 @@ class Task_TwistedTest(twisted_unittest.TestCase):
         pass
 
 
-    def verify_status(self, task=None):
+    def verify_status(self, task, parent,  subtask_key=None):
         try:
-            # set a failsafe to ensure events get cleared
-            self.failsafe = reactor.callLater(10, task.clear_events, task=task)
-
-            task.start()
+            parent.start(subtask_key=subtask_key)
 
             # wait for event indicating task has started
-            #self.wait_for_status(task, STATUS_RUNNING, task.starting_lock)
             task.starting_event.wait(5)
             self.assertEqual(task.status(), STATUS_RUNNING, 'Task started but status is not STATUS_RUNNING')
 
@@ -167,9 +162,6 @@ class Task_TwistedTest(twisted_unittest.TestCase):
             #release events just in case
             task.clear_events()
 
-            if self.failsafe:
-                self.failsafe.cancel()
-
     def test_start_task(self):
         """
         Tests Task.start()
@@ -182,13 +174,14 @@ class Task_TwistedTest(twisted_unittest.TestCase):
         task = StartupAndWaitTask()
         task.parent = WorkerProxy()
 
+
         self.assertEqual(task.status(), STATUS_STOPPED, 'Task did not initialize with status STATUS_STOPPED')
 
         # defer rest of test because this will cause the reactor to start
-        return threads.deferToThread(self.verify_status, task=task)
+        return threads.deferToThread(self.verify_status, task=task, parent=task)
 
 
-    '''def test_start_subtask(self):
+    def test_start_subtask(self):
         """
         Tests Task.start()
             verify:
@@ -200,13 +193,11 @@ class Task_TwistedTest(twisted_unittest.TestCase):
         task = ParallelTask()
         task.subtask = StartupAndWaitTask()
         task.parent = WorkerProxy()
-
         self.assertEqual(task.status(), STATUS_STOPPED, 'Task did not initialize with status STATUS_STOPPED')
 
         # defer rest of test because this will cause the reactor to start
-        d = threads.deferToThread(task.start, subtask_key='ParallelTask.StartupAndWaitTask')
-        return d.addCallback(self.verify_status, task=task)
-    '''
+        return threads.deferToThread(self.verify_status, task=task.subtask, parent=task, subtask_key='ParallelTask.StartupAndWaitTask')
+
 
 class Task_Test(unittest.TestCase):
     """

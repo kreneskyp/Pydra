@@ -105,8 +105,6 @@ class Task(object):
         if self._status == STATUS_RUNNING:
             return
 
-        print args, subtask_key
-
         #if this was subtask find it and execute just that subtask
         if subtask_key:
             print  '[debug] Task - starting subtask %s - %s' % (subtask_key, args)
@@ -238,7 +236,7 @@ class Task(object):
         if len(task_path) == 1 and task_path[0] == self.__class__.__name__:
             return self
         else:
-            raise TaskNotFoundException("Task not found")
+            raise TaskNotFoundException("Task not found: %s" % task_path)
 
 
     def __eq__(self, val):
@@ -539,7 +537,7 @@ class ParallelTask(Task):
             if task_path[0] == self.__class__.__name__:
                 return self
             else:
-                raise TaskNotFoundException("Task not found")
+                raise TaskNotFoundException("Task not found: %s" % task_path)
 
         #pop this class off the list
         task_path.pop(0)
@@ -553,7 +551,6 @@ class ParallelTask(Task):
         assign a unit of work to a Worker by requesting a worker from the compute cluster
         """
         data, index = self.get_work_unit()
-        print data, index
         if not data == None:
             print '[debug] Paralleltask - assigning remote work'
             self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
