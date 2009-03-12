@@ -257,7 +257,7 @@ class TaskContainer(Task):
         for task in self.subtasks:
             task.parent = self
 
-    def addTask(self, task, percentage=None):
+    def add_task(self, task, percentage=None):
         """
         Adds a task to the container
         """
@@ -333,6 +333,7 @@ class TaskContainer(Task):
 
         TODO: take into account tasks that have had weighting manually set. 
         """
+
         return float(1)/len(self.subtasks);
 
 
@@ -347,15 +348,24 @@ class TaskContainer(Task):
         divided evenly by calculatePercentage()
         """
         progress = 0
+        auto_total = 100
+        auto_subtask_count = len(self.subtasks)
         for subtask in self.subtasks:
-            if subtask.percentage == None:
-                percentage = self.calculatePercentage()
+            if subtask.percentage:
+                auto_total -= subtask.percentage
+                auto_subtask_count -= 1
+        auto_percentage = auto_total / auto_subtask_count / float(100)
+
+        for subtask in self.subtasks:
+            if subtask.percentage:
+                percentage = subtask.percentage/float(100)
             else:
-                percentage = subtask.percentage
+                percentage = auto_percentage
 
             # if task is done it complete 100% of its work 
             if subtask.task._status == STATUS_COMPLETE:
                 progress += 100*percentage
+
             # task is only partially complete
             else:
                 progress += subtask.task.progress()*percentage
