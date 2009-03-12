@@ -86,7 +86,7 @@ class Task(object):
         #_reset = AbstractMethod('_reset')
 
         self.id = 1
-
+        self.work_deferred = False
 
     def reset(self):
         """
@@ -113,12 +113,12 @@ class Task(object):
             split = subtask_key.split('.')
             subtask = self.get_subtask(split)
             print  '[debug] Task - got subtask'
-            deferred = threads.deferToThread(subtask.work, args, callback, callback_args)
+            self.work_deferred = threads.deferToThread(subtask.work, args, callback, callback_args)
 
         #else this is a normal task just execute it
         else:
             print '[debug] Task - starting task: %s' % args
-            deferred = threads.deferToThread(self.work, args, callback, callback_args)
+            self.work_deferred = threads.deferToThread(self.work, args, callback, callback_args)
 
         return 1
 
@@ -136,7 +136,7 @@ class Task(object):
         self.STOP_FLAG=True
 
 
-    def work(self, args, callback=None, callback_args={}):
+    def work(self, args={}, callback=None, callback_args={}):
         """
         Does the work of the task.  This is can be called directly for synchronous work or via start which
         causes a workunit thread to be spawned and call this function.  this method will set flags properly and
@@ -147,6 +147,8 @@ class Task(object):
         results = self._work(**args)
         self._status = STATUS_COMPLETE
         print '[debug] %s - Task - work complete' % self.get_worker().worker_key
+
+        self.work_deferred = None
 
         #make a callback, if any
         if callback:
@@ -450,8 +452,6 @@ class ParallelTask(Task):
         interupting twisted.Reactor.  The cleanup that normally happens in work() has been moved to
         task_complete() which will be called when there is no more work remaining.
         """
-        print 'in PTask.work()'
-
         self.__callback = callback
         self._callback_args=callback_args
 
