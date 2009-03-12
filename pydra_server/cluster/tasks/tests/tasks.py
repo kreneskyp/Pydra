@@ -25,7 +25,7 @@ from pydra_server.task_cache.demo_task import *
 
 from twisted.trial import unittest as twisted_unittest
 from twisted.internet import reactor, defer
-from threading import Lock, Condition
+from threading import Lock, Event
 
 def suite():
     """
@@ -80,24 +80,20 @@ class StartupAndWaitTask(Task):
     """
 
     def __init__(self):
-        self.starting_lock = Condition(Lock())   # used to lock task until _work() is called
-        self.is_started_lock = Condition(Lock()) # used to lock task at the beginning of _work()
-        self.running_lock = Condition(Lock())    # used to lock running loop
-        self.finished_lock = Condition(Lock())   # used to lock until Task.work() is complete
-        self.failsafe_delayed = None
+        self.starting_event = Event()   # used to lock task until _work() is called
+        self.running_event = Event()    # used to lock running loop
+        self.finished_event = Event()   # used to lock until Task.work() is complete
+        self.failsafe = None
         Task.__init__(self)
 
-    def failsafe(self):
+    def clear_events(self):
         """
-        This is a failsafe for the thread locks.  This function will release any
-        locks that are held by the task.
+        This clears threads waiting on events.  This function will
+        call set() on all the events to ensure nothing is left waiting.
         """
-        print 'FAILSAFE ENVOKED!'
-        if self.starting_lock.locked():
-            self.starting_lock.release()
-
-        if self.finished_lock.locked():
-            self.finished_lock.release()
+        self.starting_event.set()
+        self.running_event.set()
+        self.finished_event.set()
 
 
     def work(self, args={}, callback=None, callback_args={}):
@@ -105,39 +101,26 @@ class StartupAndWaitTask(Task):
         extended to add locks at the end of the work
         """
         try:
-            self.failsafe_delayed = reactor.callLater(10, self.failsafe)
+            # set a failsafe to ensure events get cleared
+            self.failsafe = reactor.callLater(5, self.clear_events)
 
-            #print 'StartupAndWaitTask - work'
-            with self.finished_lock:
-                #print 'StartupAndWaitTask - work, got finished_lock'
-                Task.work(self, args, callback, callback_args)
+            Task.work(self, args, callback, callback_args)
+            self.finished_event.set()
 
         finally:
-            if self.failsafe_delayed:
-                self.failsafe_delayed.cancel()
+            if self.failsafe:
+                self.failsafe.cancel()
 
     def _work(self, **kwargs):
         """
         'Work' until an external object modifies the STOP_FLAG flag
         """
-        #_work has been called so we know were started, release 
-        # starting_lock this will allow task to proceed
-        #print 'StartupAndWaitTask - _work'
-        with self.starting_lock:
-               self.starting_lock.notify()
-        #print 'StartupAndWaitTask - _work: released starting_lock, waiting for is_started_lock'
+        self.starting_event.set()
 
-
-        # wait here for TestCase to release lock, this allows
-        # testcase to check state at this point
-        with self.is_started_lock:
-            while not self.STOP_FLAG:
-                # wait for the running_lock.  This allows
-                # TestCase to prevent needless looping
-                # until it is ready to stop the task
-                with self.running_lock:
-                    pass
-        #print 'StartupAndWaitTask: work finished'
+        while not self.STOP_FLAG:
+            # wait for the running_event.  This  prevents needless looping
+            # and still simulates a task that is working
+            self.running_event.wait(5)
 
 
 class Task_TwistedTest(twisted_unittest.TestCase):
@@ -155,66 +138,37 @@ class Task_TwistedTest(twisted_unittest.TestCase):
         #reactor.stop()
         pass
 
-    def failsafe(self, task=None):
-        print 'TESTCASE FAILSAFE'
-        if task:
-            task.is_started_lock.release()
-            task.starting_lock.release()
-            task.running_lock.release()
-
-
-    def wait_for_status(self, task, status, condition):
-        """
-        Waits for a status to change.
-        """
-        try:
-            condition.acquire()
-            while not task.status() == status:
-                condition.wait(1)
-
-        finally:
-            if condition._Condition__lock.locked():
-                condition.release()
 
     def verify_status(self, task=None):
         try:
+            # set a failsafe to ensure events get cleared
+            self.failsafe = reactor.callLater(10, task.clear_events, task=task)
 
-            self.failsafe_delayed = reactor.callLater(10, self.failsafe, task=task)
-
-            #acquire locks
-            task.is_started_lock.acquire()
-            task.running_lock.acquire()
             task.start()
 
-            # wait for lock indicating task has started
-            self.wait_for_status(task, STATUS_RUNNING, task.starting_lock)
+            # wait for event indicating task has started
+            #self.wait_for_status(task, STATUS_RUNNING, task.starting_lock)
+            task.starting_event.wait(5)
             self.assertEqual(task.status(), STATUS_RUNNING, 'Task started but status is not STATUS_RUNNING')
-            task.is_started_lock.release()
 
             task._stop()
+
             # don't release running lock till this point.  otherwise
-            # the task will just loop indefinitely.
-            task.running_lock.release()
+            # the task will just loop indefinitely and may starve
+            # other threads that need to execute
+            task.running_event.set()
 
             #wait for the task to finish
-            with task.finished_lock:
-                self.assertEqual(task._status, STATUS_COMPLETE, 'Task stopped by status is not STATUS_COMPLETE')
+            task.finished_event.wait(5)
+            self.assertEqual(task._status, STATUS_COMPLETE, 'Task stopped by status is not STATUS_COMPLETE')
 
 
         finally:
-            #release locks
-            if task.is_started_lock._Condition__lock.locked():
-                task.is_started_lock.release()
+            #release events just in case
+            task.clear_events()
 
-            if task.running_lock._Condition__lock.locked():
-                task.running_lock.release()
-
-            #try to stop task no matter what
-            if task:
-                task._stop()
-
-            if self.failsafe_delayed:
-                self.failsafe_delayed.cancel()
+            if self.failsafe:
+                self.failsafe.cancel()
 
     def test_start_task(self):
         """
