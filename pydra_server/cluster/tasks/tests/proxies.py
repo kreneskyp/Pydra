@@ -17,7 +17,10 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from threading import Event
+from twisted.internet import reactor
 from pydra_server.cluster.tasks.tasks import Task
+
 
 class WorkerProxy():
     """
@@ -43,6 +46,7 @@ class StartupAndWaitTask(Task):
         self.running_event = Event()    # used to lock running loop
         self.finished_event = Event()   # used to lock until Task.work() is complete
         self.failsafe = None
+        self.data = None
         Task.__init__(self)
 
     def clear_events(self):
@@ -63,20 +67,25 @@ class StartupAndWaitTask(Task):
             # set a failsafe to ensure events get cleared
             self.failsafe = reactor.callLater(5, self.clear_events)
 
-            Task.work(self, args, callback, callback_args)
+            ret = Task.work(self, args, callback, callback_args)
             self.finished_event.set()
 
         finally:
             if self.failsafe:
                 self.failsafe.cancel()
 
-    def _work(self, **kwargs):
+        return ret
+
+    def _work(self, data=None):
         """
         'Work' until an external object modifies the STOP_FLAG flag
         """
+        self.data = data
         self.starting_event.set()
 
         while not self.STOP_FLAG:
             # wait for the running_event.  This  prevents needless looping
             # and still simulates a task that is working
             self.running_event.wait(5)
+
+        return self.data

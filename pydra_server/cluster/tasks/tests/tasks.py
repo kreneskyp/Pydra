@@ -20,7 +20,7 @@ from __future__ import with_statement
 
 import unittest
 from twisted.trial import unittest as twisted_unittest
-from twisted.internet import reactor, defer
+from twisted.internet import threads
 from threading import Lock, Event
 
 from pydra_server.cluster.tasks.tasks import *
@@ -97,9 +97,13 @@ class Task_TwistedTest(twisted_unittest.TestCase):
             task.finished_event.wait(5)
             self.assertEqual(task._status, STATUS_COMPLETE, 'Task stopped by status is not STATUS_COMPLETE')
 
+        except Exception, e:
+            print 'Exception while testing: %s' % e
+
 
         finally:
             #release events just in case
+            task._stop()
             task.clear_events()
 
     def test_start_task(self):

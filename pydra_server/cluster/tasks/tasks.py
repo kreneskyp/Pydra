@@ -142,7 +142,7 @@ class Task(object):
         """
         print '[debug] %s - Task - in Task.work()'  % self.get_worker().worker_key
         self._status = STATUS_RUNNING
-        results = self._work(**args)
+        results = self._work(args)
         self._status = STATUS_COMPLETE
         print '[debug] %s - Task - work complete' % self.get_worker().worker_key
 
@@ -302,8 +302,6 @@ class TaskContainer(Task):
 
     def _work(self, args=None):
         # Starts the task running all subtasks
-        self.reset()
-
         result = args
         for subtask in self.subtasks:
             print '   Starting Subtask: %s' % subtask

@@ -18,8 +18,13 @@
 """
 
 import unittest
+from threading import Event
+from twisted.trial import unittest as twisted_unittest
+from twisted.internet import threads
+
 from pydra_server.cluster.tasks.tasks import *
 from pydra_server.task_cache.demo_task import *
+from proxies import *
 
 def suite():
     """
@@ -48,7 +53,11 @@ class StatusSimulatingTaskProxy():
     def progress(self):
         return self.value
 
-class ContainerTask_Test(unittest.TestCase):
+
+class TaskContainer_Test(twisted_unittest.TestCase):
+    """
+    Tests for TaskContainer that require trial (twisted) to run
+    """
 
     def setup(self):
         pass
@@ -257,3 +266,58 @@ class ContainerTask_Test(unittest.TestCase):
 
         self.verify_status(STATUS_PAUSED, STATUS_RUNNING, STATUS_RUNNING, ctask)
         self.verify_status(STATUS_RUNNING, STATUS_PAUSED, STATUS_RUNNING, ctask)
+
+
+    def verify_sequential_work(self, task):
+        """
+        Helper function for verifying sequential work within a task works properly
+        """
+        try:
+            #start task it should pause in the first subtask
+            args = {'data':'THIS_IS_SOME_FAKE_DATA'}
+            task.start(args=args)
+
+            for subtask in task.subtasks:
+                # wait for event indicating subtask has started
+                subtask.task.starting_event.wait(5)
+                self.assertEqual(task.status(), STATUS_RUNNING, 'Task started but status is not STATUS_RUNNING')
+                self.assertEqual(subtask.task.status(), STATUS_RUNNING, 'Task started but status is not STATUS_RUNNING')
+                self.assertEqual(subtask.task.data, args, 'task did not receive data')
+                subtask.task._stop()
+
+                # don't release running lock till this point.  otherwise
+                # the subtask will just loop indefinitely and may starve
+                # other threads that need to execute
+                subtask.task.running_event.set()
+
+                #wait for the subtask to finish
+                subtask.task.finished_event.wait(5)
+                self.assertEqual(subtask.task._status, STATUS_COMPLETE, 'Task stopped by status is not STATUS_COMPLETE')
+
+            #test that container is marked as finished
+            self.assertEqual(task._status, STATUS_COMPLETE, 'Task stopped by status is not STATUS_COMPLETE')
+
+        except Exception, e:
+            print 'Exception while testing: %s' % e
+
+        finally:
+            #release events just in case
+            for subtask in task.subtasks:
+                subtask.task._stop()
+                subtask.task.clear_events()
+
+
+    def test_sequential_work(self):
+        """
+        Tests for verifying TaskContainer iterates through subtasks correctly 
+        when run in sequential mode
+        """
+
+        task1 = StartupAndWaitTask()
+        task2 = StartupAndWaitTask()
+
+        ctask = TaskContainer('tester')
+        ctask.parent = WorkerProxy()
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+        return threads.deferToThread(self.verify_sequential_work, task=ctask)

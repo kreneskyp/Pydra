@@ -55,7 +55,6 @@ class TestTask(Task):
 
         return {'data':value}
 
-
     def progress(self):
         """
         returns progress as a number between 0 and 100
@@ -87,9 +86,9 @@ class TestContainerTask(TaskContainer):
         TaskContainer.__init__(self, msg)
 
         # add some children
-        self.addTask(TestTask('child 1'))
-        self.addTask(TestTask('child 2'))
-        self.addTask(TestTask('child 3'))
+        self.add_task(TestTask('child 1'))
+        self.add_task(TestTask('child 2'))
+        self.add_task(TestTask('child 3'))
 
 
 class TestParallelTask(ParallelTask):
