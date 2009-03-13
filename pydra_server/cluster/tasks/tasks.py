@@ -326,17 +326,6 @@ class TaskContainer(Task):
             subtask._stop()
 
 
-    def calculatePercentage(self):
-        """
-        calculatePercentage - determines the percentage of work that each
-        child task accounts for.
-
-        TODO: take into account tasks that have had weighting manually set. 
-        """
-
-        return float(1)/len(self.subtasks);
-
-
 
     def progress(self):
         """
@@ -395,39 +384,45 @@ class TaskContainer(Task):
         complete - complete if all children are complete
         stopped - default response if no other conditions are met
         """
-        has_paused = False;
-        has_unfinished = False;
+        has_paused = False
+        has_unfinished = False
+        has_failed = False
 
         for subtask in self.subtasks:
-            subtaskStatus = subtask.task.status()
-            if subtaskStatus == STATUS_RUNNING:
+            status = subtask.task.status()
+            if status == STATUS_RUNNING:
                 # we can return right here because if any child is running the 
-                # container is considered to be running
+                # container is considered to be running.  This overrides STATUS_FAILED
+                # because we want to indicate that the task is still doing something
+                # even though it should be stopped
                 return STATUS_RUNNING
 
-            elif subtaskStatus == STATUS_FAILED:
-                # we can return right here because if any child failed then the
-                # container is considered to be failed.  All other running tasks
-                # should be stopped on failure.
-                return STATUS_FAILED
-
-            elif subtaskStatus == STATUS_PAUSED:
-                has_paused = True
-
-            elif subtaskStatus <> STATUS_COMPLETE:
+            elif status == STATUS_FAILED:
+                # mark has_failed flag.  this can still be overridden by a running task
+                has_failed = True
                 has_unfinished = True
 
-        # Task is not running or failed.  If any are paused
-        # then the container is paused
+            elif status == STATUS_PAUSED:
+                # mark has_paused flag, can be overriden by failed or running tasks
+                has_paused = True;
+                has_unfinished = True
+
+            elif status == STATUS_STOPPED:
+                #still need to mark this status to indicate we arent complete
+                has_unfinished = True
+
+        if has_failed:
+            return STATUS_FAILED
+
         if has_paused:
             return STATUS_PAUSED
 
-        # task is not running, failed, or paused.  if all children are complete then it is complete
         if not has_unfinished:
             return STATUS_COMPLETE
 
-        # only status left it could be is STOPPED
+        # its not any other status, it must be stopped
         return STATUS_STOPPED
+
 
 
 class ParallelTask(Task):

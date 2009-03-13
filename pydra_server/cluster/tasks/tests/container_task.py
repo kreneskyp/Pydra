@@ -37,7 +37,14 @@ class StatusSimulatingTaskProxy():
     Task Proxy for simulating status
     """
     value = 0
-    _status = STATUS_RUNNING
+    _status = None
+
+    def __init__(self):
+        self._status = STATUS_STOPPED
+
+    def status(self):
+        return self._status
+
     def progress(self):
         return self.value
 
@@ -45,7 +52,6 @@ class ContainerTask_Test(unittest.TestCase):
 
     def setup(self):
         pass
-
 
     def test_progress_auto_weighting(self):
         """
@@ -150,3 +156,104 @@ class ContainerTask_Test(unittest.TestCase):
         ctask.add_task(task2)
 
         self.assertEqual(ctask.progress(), 100, 'Container task should report 100 because status is STATUS_COMPLETE')
+
+    def verify_status(self, status1, status2, expected, task):
+        """
+        helper function for verifying containertask's status
+        """
+        task.subtasks[0].task._status = status1
+        task.subtasks[1].task._status = status2
+
+        self.assertEqual(task.status(), expected, 'statuses were [%s, %s] expected status:%s   actual status:%s' % (status1, status2, expected, task.status()))
+
+    def test_status_not_started(self):
+        """
+        Test status for container task that has no started subtasks
+        """
+        task1 = StatusSimulatingTaskProxy()
+        task2 = StatusSimulatingTaskProxy()
+
+        ctask = TaskContainer('tester')
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+
+        self.verify_status(STATUS_STOPPED, STATUS_STOPPED, STATUS_STOPPED, ctask)
+
+
+    def test_status_any_subtask_running(self):
+        """
+        Test status for TaskContainer that has any running subtasks
+        """
+        task1 = StatusSimulatingTaskProxy()
+        task2 = StatusSimulatingTaskProxy()
+
+        ctask = TaskContainer('tester')
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+
+        self.verify_status(STATUS_RUNNING, STATUS_STOPPED, STATUS_RUNNING, ctask)
+        self.verify_status(STATUS_STOPPED, STATUS_RUNNING, STATUS_RUNNING, ctask)
+
+        self.verify_status(STATUS_COMPLETE, STATUS_RUNNING, STATUS_RUNNING, ctask)
+        self.verify_status(STATUS_RUNNING, STATUS_COMPLETE, STATUS_RUNNING, ctask)
+
+        self.verify_status(STATUS_PAUSED, STATUS_RUNNING, STATUS_RUNNING, ctask)
+        self.verify_status(STATUS_RUNNING, STATUS_PAUSED, STATUS_RUNNING, ctask)
+
+
+    def test_status_subtask_failed(self):
+        """
+        Tests for TaskContainer that has any failed subtasks
+        """
+        task1 = StatusSimulatingTaskProxy()
+        task2 = StatusSimulatingTaskProxy()
+
+        ctask = TaskContainer('tester')
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+
+        self.verify_status(STATUS_FAILED, STATUS_STOPPED, STATUS_FAILED, ctask)
+        self.verify_status(STATUS_STOPPED, STATUS_FAILED, STATUS_FAILED, ctask)
+
+        self.verify_status(STATUS_COMPLETE, STATUS_FAILED, STATUS_FAILED, ctask)
+        self.verify_status(STATUS_FAILED, STATUS_COMPLETE, STATUS_FAILED, ctask)
+
+        self.verify_status(STATUS_PAUSED, STATUS_FAILED, STATUS_FAILED, ctask)
+        self.verify_status(STATUS_FAILED, STATUS_PAUSED, STATUS_FAILED, ctask)
+
+        self.verify_status(STATUS_RUNNING, STATUS_FAILED, STATUS_RUNNING, ctask)
+        self.verify_status(STATUS_FAILED, STATUS_RUNNING, STATUS_RUNNING, ctask)
+
+    def test_status_all_subtask_complete(self):
+        """
+        Tests for TaskContainer that has all complete subtasks
+        """
+        task1 = StatusSimulatingTaskProxy()
+        task2 = StatusSimulatingTaskProxy()
+
+        ctask = TaskContainer('tester')
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+
+        self.verify_status(STATUS_COMPLETE, STATUS_COMPLETE, STATUS_COMPLETE, ctask)
+
+
+    def test_status_any_subtask_paused(self):
+        """
+        Tests for TaskContainer that has any paused subtasks
+        """
+        task1 = StatusSimulatingTaskProxy()
+        task2 = StatusSimulatingTaskProxy()
+
+        ctask = TaskContainer('tester')
+        ctask.add_task(task1)
+        ctask.add_task(task2)
+
+        self.verify_status(STATUS_PAUSED, STATUS_STOPPED, STATUS_PAUSED, ctask)
+        self.verify_status(STATUS_STOPPED, STATUS_PAUSED, STATUS_PAUSED, ctask)
+
+        self.verify_status(STATUS_COMPLETE, STATUS_PAUSED, STATUS_PAUSED, ctask)
+        self.verify_status(STATUS_PAUSED, STATUS_COMPLETE, STATUS_PAUSED, ctask)
+
+        self.verify_status(STATUS_PAUSED, STATUS_RUNNING, STATUS_RUNNING, ctask)
+        self.verify_status(STATUS_RUNNING, STATUS_PAUSED, STATUS_RUNNING, ctask)

@@ -19,13 +19,16 @@
 from __future__ import with_statement
 
 import unittest
-from pydra_server.cluster.tasks.tasks import *
-from pydra_server.cluster.worker import Worker
-from pydra_server.task_cache.demo_task import *
-
 from twisted.trial import unittest as twisted_unittest
 from twisted.internet import reactor, defer
 from threading import Lock, Event
+
+from pydra_server.cluster.tasks.tasks import *
+from pydra_server.cluster.worker import Worker
+from pydra_server.task_cache.demo_task import *
+from proxies import *
+
+
 
 def suite():
     """
@@ -58,69 +61,6 @@ def suite():
     tasks_suite.addTest(Task_TwistedTest('test_start'))
 
     return tasks_suite
-
-
-class WorkerProxy():
-    """
-    Class for proxying worker functions
-    """
-    worker_key = "WorkerProxy"
-
-    def get_worker(self):
-        return self
-
-
-class StartupAndWaitTask(Task):
-    """
-    Task that runs indefinitely.  Used for tests that
-    require a task with state STATUS_RUNNING.  This task
-    uses a lock so that the testcase can request the lock
-    and effectively pause the task at specific places to
-    verify its internal state
-    """
-
-    def __init__(self):
-        self.starting_event = Event()   # used to lock task until _work() is called
-        self.running_event = Event()    # used to lock running loop
-        self.finished_event = Event()   # used to lock until Task.work() is complete
-        self.failsafe = None
-        Task.__init__(self)
-
-    def clear_events(self):
-        """
-        This clears threads waiting on events.  This function will
-        call set() on all the events to ensure nothing is left waiting.
-        """
-        self.starting_event.set()
-        self.running_event.set()
-        self.finished_event.set()
-
-
-    def work(self, args={}, callback=None, callback_args={}):
-        """
-        extended to add locks at the end of the work
-        """
-        try:
-            # set a failsafe to ensure events get cleared
-            self.failsafe = reactor.callLater(5, self.clear_events)
-
-            Task.work(self, args, callback, callback_args)
-            self.finished_event.set()
-
-        finally:
-            if self.failsafe:
-                self.failsafe.cancel()
-
-    def _work(self, **kwargs):
-        """
-        'Work' until an external object modifies the STOP_FLAG flag
-        """
-        self.starting_event.set()
-
-        while not self.STOP_FLAG:
-            # wait for the running_event.  This  prevents needless looping
-            # and still simulates a task that is working
-            self.running_event.wait(5)
 
 
 class Task_TwistedTest(twisted_unittest.TestCase):
