@@ -321,3 +321,93 @@ class TaskContainer_Test(twisted_unittest.TestCase):
         ctask.add_task(task1)
         ctask.add_task(task2)
         return threads.deferToThread(self.verify_sequential_work, task=ctask)
+
+
+class TaskContainer2_Test(unittest.TestCase):
+    """
+    Tests for verify functionality of Task class
+    """
+    def setUp(self):
+        self.container_task = TestContainerTask()
+        self.worker = WorkerProxy()
+        self.container_task.parent = self.worker
+
+    def tearDown(self):
+        pass
+
+
+    def test_key_generation_containertask(self):
+        """
+        Verifies that the task key used to look up the task is generated correctly
+        """
+        expected = 'TestContainerTask'
+        key = self.container_task.get_key()
+        self.assertEqual(key, expected, 'Generated key [%s] does not match the expected key [%s]' % (key, expected) )
+
+
+    def test_key_generation_containertask_child(self):
+        """
+        Verifies that the task key used to look up the task is generated correctly
+        """
+        for i in range(len(self.container_task.subtasks)):
+            expected = 'TestContainerTask.%i' % i
+            key = self.container_task.subtasks[i].task.get_key()
+            self.assertEqual(key, expected, 'Generated key [%s] does not match the expected key [%s]' % (key, expected) )
+
+
+    def test_get_subtask_containertask(self):
+        """
+        Verifies:
+             * that the task key returns the correct task if given the correct key
+             * that the task key returns an error if given an incorrect key
+        """
+        # correct key
+        key = 'TestContainerTask'
+        expected = self.container_task
+        returned = self.container_task.get_subtask(key.split('.'))
+        self.assertEqual(returned, expected, 'Subtask retrieved was not the expected Task')
+
+        # incorrect Key
+        key = 'FakeTaskThatDoesNotExist'
+        self.assertRaises(TaskNotFoundException, self.container_task.get_subtask, key.split('.'))
+
+
+    def test_get_subtask_containertask_child(self):
+        """
+        Verifies:
+             * that the task key returns the correct task if given the correct key
+             * that the task key returns an error if given an incorrect key
+        """
+        # correct key
+        for i in range(len(self.container_task.subtasks)):
+            key = 'TestContainerTask.%i' % i
+            expected = self.container_task.subtasks[i].task
+            returned = self.container_task.get_subtask(key.split('.'))
+            self.assertEqual(returned, expected, 'Subtask retrieved was not the expected Task')
+
+        # incorrect Key
+        key = 'TestContainerTask.10'
+        self.assertRaises(TaskNotFoundException, self.container_task.get_subtask, key.split('.'))
+
+        # Invalid Key (must be integer)
+        key = 'TestContainerTask.FakeTaskThatIsntAnInteger'
+        self.assertRaises(TaskNotFoundException, self.container_task.get_subtask, key.split('.'))
+
+
+    def test_get_worker_containertask(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        returned = self.container_task.get_worker()
+        self.assert_(returned, 'no worker was returned')
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+
+    def test_get_worker_containertask_child(self):
+        """
+        Verifies that the worker can be retrieved
+        """
+        for i in range(len(self.container_task.subtasks)):
+            returned = self.container_task.subtasks[i].task.get_worker()
+            self.assert_(returned, 'no worker was returned')
+            self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
