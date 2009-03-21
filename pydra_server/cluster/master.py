@@ -58,7 +58,7 @@ from django.utils import simplejson
 
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
-from pydra_server.cluster.task_manager import TaskManager
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 
@@ -247,7 +247,8 @@ class Master(object):
 
                 # Authenticate with the node
                 pub_key = node.load_pub_key()
-                self.rsa_client.auth(node.ref, pub_key.encrypt, node=node)
+                pub_key_encrypt = pub_key.encrypt if pub_key else None
+                self.rsa_client.auth(node.ref, pub_key_encrypt, node=node)
 
             #failures
             else:
