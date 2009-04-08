@@ -112,7 +112,7 @@ class RSAAvatar(pb.Avatar):
             print '[Info] verified'
 
         else:
-            # no challenge, this is the first time the client is connectig. 
+            # no challenge, this is the first time the client is connecting.
             # Allow the the user past.  This can only be reached if 
             # no_key_first_use == True
             print '[Info] first time client has connected, allowing access without verification'
