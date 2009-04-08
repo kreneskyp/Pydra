@@ -774,7 +774,7 @@ class AMFAuthenticator(object):
 
         return self.auth
 
-
+import datetime
 class AMFInterface(pb.Root):
     """
     Interface for Controller.  This exposes functions to a controller.
@@ -782,10 +782,46 @@ class AMFInterface(pb.Root):
     def __init__(self, master, checker):
         self.master = master
         self.checker = checker
+        self.sessions = {}
+        self.session_cleanup = reactor.callLater(20, self.clean_sessions)
 
     def auth(self, user, password):
-        authenticator = AMFAuthenticator(self.checker)
-        return authenticator.auth(user, password)
+        """
+        Authenticate a client session.  Sessions must initially be 
+        authenticated using strict security.  After that a session code can be
+        used to quickly authenticate.  The session will timeout after a few 
+        minutes and require the client to re-authenticate with a new session 
+        code.  This model ensures that session codes are never left active for
+        long periods of time.
+        """
+        if self.sessions.has_key(user):
+            #client has already authenticated, let it pass
+            print '[DEBUG] AMFInterface - quick auth'
+            return True
+
+        else:
+            #client has not authenticated yet.
+            authenticator = AMFAuthenticator(self.checker)
+            if authenticator.auth(user, password):
+                print '[DEBUG] AMFInterface - real auth'
+                expiration = datetime.datetime.now() + datetime.timedelta(0,120)
+                self.sessions[user] = {'code':password, 'expire':expiration}
+                return True
+
+            else:
+                return False
+
+    def clean_sessions(self):
+        """
+        Remove session that have expired.
+        """
+        sessions = self.sessions
+        now = datetime.datetime.now()
+        for k,v in sessions.items():
+            if v['expire'] <= now:
+                del sessions[k]
+
+        self.session_cleanup = reactor.callLater(20, self.clean_sessions)
 
     def is_alive(self, _):
         print '[debug] is alive'
