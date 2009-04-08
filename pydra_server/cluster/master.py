@@ -61,6 +61,8 @@ from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
+from pydra_server.cluster.amf.interface import AMFInterface
+
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -737,139 +739,6 @@ class MasterRealm:
             print '[info] worker:%s - connected' % avatarID
 
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
-
-
-class AMFAuthenticator(object):
-    """
-    Class used to authenticate the request.  This is a hack of a class but
-    unfortunately required because there does not appear to be a better way
-    to block until a deferred completes
-    """
-    def __init__(self, checker):
-        self.result = False
-        self.checker = checker
-
-    def auth_success(self, result):
-        self.result = True
-        self.auth = True
-
-    def auth_failure(self, result):
-        print '[error] Unauthorized attempt to use service'
-        self.result = True
-        self.auth = False
-
-    def auth(self, user, password):
-        from twisted.cred.credentials import UsernamePassword
-        credentials = UsernamePassword(user, password)
-        avatarId = self.checker.requestAvatarId(credentials)
-        avatarId.addCallback(self.auth_success)
-        avatarId.addErrback(self.auth_failure)
-
-        # block for 5 seconds or until a result happens
-        # in most cases a result should happen very quickly
-        for i in range(25):
-            if self.result:
-                break
-            time.sleep(.2)
-
-        return self.auth
-
-import datetime
-class AMFInterface(pb.Root):
-    """
-    Interface for Controller.  This exposes functions to a controller.
-    """
-    def __init__(self, master, checker):
-        self.master = master
-        self.checker = checker
-        self.sessions = {}
-        self.session_cleanup = reactor.callLater(20, self.clean_sessions)
-
-    def auth(self, user, password):
-        """
-        Authenticate a client session.  Sessions must initially be 
-        authenticated using strict security.  After that a session code can be
-        used to quickly authenticate.  The session will timeout after a few 
-        minutes and require the client to re-authenticate with a new session 
-        code.  This model ensures that session codes are never left active for
-        long periods of time.
-        """
-        if self.sessions.has_key(user):
-            #client has already authenticated, let it pass
-            print '[DEBUG] AMFInterface - quick auth'
-            return True
-
-        else:
-            #client has not authenticated yet.
-            authenticator = AMFAuthenticator(self.checker)
-            if authenticator.auth(user, password):
-                print '[DEBUG] AMFInterface - real auth'
-                expiration = datetime.datetime.now() + datetime.timedelta(0,120)
-                self.sessions[user] = {'code':password, 'expire':expiration}
-                return True
-
-            else:
-                return False
-
-    def clean_sessions(self):
-        """
-        Remove session that have expired.
-        """
-        sessions = self.sessions
-        now = datetime.datetime.now()
-        for k,v in sessions.items():
-            if v['expire'] <= now:
-                del sessions[k]
-
-        self.session_cleanup = reactor.callLater(20, self.clean_sessions)
-
-    def is_alive(self, _):
-        print '[debug] is alive'
-        return 1
-
-    def node_status(self, _):
-        node_status = {}
-        worker_list = self.master.workers
-        #iterate through all the nodes adding their status
-        for key, node in self.master.nodes.items():
-            worker_status = {}
-            if node.cores:
-                #iterate through all the workers adding their status as well
-                #also check for a worker whose should be running but is not connected
-                for i in range(node.cores):
-                    w_key = '%s:%s:%i' % (node.host, node.port, i)
-                    html_key = '%s_%i' % (node.id, i)
-                    if w_key in self.master._workers_idle:
-                        worker_status[html_key] = (1,-1,-1)
-                    elif w_key in self.master._workers_working:
-                        task, subtask = self.master._workers_working[w_key]
-                        worker_status[html_key] = (1,task,subtask)
-                    else:
-                        worker_status[html_key] = -1
-
-            else:
-                worker_status=-1
-
-            node_status[key] = {'status':node.status(),
-                                'workers':worker_status
-                               }
-        return node_status
-
-    def list_tasks(self, _):
-        return self.master.task_manager.list_tasks()
-
-    def list_queue(self, _):
-        return self.master._queue
-
-    def run_task(self, _, key):
-        return self.master.queue_task(key)
-
-    def task_status(self, _):
-        return self.master.task_manager.task_status()
-
-    def cancel_task(self, _, task_id):
-        return self.master.cancel_task(int(task_id))
-
 
 
 #setup application used by twistd
