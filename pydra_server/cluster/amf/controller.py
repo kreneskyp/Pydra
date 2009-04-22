@@ -26,9 +26,9 @@ class AMFController(object):
     """
     AMFController - AMFController is a client for controlling the cluster via pyAMF, the actionscript
                 messaging protocol.  While this app does not now and has no plans for interacting 
-                with adobe flash.  The pyAMF protocol allows remoting in an asynchronous fashion.  
+                with adobe flash.  The pyAMF protocol allows remoting in an asynchronous fashion.
                 This is ideal for the Controller usecase.  Implementations using sockets resulted in
-                connections that would not exit properly when django is run with apache. Additionally, 
+                connections that would not exit properly when django is run with apache. Additionally,
                 Twisted reactor does not play well with django server so a twisted client is not possible
     """
 
@@ -61,7 +61,7 @@ class AMFController(object):
         Setup the client and service
         """
         #connect
-        self.client = RemotingService('http://127.0.0.1:18801')
+        self.client = RemotingService('https://127.0.0.1:18801')
         self.client.setCredentials('controller','1234')
         self.service = self.client.getService('controller')
 

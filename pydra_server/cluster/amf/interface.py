@@ -21,8 +21,21 @@ import datetime
 
 from twisted.spread import pb
 from twisted.internet import reactor
+from twisted.python.randbytes import secureRandom
 
 from authenticator import AMFAuthenticator
+
+
+def authenticated(fn):
+    """
+    decorator for marking functions as requiring authentication.
+    """
+    def new(*args):
+        client = args[1].getClientIP()
+        if True:
+            return fn(*args)
+        return 0
+
 
 class AMFInterface(pb.Root):
     """

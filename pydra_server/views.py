@@ -30,7 +30,7 @@ from django.http import HttpResponse
 import math
 
 from pydra_server.models import Node, TaskInstance, pydraSettings
-from cluster.amf_controller import AMFController
+from cluster.amf.controller import AMFController
 from forms import NodeForm
 from models import pydraSettings
 import settings

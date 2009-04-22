@@ -165,7 +165,14 @@ class Master(object):
         root.putChild("", gw)
 
         #setup services
-        controller_service = internet.TCPServer(18801, server.Site(root))
+        from twisted.internet.ssl import DefaultOpenSSLContextFactory
+        try:
+            context = DefaultOpenSSLContextFactory('ca-key.pem', 'ca-cert.pem')
+        except:
+            print '[ERROR] - Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh'
+            sys.exit()
+
+        controller_service = internet.SSLServer(18801, server.Site(root), contextFactory=context)
         worker_service = internet.TCPServer(18800, pb.PBServerFactory(p))
 
         return controller_service,  worker_service
