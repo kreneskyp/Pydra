@@ -44,21 +44,20 @@ class RemoteMethodProxy():
         new_args = (self.controller.user, ) + args
         result = self.func(*new_args)
 
-        if result == 0:
-            #authenticate required
+        if result:
+            return result[0]
 
-            if (self.controller._authenticate()):
-                # authenticated reissue command
-                ret = self.func(*new_args)
-                return ret
 
-            else:
-                # authenticate failed
-                print '[ERROR] AMFController - authentication failed'
-                return -1
+        #authenticate required
+        if (self.controller._authenticate()):
+            # authenticated reissue command
+            ret = self.func(*new_args)
+            return ret
 
-        # some result other than authenticate
-        return result
+        else:
+            # authenticate failed
+            print '[ERROR] AMFController - authentication failed'
+            return -1
 
 
 class AMFController(object):

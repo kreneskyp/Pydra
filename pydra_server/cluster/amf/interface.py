@@ -45,7 +45,7 @@ def authenticated(fn):
                 # user is authorized - execute original function
                 # strip authentication key from the args, its not needed by the
                 # interface and could cause errors.
-                return fn(*(args[:-1]))
+                return [fn(*(args[:-1]))]
 
         except KeyError:
             pass # no session yet user must go through authentication
