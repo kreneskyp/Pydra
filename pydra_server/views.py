@@ -129,7 +129,8 @@ def node_status(request):
     c = RequestContext(request, {
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
-    return HttpResponse(pydra_controller.remote_node_status(), mimetype='application/javascript')
+
+    return HttpResponse(simplejson.dumps(pydra_controller.remote_node_status()), mimetype='application/javascript')
 
 
 def jobs(request):

@@ -17,9 +17,48 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import socket
+import hashlib
+
+from twisted.python.randbytes import secureRandom
 from pyamf.remoting.client import RemotingService
 from django.utils import simplejson
-import socket
+
+from pydra_server.cluster.auth.rsa_auth import load_crypto
+
+
+class RemoteMethodProxy():
+    """
+    RemoteMethodProxy is a proxy used for calling remote methods exposed over
+    the AMF interface.  This proxy encapsulates authentication for the methods.
+    It will automatically respond to authentication responses so that specific
+    methods on the interface do not require extra code to add support.
+    """
+
+    def __init__(self, func, controller):
+        self.func = func
+        self.controller = controller
+
+    def __call__(self, *args):
+        # add user name to args
+        new_args = (self.controller.user, ) + args
+        result = self.func(*new_args)
+
+        if result == 0:
+            #authenticate required
+
+            if (self.controller._authenticate()):
+                # authenticated reissue command
+                ret = self.func(*new_args)
+                return ret
+
+            else:
+                # authenticate failed
+                print '[ERROR] AMFController - authentication failed'
+                return -1
+
+        # some result other than authenticate
+        return result
 
 
 class AMFController(object):
@@ -30,6 +69,12 @@ class AMFController(object):
                 This is ideal for the Controller usecase.  Implementations using sockets resulted in
                 connections that would not exit properly when django is run with apache. Additionally,
                 Twisted reactor does not play well with django server so a twisted client is not possible
+
+                This class is a proxy object.  All exposed methods are declared
+                in the AMFInterface class.  This class will dispatch calls to
+                any remote method but it is not actually aware of which methods
+                are available.  The only function this class serves is to
+                encapsulate connections and authentication.
     """
 
     services_exposed_as_properties = [
@@ -41,6 +86,9 @@ class AMFController(object):
         self.master_host = master_host
         self.master_port = master_port
 
+        # load rsa crypto
+        self.pub_key, self.priv_key = load_crypto('./master.key')
+
         print '[Info] Pydra Controller Started'
         self.connect()
 
@@ -49,10 +97,17 @@ class AMFController(object):
         """
         Overridden to lookup some functions as properties
         """
+
         #check to see if this is a function acting as a property
         if key in self.services_exposed_as_properties:
-            return self.__class__.__dict__['remote_%s' % key](self)
+            return  RemoteMethodProxy(self.service.__getattr__(key), self)()
 
+
+        # return a proxy for remote_ methods
+        if key[:7] == 'remote_':
+            return RemoteMethodProxy(self.service.__getattr__(key[7:]), self)
+
+        # else its a normal method or property
         return self.__dict__[key]
 
 
@@ -60,103 +115,24 @@ class AMFController(object):
         """
         Setup the client and service
         """
-        #connect
+        self.user = hashlib.sha512(secureRandom(64)).hexdigest()
+        self.password = hashlib.sha512(secureRandom(64)).hexdigest()
+
         self.client = RemotingService('https://127.0.0.1:18801')
-        self.client.setCredentials('controller','1234')
+
+        self.client.setCredentials(self.user, self.password)
         self.service = self.client.getService('controller')
 
 
-    def remote_is_alive(self):
-        """
-        Simple ping just to see if connection is active
-        """
-        try:
-            return self.service.is_alive()
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
+    def _authenticate(self):
+        # reconnect to ensure fresh credentials
+        #self.connect()
 
+        challenge = self.service.authenticate(self.user)
+        challenge = challenge.__str__()
 
-    def remote_node_status(self):
-        """
-        Returns a json'ified list of status for nodes/workers
-        """
-        try:
-            ret = self.service.node_status()
-            print ret
-            return simplejson.dumps(ret)
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
+        # re-encrypt using servers key and then sha hash it.
+        response_encode = self.priv_key.encrypt(challenge, None)
+        response_hash = hashlib.sha512(response_encode[0]).hexdigest()
 
-
-    def remote_list_tasks(self):
-        """
-        Returns a list of tasks that can be run
-        """
-        try:
-            ret = self.service.list_tasks()
-            return ret
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
-
-
-    def remote_list_queue(self):
-        """
-        Returns a list of tasks that can be run
-        """
-        try:
-            ret = self.service.list_queue()
-            print ret
-            return ret
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
-
-
-    def remote_list_running(self):
-        """
-        Returns a list of tasks that can be run
-        """
-        try:
-            ret = self.service.list_running()
-            print ret
-            return ret
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
-
-
-    def remote_run_task(self, key):
-        """
-        Requests a task be run
-        """
-        try:
-            ret = self.service.run_task(key)
-            return ret
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
-
-
-    def remote_cancel_task(self, id):
-        """
-        Cancels a task.  This is used for tasks in the queue and 
-        tasks that are running.  Its the same function because that
-        state can change before this method reaches the remote server
-        """
-        try:
-            ret = self.service.cancel_task(id)
-            print ret
-            return ret
-        except socket.error:
-            # need to reconnect after a socket error
-            self.connect()
-            return 0
+        return self.service.challenge_response(self.user, response_hash)
