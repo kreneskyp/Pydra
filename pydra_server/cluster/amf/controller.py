@@ -47,7 +47,6 @@ class RemoteMethodProxy():
         if result:
             return result[0]
 
-
         #authenticate required
         if (self.controller._authenticate()):
             # authenticated reissue command
@@ -96,11 +95,9 @@ class AMFController(object):
         """
         Overridden to lookup some functions as properties
         """
-
         #check to see if this is a function acting as a property
         if key in self.services_exposed_as_properties:
-            return  RemoteMethodProxy(self.service.__getattr__(key), self)()
-
+            return RemoteMethodProxy(self.service.__getattr__(key), self)()
 
         # return a proxy for remote_ methods
         if key[:7] == 'remote_':

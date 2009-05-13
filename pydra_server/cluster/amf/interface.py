@@ -139,6 +139,7 @@ class AMFInterface(pb.Root):
         return self.authenticated
 
 
+    @authenticated
     def is_alive(self, _):
         print '[debug] is alive'
         return 1
