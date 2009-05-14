@@ -25,7 +25,7 @@ from pyamf.remoting.client import RemotingService
 from django.utils import simplejson
 
 from pydra_server.cluster.auth.rsa_auth import load_crypto
-
+import httplib
 
 class RemoteMethodProxy():
     """
@@ -39,24 +39,38 @@ class RemoteMethodProxy():
         self.func = func
         self.controller = controller
 
+
     def __call__(self, *args):
-        # add user name to args
-        new_args = (self.controller.user, ) + args
-        result = self.func(*new_args)
 
-        if result:
-            return result[0]
+            # add user name to args
+            new_args = (self.controller.user, ) + args
 
-        #authenticate required
-        if (self.controller._authenticate()):
-            # authenticated reissue command
-            ret = self.func(*new_args)
-            return ret
+            # attempt to call func
 
-        else:
-            # authenticate failed
-            print '[ERROR] AMFController - authentication failed'
-            return -1
+            try:
+                result = self.func(*new_args)
+            except (httplib.CannotSendRequest, socket.error):
+                self.controller.connect()
+                try:
+                    result = self.func(*new_args)
+                except (httplib.CannotSendRequest, socket.error):
+                    print '[error] RemoteMethodProxy - error sending request, reconnect failed'
+                    return False
+
+            if result:
+                return result[0]
+
+            #authenticate required
+            if (self.controller._authenticate()):
+                # authenticated reissue command
+                ret = self.func(*new_args)
+                return ret
+
+            else:
+                # authenticate failed
+                print '[ERROR] AMFController - authentication failed'
+                return -1
+
 
 
 class AMFController(object):
@@ -97,7 +111,10 @@ class AMFController(object):
         """
         #check to see if this is a function acting as a property
         if key in self.services_exposed_as_properties:
-            return RemoteMethodProxy(self.service.__getattr__(key), self)()
+            #try:
+                return RemoteMethodProxy(self.service.__getattr__(key), self)()
+            #except:
+            #    return False
 
         # return a proxy for remote_ methods
         if key[:7] == 'remote_':

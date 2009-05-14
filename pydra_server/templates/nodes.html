@@ -73,21 +73,45 @@
 
             }
 
+            .node_workers_status_connected {
+                color:green;
+            }
+
+            .node_workers_status_disconnected {
+                color:red;
+            }
+
         </style>
 
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/json2.js"></script>
         <script type="text/javascript">
 
-            function process_status_update(jsonUpdate) {
-                updateMsg = JSON.parse(jsonUpdate);
+            var worker_count = -1;
+
+            function process_status_update(data) {
+                console.log(data);
+                if (data == false) {
+                    $('#master_errors').show();
+                } else {
+                    $('#master_errors').hide();
+                    process_worker_updates(data)
+                }
+            }
+
+            function process_worker_updates(updateMsg) {
+                workers_busy = 0;
+                worker_count = 0;
+
                 for (key in updateMsg){
                     node = updateMsg[key];
                     node_status = node['status'];
+                    node_worker_connected = 0;
+                    $node = $('#node_' + key);
+
                     if (node_status == 1) {
-                        $('#node_' + key).removeClass('status_disconnected').addClass('status_connected').html('connected')
+                        $node.children('.status').removeClass('status_disconnected').addClass('status_connected').html('connected')
                     } else {
-                        $('#node_' + key).addClass('status_disconnected').removeClass('status_connected').html('disconnected')
+                        $node.children('.status').addClass('status_disconnected').removeClass('status_connected').html('disconnected')
                     }
 
                     workers = node['workers'];
@@ -95,30 +119,66 @@
                         //alert('workers are not known');
                     } else {
                         for (worker_key in workers) {
+                            worker_count += 1;
                             worker = workers[worker_key];
-                            base = '#worker_' + worker_key
-                            // is worker active
+                            $worker = $('#worker_' + worker_key);
+                            $status = $worker.children('.status');
+                            $task = $worker.children('.task');
+
+                            // is worker connected
                             if (worker == -1){
-                                $(base + ' .status').removeClass('status_connected').addClass('status_disconnected').html('disconnected')
+                                //worker is disconnected
+                                $status.removeClass('status_connected').addClass('status_disconnected').html('disconnected')
+                                $task.html('Unknown');
 
                             } else {
-                                $(base + ' .status').removeClass('status_disconnected').addClass('status_connected').html('connected')
+                                // worker is connected
+                                node_worker_connected += 1;
+                                $status.removeClass('status_disconnected').addClass('status_connected').html('connected')
+                                // what is worker doing
                                 if (worker[1] != -1 && worker[2] != -1) {
-                                    $(base + ' .task').html(worker[1]+':'+worker[2]);
+                                    // worker is working on subtask
+                                    $task.html(worker[1]+':'+worker[2]);
+                                    workers_busy += 1;
                                 } else if (worker[1] != -1) {
-                                    $(base + ' .task').html(worker[1])
+                                    // worker is working on task
+                                    $task.html(worker[1])
+                                    workers_busy += 1;
                                 } else {
-                                    $(base + ' .task').html('idle')
+                                    //worker is idle
+                                    $task.html('idle')
                                 }
                             }
                         }
                     }
+
+                    // worker status summary
+                    $node.children('.node_worker_status').children('.connected').html(''+node_worker_connected);
+                    $node_status = $node.children('.node_worker_status');
+                    if (node_worker_connected == 0) {
+                        $node_status.removeClass('node_workers_status_connected');
+                        $node_status.removeClass('node_workers_status_partial');
+                        $node_status.addClass('node_workers_status_disconnected');
+                    } else {
+                        total_workers = parseInt($('#node_' + key + ' .node_worker_status .total').html());
+                        if (node_worker_connected == total_workers) {
+                            $node_status.addClass('node_workers_status_connected');
+                            $node_status.removeClass('node_workers_status_partial');
+                            $node_status.removeClass('node_workers_status_disconnected');
+                        } else {
+                            $node_status.removeClass('node_workers_status_connected');
+                            $node_status.addClass('node_workers_status_partial');
+                            $node_status.removeClass('node_workers_status_disconnected');
+                        }
+                    }
+
                 }
+                $('#capacity').html(workers_busy + ' of ' + worker_count + ' busy');
             }
 
             function update() {
                 //ajax call to status
-                $.post('{{SITE_ROOT}}/nodes/status/',{},process_status_update);
+                $.getJSON('{{SITE_ROOT}}/nodes/status/',{},process_status_update);
 
                 //rerun this update in 5 seconds
                 setTimeout('update()', 5000);
@@ -139,16 +199,16 @@
 {% endblock %}
 
 {% block content %}
-    {% if not controller.is_alive %}
-        <div id="master_errors">
+
+        <div id="master_errors" {% if controller.is_alive %}style="display:none;"{% endif %}>
             Master Node is not running. 
         </div>
-    {% endif %}
+
 
         <table id="cluster">
             <tr>
                 <td>Capacity</td>
-                <td>[3 of 5 workers busy]</td>
+                <td id="capacity">[3 of 5 workers busy]</td>
             </tr>
             <tr>
                 <td>Speed</td>
@@ -176,8 +236,8 @@
         </thead>
         <tbody>
             {% for node in nodes.object_list %}
-                <tr>
-                    <td id="node_{{node.id}}" class="status">Unknown</td>
+                <tr id="node_{{node.id}}">
+                    <td class="status">Unknown</td>
                     <td>
                         {% if perms.pydra_server.can_edit_nodes %}
                             <a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a>
@@ -186,7 +246,7 @@
                         {% endif %}
                     </td>
                     <td class="port">{{node.port}}</td>
-                    <td>[3 of 4 connected]</td>
+                    <td class="node_worker_status"><span class="connected">Unknown</span> of <span class="total">{{node|available_cores}}</span></td>
                     <td>{{node|available_cores}}</td>
                     <td>{{node.cores}}</td>
                 </tr>
