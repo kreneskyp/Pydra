@@ -38,7 +38,7 @@ def authenticated(fn):
     """
     def new(*args):
         interface = args[0]
-        user = args[2]
+        user = args[-1]
 
         try:
             if interface.sessions[user]['auth']:

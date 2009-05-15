@@ -43,13 +43,15 @@ class RemoteMethodProxy():
     def __call__(self, *args):
 
             # add user name to args
-            new_args = (self.controller.user, ) + args
+            new_args =  args + (self.controller.user, )
 
             # attempt to call func
-
             try:
                 result = self.func(*new_args)
             except (httplib.CannotSendRequest, socket.error):
+                # error connecting - retry only once then retry the function
+                # if it still fails then return a failure indicating connection
+                # problems.
                 self.controller.connect()
                 try:
                     result = self.func(*new_args)
