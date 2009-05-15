@@ -65,8 +65,8 @@ class RemoteMethodProxy():
             #authenticate required
             if (self.controller._authenticate()):
                 # authenticated reissue command
-                ret = self.func(*new_args)
-                return ret
+                result = self.func(*new_args)
+                return result[0]
 
             else:
                 # authenticate failed

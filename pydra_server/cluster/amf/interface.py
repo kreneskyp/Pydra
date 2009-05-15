@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import datetime
+import datetime, time
 import hashlib
 
 from twisted.spread import pb
@@ -197,8 +197,12 @@ class AMFInterface(pb.Root):
         Runs a task.  It it first placed in the queue and the queue manager
         will run it when appropriate
         """
-        return self.master.queue_task(key)
+        task_instance =  self.master.queue_task(key)
 
+        return {
+                'id':task_instance.id,
+                'time':time.mktime(task_instance.queued.timetuple())
+               }
 
     @authenticated
     def task_status(self, _):

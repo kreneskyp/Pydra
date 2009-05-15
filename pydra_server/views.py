@@ -169,7 +169,9 @@ def run_task(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    return HttpResponse(pydra_controller.remote_run_task(key), mimetype='application/javascript')
+    json = simplejson.dumps(pydra_controller.remote_run_task(key))
+
+    return HttpResponse(json, mimetype='application/javascript')
 
 
 @user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
