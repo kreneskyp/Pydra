@@ -142,7 +142,7 @@ class Task(object):
         """
         print '[debug] %s - Task - in Task.work()'  % self.get_worker().worker_key
         self._status = STATUS_RUNNING
-        results = self._work(args)
+        results = self._work(**args)
         self._status = STATUS_COMPLETE
         print '[debug] %s - Task - work complete' % self.get_worker().worker_key
 
@@ -300,17 +300,17 @@ class TaskContainer(Task):
         return self.subtasks[index].get_subtask(task_path)
 
 
-    def _work(self, args=None):
+    def _work(self, **kwargs):
         # Starts the task running all subtasks
-        result = args
+        result = kwargs
         for subtask in self.subtasks:
             print '   Starting Subtask: %s' % subtask
             if self.sequential:
                 #sequential task, run the task work directly (default)
-                result = subtask.task.work(result)
+                result = subtask.task.work(args=result)
             else:
                 #parallel task, run the subtask in its own thread
-                result = subtask.task.start(result)
+                result = subtask.task.start(args=result)
 
         return result
 
