@@ -23,7 +23,14 @@
     {% block head %}
         {{ block.super }}
         <style>
-            table {
+
+            td, th {
+                margin:0;
+                padding:0;
+                text-align:center;
+            }
+
+            #cluster, #nodes {
                 width:90%;
                 margin-left:5%;
             }
@@ -36,25 +43,8 @@
             #nodes {
                 border: 1px solid black;
                 margin-top:20px;
-            }
-
-            td, th{
-                padding-left:10px;
-                padding-right:10px;
-                text-align:center;
-            }
-
-            td.status {
-                border: 1px solid black;
-                background-color: gray;
-                width:100px;
-            }
-
-            td.status_connected {
-                background-color:#c2e192;
-            }
-            td.status_disconnected {
-                background-color:#ee9c98;
+                border-collapse:collapse;
+                border-spacing:0px;
             }
 
             #content {
@@ -73,13 +63,74 @@
 
             }
 
+            #header_top th {
+                color:white;
+                background-color:#666666;
+                border: 1px solid black;
+            }
+
+            #header_bottom th {
+                color:white;
+                background-color:#888888;
+                border-top: 1px dotted black;
+                border-bottom: 1px solid black;
+            }
+
+            #header_bottom th.status, #header_bottom th.id {
+                border-right:2px dotted #444444;
+            }
+
+            .status, #header_top th.status {width:100px;}
+            .host, #header_top .host {width:300px;}
+            .port {width:60px;}
+            .id {width:60px;}
+            #header_top th.workers {
+                border-bottom:1px solid #444444;
+            }
+
+            tr.node td table{
+                width:100%;
+                border-collapse:collapse;
+                border-spacing:0px;
+            }
+
+            tr.notfirst td table {
+                border-top:1px dotted #333333;
+            }
+
+            td.status .inner {
+                width:96px;
+                border:1px solid black;
+                margin:2px;
+            }
+
+            .worker td.status .inner {
+                margin-bottom:0;
+            }
+
+            .worker.last td.status .inner {
+                margin-bottom:4px;
+            }
+
+            div.status_connected {
+                background-color:#c2e192;
+            }
+            div.status_disconnected {
+                background-color:#ee9c98;
+            }
+
+            td.host {padding-left:10px; text-align:left; width:290px;}
+
             .node_workers_status_connected {
+                font-weight:bold;
                 color:green;
             }
 
             .node_workers_status_disconnected {
+                font-weight:bold;
                 color:red;
             }
+
 
         </style>
 
@@ -89,7 +140,6 @@
             var worker_count = -1;
 
             function process_status_update(data) {
-                console.log(data);
                 if (data == false) {
                     $('#master_errors').show();
                 } else {
@@ -109,9 +159,9 @@
                     $node = $('#node_' + key);
 
                     if (node_status == 1) {
-                        $node.children('.status').removeClass('status_disconnected').addClass('status_connected').html('connected')
+                        $node.find('.status .inner').removeClass('status_disconnected').addClass('status_connected').html('connected')
                     } else {
-                        $node.children('.status').addClass('status_disconnected').removeClass('status_connected').html('disconnected')
+                        $node.find('.status .inner').addClass('status_disconnected').removeClass('status_connected').html('disconnected')
                     }
 
                     workers = node['workers'];
@@ -122,7 +172,7 @@
                             worker_count += 1;
                             worker = workers[worker_key];
                             $worker = $('#worker_' + worker_key);
-                            $status = $worker.children('.status');
+                            $status = $worker.find('.status .inner');
                             $task = $worker.children('.task');
 
                             // is worker connected
@@ -153,14 +203,17 @@
                     }
 
                     // worker status summary
-                    $node.children('.node_worker_status').children('.connected').html(''+node_worker_connected);
-                    $node_status = $node.children('.node_worker_status');
+                    $node_status = $node.find('.node_worker_status');
+                    $node_status.children('.connected').html(''+node_worker_connected);
+
                     if (node_worker_connected == 0) {
+                        // no workers connected
                         $node_status.removeClass('node_workers_status_connected');
                         $node_status.removeClass('node_workers_status_partial');
                         $node_status.addClass('node_workers_status_disconnected');
                     } else {
-                        total_workers = parseInt($('#node_' + key + ' .node_worker_status .total').html());
+                        //workers connected, how many?
+                        total_workers = parseInt($node_status.children('.total').html());
                         if (node_worker_connected == total_workers) {
                             $node_status.addClass('node_workers_status_connected');
                             $node_status.removeClass('node_workers_status_partial');
@@ -223,52 +276,45 @@
         <table id="nodes">
         <thead>
             <tr id='header_top'>
-                <th rowspan="2">Status</th>
-                <th rowspan="2">Host</th>
-                <th rowspan="2">Port</th>
-                <th colspan="3">Workers</th>
+                <th rowspan="2" class="status">Status</th>
+                <th rowspan="2" class="host">Host</th>
+                <th class="port" rowspan="2">Port</th>
+                <th colspan="3" class="workers">Workers</th>
             </tr>
             <tr id='header_bottom'>
-                <th>Status</th>
-                <th>Count</th>
-                <th>Cores</th>
+                <th class="status">Status</th>
+                <th class="id">Id</th>
+                <th>Task</th>
             </tr>
         </thead>
         <tbody>
             {% for node in nodes.object_list %}
-                <tr id="node_{{node.id}}">
-                    <td class="status">Unknown</td>
-                    <td>
-                        {% if perms.pydra_server.can_edit_nodes %}
-                            <a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a>
-                        {% else %}
-                            {{node.host}}
-                        {% endif %}
-                    </td>
-                    <td class="port">{{node.port}}</td>
-                    <td class="node_worker_status"><span class="connected">Unknown</span> of <span class="total">{{node|available_cores}}</span></td>
-                    <td>{{node|available_cores}}</td>
-                    <td>{{node.cores}}</td>
-                </tr>
-                <tr>
-                    <td colspan="100%">
-                        <table>
-                        <tr id='header_top'>
-                            <th>Status</th>
-                            <th>Id</th>
-                            <th>Task</th>
-                        </tr>
+                <tr id="node_{{node.id}}" class="node {% if not forloop.first%}notfirst{%endif%}"><td colspan="100%">
+                <table>
+                    <tr>
+                    <td class="status"><div class="inner">Unknown</div></td>
+                        <td class="host">
+                            {% if perms.pydra_server.can_edit_nodes %}
+                                <a href="{{SITE_ROOT}}/nodes/edit/{{node.id}}">{{node.host}}</a>
+                            {% else %}
+                                {{node.host}}
+                            {% endif %}
+                        </td>
+                        <td class="port">{{node.port}}</td>
+                        <td class="node_worker_status status"><span class="connected">Unknown</span> of <span class="total">{{node|available_cores}}</span></td>
+                        <td>{{node|available_cores}}</td>
+                        <td>{{node.cores}}</td>
+                    </tr>
                         {% for id in node|node_range %}
-                            <tr id="worker_{{node.id}}_{{id}}">
-                                <td class="status">Unknown</td>
-                                <td>{{forloop.counter}}</td>
+                            <tr id="worker_{{node.id}}_{{id}}" class="worker {% if forloop.last %}last{% endif %}">
+                                <td colspan="3"></td>
+                                <td class="status"><div class="inner">Unknown</div></td>
+                                <td class="id">{{forloop.counter}} </td>
                                 <td class="task">Unknown</td>
                             </tr>
                         {% endfor %}
-                        </table>
-                    </td>
-                </tr>
-
+                     </table>
+                </td></tr>
             {% endfor %}
         </tbody>
         </table>
