@@ -156,7 +156,8 @@ def task_progress(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    return HttpResponse(pydra_controller.remote_task_status(), mimetype='application/javascript')
+    data = pydra_controller.remote_task_status()
+    return HttpResponse(simplejson.dumps(data), mimetype='application/javascript');
 
 
 @user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))

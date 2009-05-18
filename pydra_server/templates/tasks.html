@@ -47,7 +47,7 @@
                 });
 
                 // AUTO UPDATES ARE DISABLED
-                //update();
+                update();
             });
 
             /* processes the response when queuing a task */
@@ -70,7 +70,7 @@
                 }
                 html += '</tr>'
 
-                $('#queue thead').append(html)
+                $('#queue').append(html)
             }
 
 
@@ -94,7 +94,42 @@
                 node.removeClass(CLASS_COMPLETE);
             }
 
-            function processProgressData(incommingJSON) {
+
+            /* process the progress message from the update */
+            function processProgressData(data) {
+                /*
+                    Process queue changes by iterating each row from the queue
+                    and running tables.  The status list will only contain
+                    queued or running tasks so we can check status changes
+                    from queued to running, and any absent tasks have completed
+                    or stopped.
+                */
+                $('#queue tr:gt(1), #running tr:gt(1)').each(function(row){
+                    id = this.id.slice(9);
+                    status = data[id];
+
+                    if (status == undefined) {
+                        $(this).remove();
+                    } else if (status['s'] == STATUS_RUNNING) {
+                        if (this.parentNode.parentNode.id == 'queue') {
+                            // move row to running table
+                            $('#running').append(this);
+
+                            // insert time started element
+                            started = new Date(parseInt(status['t'])*1000);
+                            started = dateFormat(started, "yyyy-mm-dd HH:MM:ss")
+                            $(this).children('.queue_time').after('<td class="start_time">'+ started +'</td>')
+                        }
+                    }
+                });
+
+            }
+
+
+            // function that updates progress bars
+            // this code is from the proof-of-concept version of this page
+            // it needs to be updated to work with this page.
+            function updatebar() {
                 statusMessage = JSON.parse(incommingJSON);
                 for (key in statusMessage){
                     progressArray = statusMessage[key]['status'];
@@ -190,8 +225,8 @@
             }
 
             function update() {
-                $.post('progress/',{},processProgressData);
-                setTimeout('update()', 2000);
+                $.getJSON('progress/', {}, processProgressData);
+                setTimeout('update()', 5000);
             }
 
         </script>
@@ -293,6 +328,7 @@
             <thead>
                 <tr><th id="title" colspan="100%">Running Jobs</th></tr>
                 <tr>
+                    <th>ID</th>
                     <th>Name</th>
                     <th>Description</th>
                     <th>Time Queued</th>
@@ -302,13 +338,14 @@
             </thead>
 
             {% for task in running %}
-                <tr id="{{task.id}}">
+                <tr id="instance_{{task.id}}">
+                    <td>{{task.id}}</td>
                     <td>{{task.task_key}}</td>
                     <td>{{tasks|task_description:task.task_key}}</td>
                     <td class="queue_time">{{task.queued}}</td>
                     <td class="start_time">{{task.started}}</td>
                     <td class="buttons">
-                        {% if perms.pydra_server.can_run_tasks %}<input class="button_cancel" type="button" value="Stop"/>{% endif %}
+                        {% if perms.pydra_server.can_run_tasks %}<input class="button_cancel" type="button" value="Cancel"/>{% endif %}
                     </td>
                 </tr>
             {% endfor %}

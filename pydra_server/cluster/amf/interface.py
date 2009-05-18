@@ -211,7 +211,18 @@ class AMFInterface(pb.Root):
         Returns the status of all running tasks.  This is a detailed list
         of progress and status messages.
         """
-        return self.master.task_manager.task_status()
+        import time
+        from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING
+        statuses = {}
+
+        for instance in self.master._queue:
+            statuses[instance.id] = {'s':STATUS_STOPPED}
+
+        for instance in self.master._running:
+            start = time.mktime(instance.started.timetuple())
+            statuses[instance.id] = {'s':STATUS_RUNNING, 't':start}
+
+        return statuses
 
 
     @authenticated
