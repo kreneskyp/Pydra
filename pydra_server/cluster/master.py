@@ -573,7 +573,7 @@ class Master(object):
             if self.run_task(task_instance.id, task_instance.task_key, simplejson.loads(task_instance.args), task_instance.subtask_key):
                 #task started, update its info and remove it from the queue
                 print '[info] Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key)
-                task_instance.started = time.strftime('%Y-%m-%d %H:%M:%S')
+                task_instance.started = datetime.datetime.now()
                 task_instance.save()
 
                 del self._queue[0]
