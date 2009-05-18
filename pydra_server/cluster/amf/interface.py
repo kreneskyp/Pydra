@@ -200,7 +200,8 @@ class AMFInterface(pb.Root):
         task_instance =  self.master.queue_task(key)
 
         return {
-                'id':task_instance.id,
+                'task_key':key,
+                'instance_id':task_instance.id,
                 'time':time.mktime(task_instance.queued.timetuple())
                }
 

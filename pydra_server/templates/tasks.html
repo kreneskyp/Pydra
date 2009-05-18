@@ -25,10 +25,12 @@
     {{ block.super }}
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.progressbar.js"></script>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/json2.js"></script>
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.acts_as_tree_table.js"></script>
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/date.format.js"></script>
 
         <script>
+            var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
+
             $(document).ready(function() {
                 //$('table[id^=taskstable-]').acts_as_tree_table({default_state:'collapsed'});
 
@@ -37,7 +39,7 @@
                 //$('span.progressbar').progressBar({barImage: 'http://doors.osuosl.org/media/images/progressbg_yellow.gif', boxImage:'http://doors.osuosl.org/media/images/progressbar.gif'});
 
                 $('.button_run').live('click', function(evt) {
-                    $.post('run/', {'key':evt.target.parentNode.parentNode.id});
+                    $.post('run/', {'key':evt.target.parentNode.parentNode.id}, process_queued_task, 'json');
                 });
 
                 $('.button_cancel').live('click', function(evt) {
@@ -47,6 +49,30 @@
                 // AUTO UPDATES ARE DISABLED
                 //update();
             });
+
+            /* processes the response when queuing a task */
+            function process_queued_task (data){
+                // create html for entry
+                task_name = data['task_key']
+                task_instance = data['instance_id']
+                task_description = $('#' + task_name).find('.description').html();
+
+                time = new Date(parseInt(data['time'])*1000);
+                formated_time = dateFormat(time, "yyyy-mm-dd HH:MM:ss")
+
+
+                // construct html
+                html = '<tr id="instance_'+ task_instance +'"><td>'+task_instance+'</td><td>'+ task_name +'</td><td>'+task_description+'</td><td class="queue_time">'+ formated_time +'</td>';
+                if (can_run_tasks) {
+                    html += '<td class="center"><input class="button_cancel" type="button" value="Cancel"/></td>'
+                } else {
+                    html += '<td></td>'
+                }
+                html += '</tr>'
+
+                $('#queue thead').append(html)
+            }
+
 
             var STATUS_FAILED = -1;
             var STATUS_STOPPED = 0;
@@ -196,7 +222,7 @@
                 margin-top:20px;
             }
 
-            td.center {
+            .queue_time, .start_time, .buttons {
                 text-align:center;
             }
 
@@ -222,7 +248,7 @@
             {% for key,task in tasks.items %}
                 <tr id="{{key}}">
                     <td>{{key}}</td>
-                    <td>{{task.description}}</td>
+                    <td class="description">{{task.description}}</td>
                     <td class="center">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
                     <td class="center">[schedule]</td>
                     <td class="center">
@@ -240,7 +266,7 @@
             <thead>
                 <tr><th colspan="100%">Queued Jobs</th></tr>
                 <tr>
-                    <th></th>
+                    <th>ID</th>
                     <th>Name</th>
                     <th>Description</th>
                     <th>Time Queued</th>
@@ -249,10 +275,9 @@
 
             {% for task in queue %}
                 <tr id="{{task.id}}">
-                    <td></td>
-                    <td>{{task.task_key}}</td>
+                    <td class="task_id">{{task.task_key}}</td>
                     <td>{{tasks|task_description:task.task_key}}</td>
-                    <td class="center">{{task.queued}}</td>
+                    <td class="queue_time">{{task.queued}}</td>
                     <td>
                         {% if perms.pydra_server.can_manage_queue %}
                             <input type="button" value="Up"/>
@@ -280,9 +305,9 @@
                 <tr id="{{task.id}}">
                     <td>{{task.task_key}}</td>
                     <td>{{tasks|task_description:task.task_key}}</td>
-                    <td class="center">{{task.queued}}</td>
-                    <td class="center">{{task.started}}</td>
-                    <td class="center">
+                    <td class="queue_time">{{task.queued}}</td>
+                    <td class="start_time">{{task.started}}</td>
+                    <td class="buttons">
                         {% if perms.pydra_server.can_run_tasks %}<input class="button_cancel" type="button" value="Stop"/>{% endif %}
                     </td>
                 </tr>
