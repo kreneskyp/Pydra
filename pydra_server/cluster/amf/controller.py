@@ -60,12 +60,20 @@ class RemoteMethodProxy():
                     return False
 
             if result:
+                if (result.__class__.__name__ == 'ErrorFault'):
+                    print '[error] ErrorFault: ', result
+                    return -2
+
                 return result[0]
 
             #authenticate required
             if (self.controller._authenticate()):
                 # authenticated reissue command
                 result = self.func(*new_args)
+                if (result.__class__.__name__ == 'ErrorFault'):
+                    print '[error] ErrorFault: ', result
+                    return -2
+
                 return result[0]
 
             else:
