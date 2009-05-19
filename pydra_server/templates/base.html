@@ -1,5 +1,9 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <?xml version="1.0" encoding="UTF-8"?>
+
 <html xmlns="http://www.w3.org/1999/xhtml">
+
 
 <!--
     Copyright 2009 Oregon State University
@@ -24,88 +28,124 @@
     {% block head %}
         <link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}/css/main.css" />
         <style>
-            * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; font-color: #444; line-height: 25px; padding: 0px; margin: 0px; }
+            * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; line-height: 25px; padding: 0; margin: 0;}
+
+            html, body {
+                height: 100%;
+            }
 
             div#headerContainer {
                 padding:0px;
                 text-align:center;
-                margin-bottom:10px;
             }
 
             div#mainmenu { 
-                color:white;
-                background-color:#1854d0;
-                padding:0px;
-                margin:0px;
+                background-color:white;
+                border-bottom: 1px solid #161650;
+                height:30px;
+                padding-top:40px;
             }
 
             div#submenu { 
-                background-color:#707070;
-                padding:0px;
-                margin:0px;
+            background-color:#ecf1ff;
+                background-color:#5f8dd3;
+                border-bottom: 1px solid #161650;
+                height:25px;
+                line-height:25px;
             }
 
-            span.menuitem {
-                margin: 0px;
-                padding-left: 5px;
-                padding-right:5px;
+            span.menuitem, span.mainmenuitem {
+                border-color: #161650;
                 border-style: solid;
                 border-width: 0px 1px 0px 0px;
-                border-color:black;
+                padding-left: 5px;
+                padding-right:5px;
             }
 
             span.lastmenuitem {
                 border: 0px;
             }
 
-            span.results {
-                position:absolute;
-                left:20px;
-                font-weight:bold;
-            }
-
-            a.mainmenuitem {
-                font-size:14px;
-            }
-
             a:link { 
                 color:white; 
                 text-decoration:none; 
             }
-            a.menuitem                   { color:white; text-decoration:none; }
+            a.menuitem                   { color:white;  text-decoration:none; }
             a.menuitme:visited           { color:white; text-decoration:none; }
             a.menuitme:hover             { color:white; text-decoration:underline; }
             a.menuitme:active            { color:white; text-decoration:none;}
 
-            a.mainmenuitem                   { color:white; text-decoration:none; }
-            a.mainmenuitem:visited           { color:white; text-decoration:none; }
-            a.mainmenuitem:hover             { color:white; text-decoration:underline; }
-            a.mainmenuitem:active            { color:white; text-decoration:none;}
+
+            span.mainmenuitem { border-color: #d1d1d1; }
+            a.mainmenuitem {
+                border-color:white;
+                color:#161650;
+                font-size:155%;
+                padding-left: 15px;
+                padding-right:15px;
+                text-decoration:none;
+            }
+            a.mainmenuitem:visited           { text-decoration:none; }
+            a.mainmenuitem:hover             { text-decoration:underline; }
+            a.mainmenuitem:active            { text-decoration:none;}
+
+            #content {
+                padding-top:10px;
+                min-width:800px;
+                width:800px;
+                width:80%;
+                margin-left:auto;
+                margin-right:auto;
+            }
+
+            #pydra {
+                background-color:#f6f9fb;
+                border-bottom: 1px solid #d1d1d1;
+                color:#5f5f5f;
+                font-size:10px;
+                height:22px;
+                padding-left:20px;
+                text-align:left;
+            }
+
+            #pydra a {
+                float:left;
+                color:#5f5f5f;
+                font-size:10px;
+                text-decoration:none; 
+            }
+
         </style>
     {% endblock %}
     <head>
 
-    <div id="headerContainer">
-    {% block header %}
-        <div id="mainmenu">
-            <span class="menuitem "><a class="mainmenuitem" href="{{SITE_ROOT}}/nodes">Nodes</a></span>
-            <span class="menuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/jobs">Jobs</a></span>
-            {% if user.is_authenticated %}
-                <span class="menuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/logout">Logout</a></span>
-            {% else %}
-                <span class="menuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/login">Login</a></span>
-            {% endif %}
+        <div id="headerContainer">
+        {% block header %}
+
+            <div id="pydra">
+                <a href="http://pydra-project.osuosl.org">Pydra {{VERSION}}</a>
+            </div>
+
+            <div id="mainmenu">
+                <span class="mainmenuitem "><a class="mainmenuitem" href="{{SITE_ROOT}}/nodes">Nodes</a></span>
+                <span class="mainmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/jobs">Jobs</a></span>
+                {% if user.is_authenticated %}
+                    <span class="mainmenuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/logout">Logout</a></span>
+                {% else %}
+                    <span class="mainmenuitem lastmenuitem"><a class="mainmenuitem" href="{{SITE_ROOT}}/accounts/login">Login</a></span>
+                {% endif %}
+            </div>
+            <div id="submenu">
+                {% block submenu %}
+                {% endblock %}
+            </div>
+        {% endblock %}
         </div>
-         <div id="submenu">
-            {% block submenu %}
+
+        <div id="content">
+            {% block content %}
             {% endblock %}
         </div>
-    {% endblock %}
-    </div>
 
-    <div id="content">
-        {% block content %}
-        {% endblock %}
-    </div>
 </body>
 </html>
