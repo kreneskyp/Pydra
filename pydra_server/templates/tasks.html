@@ -70,7 +70,8 @@
                 }
                 html += '</tr>'
 
-                $('#queue').append(html)
+                $('#queue').append(html);
+                repaint_zebra_stripes('#queue');
             }
 
 
@@ -104,6 +105,7 @@
                     from queued to running, and any absent tasks have completed
                     or stopped.
                 */
+
                 $('#queue tr:gt(1), #running tr:gt(1)').each(function(row){
                     id = this.id.slice(9);
                     status = data[id];
@@ -123,6 +125,29 @@
                     }
                 });
 
+                repaint_zebra_stripes('#queue');
+                repaint_zebra_stripes('#running');
+
+            }
+
+
+            /*
+                update the zebra striping for a table.  This is required after
+                an item has been removed from the middle of the list, or the
+                order of the list has been changed
+            */
+            function repaint_zebra_stripes(table) {
+
+                stripe = false;
+                $(table + ' tr:gt(1)').each(function(index, row){
+                    if (stripe) {
+                        $(row).addClass('stripe');
+                        stripe = false;
+                    } else {
+                        $(row).removeClass('stripe');
+                        stripe = true;
+                    }
+                });
             }
 
 
@@ -267,6 +292,10 @@
                 width:100%;
             }
 
+            tr.stripe td {
+                background-color:#f6f9fb
+            }
+
             .buttons {
                 width: 9em;
             }
@@ -305,7 +334,7 @@
             </thead>
 
             {% for key,task in tasks.items %}
-                <tr id="{{key}}">
+                <tr id="{{key}}" class="{% cycle '' 'stripe' %}">
                     <td>{{key}}</td>
                     <td class="description">{{task.description}}</td>
                     <td class="last_run">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
@@ -333,7 +362,7 @@
             </thead>
 
             {% for task in queue %}
-                <tr id="{{task.id}}">
+                <tr id="{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.task_key}}</td>
                     <td class="task_name">{{tasks|task_description:task.task_key}}</td>
                     <td class="queue_time">{{task.queued}}</td>
@@ -362,7 +391,7 @@
             </thead>
 
             {% for task in running %}
-                <tr id="instance_{{task.id}}">
+                <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_name">{{task.task_key}}</td>
                     <td class="description">{{tasks|task_description:task.task_key}}</td>
