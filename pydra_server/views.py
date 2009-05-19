@@ -57,6 +57,17 @@ def pydra_processor(request):
     return {'controller':pydra_controller}
 
 
+def settings_processor(request):
+    """
+    settings_processor adds settings required by most pages
+    """
+
+    return {
+        'VERSION':settings.VERSION,
+        'MEDIA':settings.MEDIA_URL
+    }
+
+
 def nodes(request):
     """
     display nodes
@@ -89,7 +100,7 @@ def nodes(request):
     return render_to_response('nodes.html', {
         'nodes':paginatedNodes,
         'pages':pages,
-    }, context_instance=RequestContext(request, processors=[pydra_processor]))
+    }, context_instance=RequestContext(request, processors=[pydra_processor, settings_processor]))
 
 
 @user_passes_test(lambda u: u.has_perm('pydra_server.can_edit_nodes'))
@@ -119,7 +130,7 @@ def node_edit(request, id=None):
     return render_to_response('node_edit.html', {
         'form': form,
         'id':id,
-    }, context_instance=RequestContext(request))
+    }, context_instance=RequestContext(request, processors=[settings_processor]))
 
 
 def node_status(request):
@@ -146,7 +157,7 @@ def jobs(request):
         'tasks': tasks,
         'queue': queue,
         'running': running,
-    }, context_instance=RequestContext(request, processors=[pydra_processor]))
+    }, context_instance=RequestContext(request, processors=[pydra_processor, settings_processor]))
 
 
 def task_progress(request):
