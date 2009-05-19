@@ -45,14 +45,17 @@
             }
 
             #master_errors {
-                width:90%;
+                background-color:#ee9c98;
+                border: 2px solid #c83737;
+                color:#550000;
+                font-weight:bold;
+                font-size:110%;
                 margin-top:20px;
                 margin-bottom:20px;
                 padding-top:5px;
                 padding-bottom:5px;
-                background-color:#ee9c98;
-                border: 1px solid black;
-
+                text-align:center;
+                width:100%;
             }
 
             #header_top th {
@@ -85,16 +88,17 @@
             }
 
             tr.node td table{
-                width:100%;
                 border-collapse:collapse;
                 border-spacing:0px;
                 border-bottom:1px dotted #333333;
+                width:100%;
             }
 
             td.status .inner {
-                width:96px;
+                background-color:#cccccc;
                 border:1px solid black;
                 margin:2px;
+                width:96px;
             }
 
             .worker td.status .inner {
@@ -105,11 +109,16 @@
                 margin-bottom:4px;
             }
 
-            div.status_connected {
+            td.status .status_connected {
                 background-color:#c2e192;
+                border-color:#124612;
+                color:#124612;
             }
-            div.status_disconnected {
+
+            td.status .status_disconnected {
                 background-color:#ee9c98;
+                border-color:#550000;
+                color:#550000;
             }
 
             td.host {padding-left:10px; text-align:left; width:290px;}
@@ -121,7 +130,7 @@
 
             .node_workers_status_disconnected {
                 font-weight:bold;
-                color:red;
+                color:#c83737;
             }
 
             .node_workers_status_partial {
@@ -252,7 +261,7 @@
 {% block content %}
 
         <div id="master_errors" {% if controller.is_alive %}style="display:none;"{% endif %}>
-            Master Node is not running. 
+            Master Node is not running.
         </div>
 
 
