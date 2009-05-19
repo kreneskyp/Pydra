@@ -31,29 +31,21 @@
             }
 
             #cluster, #nodes {
-                width:90%;
-                margin-left:5%;
+                width:100%;
             }
 
             #cluster {
-                border: 1px solid black;
                 margin-top:10px;
             }
 
             #nodes {
-                border: 1px solid black;
                 margin-top:20px;
                 border-collapse:collapse;
                 border-spacing:0px;
             }
 
-            #content {
-                text-align:center;
-            }
-
             #master_errors {
                 width:90%;
-                margin-left:5%;
                 margin-top:20px;
                 margin-bottom:20px;
                 padding-top:5px;
@@ -76,6 +68,10 @@
                 border-bottom: 1px solid black;
             }
 
+            #header_bottom th {
+                border-right:1px solid black;
+            }
+
             #header_bottom th.status, #header_bottom th.id {
                 border-right:2px dotted #444444;
             }
@@ -92,10 +88,7 @@
                 width:100%;
                 border-collapse:collapse;
                 border-spacing:0px;
-            }
-
-            tr.notfirst td table {
-                border-top:1px dotted #333333;
+                border-bottom:1px dotted #333333;
             }
 
             td.status .inner {

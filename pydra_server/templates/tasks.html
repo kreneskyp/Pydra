@@ -64,7 +64,7 @@
                 // construct html
                 html = '<tr id="instance_'+ task_instance +'"><td>'+task_instance+'</td><td>'+ task_name +'</td><td>'+task_description+'</td><td class="queue_time">'+ formated_time +'</td>';
                 if (can_run_tasks) {
-                    html += '<td class="center"><input class="button_cancel" type="button" value="Cancel"/></td>'
+                    html += '<td class="buttons"><a class="button_cancel" href="#">Cancel</a></td>'
                 } else {
                     html += '<td></td>'
                 }
@@ -235,30 +235,55 @@
             * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; font-color: #444; line-height: 25px; padding: 0px; margin: 0px; }
 
             #content {
-                width:100%;
-                margin-left:10%;
+                padding-top:30px;
             }
 
-            #tasks {
-                border: 1px solid black;
-                width:80%;
-                margin-top:20px;
-            }
-
-            #queue {
-                border: 1px solid black;
-                width:80%;
-                margin-top:20px;
-            }
-
-            #running {
+            th {
+                background-color:#888888;
                 border:1px solid black;
-                width:80%;
-                margin-top:20px;
+                color:white;
             }
 
-            .queue_time, .start_time, .buttons {
+            th.title {
+                background-color:#666666;
+            }
+
+            td {
+                border-bottom: 1px dotted #444444;
+                border-left: 1px dotted #444444;
+                border-right:1px dotted #444444;
+            }
+
+            td, th {
+                padding-left:5px;
+                padding-right:5px;
+            }
+
+            #tasks, #queue, #running {
+                border: 0px solid black;
+                border-spacing:0;
+                border-collapse:collapse;
+                margin-top:30px;
+                width:100%;
+            }
+
+            .buttons {
+                width: 9em;
+            }
+
+            .task_id { width:70px; }
+            .task_name { width:150px; }
+            .task_name { width:150px; }
+            .queue_time, .start_time, .buttons, .last_run {
                 text-align:center;
+            }
+            .queue_time, .start_time, .last_run {
+                width:11em;
+            }
+
+
+            .buttons a, .buttons a:hover, .buttons a:visited, .buttons a:active {
+                color:blue;
             }
 
         </style>
@@ -270,13 +295,12 @@
 {% block content %}
         <table id="tasks">
             <thead>
-                <tr><th colspan="100%">Available Tasks</th></tr>
+                <tr><th colspan="100%" class="title">Available Tasks</th></tr>
                 <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Last Run</th>
-                    <th>Recurrence</th>
-                    <th>Commands</th>
+                    <th class="task_name">Name</th>
+                    <th class="description">Description</th>
+                    <th class="last_run">Last Run</th>
+                    <th class="buttons"></th>
                 </tr>
             </thead>
 
@@ -284,14 +308,13 @@
                 <tr id="{{key}}">
                     <td>{{key}}</td>
                     <td class="description">{{task.description}}</td>
-                    <td class="center">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
-                    <td class="center">[schedule]</td>
-                    <td class="center">
+                    <td class="last_run">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
+                    <td class="buttons">
                         {% if perms.pydra_server.can_run_tasks %}
-                            <input class="button_run" type="button" value="Run"/>
-                            <input type="button" value="Schedule"/>
+                            <a class="button_run" type="button" value="Run" href="#">Run</a>
+                            <a type="button" value="Schedule" href="#">Schedule</a>
                         {% endif %}
-                        <input type="button" value="Log"/>
+                        <a type="button" value="Log" href="#">Log</a>
                     </td>
                 </tr>
             {% endfor %}
@@ -299,21 +322,22 @@
 
         <table id="queue">
             <thead>
-                <tr><th colspan="100%">Queued Jobs</th></tr>
+                <tr><th colspan="100%" class="title">Queued Jobs</th></tr>
                 <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Time Queued</th>
+                    <th class="task_id">ID</th>
+                    <th class="task_name">Name</th>
+                    <th class="description">Description</th>
+                    <th class="queue_time">Time Queued</th>
+                    <th class="buttons"></th>
                 </tr>
             </thead>
 
             {% for task in queue %}
                 <tr id="{{task.id}}">
                     <td class="task_id">{{task.task_key}}</td>
-                    <td>{{tasks|task_description:task.task_key}}</td>
+                    <td class="task_name">{{tasks|task_description:task.task_key}}</td>
                     <td class="queue_time">{{task.queued}}</td>
-                    <td>
+                    <td class="buttons">
                         {% if perms.pydra_server.can_manage_queue %}
                             <input type="button" value="Up"/>
                             <input type="button" value="Down"/>
@@ -326,22 +350,22 @@
 
         <table id="running">
             <thead>
-                <tr><th id="title" colspan="100%">Running Jobs</th></tr>
+                <tr><th id="title" colspan="100%" class="title">Running Jobs</th></tr>
                 <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Time Queued</th>
-                    <th>Time Started</th>
-                    <th></th>
+                    <th class="task_id">ID</th>
+                    <th class="task_name">Name</th>
+                    <th class="decription">Description</th>
+                    <th class="queue_time">Time Queued</th>
+                    <th class="start_time">Time Started</th>
+                    <th class="buttons"></th>
                 </tr>
             </thead>
 
             {% for task in running %}
                 <tr id="instance_{{task.id}}">
-                    <td>{{task.id}}</td>
-                    <td>{{task.task_key}}</td>
-                    <td>{{tasks|task_description:task.task_key}}</td>
+                    <td class="task_id">{{task.id}}</td>
+                    <td class="task_name">{{task.task_key}}</td>
+                    <td class="description">{{tasks|task_description:task.task_key}}</td>
                     <td class="queue_time">{{task.queued}}</td>
                     <td class="start_time">{{task.started}}</td>
                     <td class="buttons">
