@@ -141,12 +141,18 @@ class AMFInterface(pb.Root):
 
     @authenticated
     def is_alive(self, _):
+        """
+        Remote function just for determining that Master is responsive
+        """
         print '[debug] is alive'
         return 1
 
 
     @authenticated
     def node_status(self, _):
+        """
+        Returns status information about Nodes and Workers in the cluster
+        """
         node_status = {}
         worker_list = self.master.workers
         #iterate through all the nodes adding their status
@@ -161,8 +167,8 @@ class AMFInterface(pb.Root):
                     if w_key in self.master._workers_idle:
                         worker_status[html_key] = (1,-1,-1)
                     elif w_key in self.master._workers_working:
-                        task, subtask = self.master._workers_working[w_key]
-                        worker_status[html_key] = (1,task,subtask)
+                        task_instance_id, task_key, args, subtask_key, workunit_key = self.master._workers_working[w_key]
+                        worker_status[html_key] = (1,task_key,subtask_key if subtask_key else -1)
                     else:
                         worker_status[html_key] = -1
 
@@ -171,8 +177,9 @@ class AMFInterface(pb.Root):
 
             node_status[key] = {'status':node.status(),
                                 'workers':worker_status
-                               }
-        return node_status
+                            }
+
+        return [node_status]
 
 
     @authenticated
