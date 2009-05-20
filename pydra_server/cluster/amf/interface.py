@@ -179,7 +179,7 @@ class AMFInterface(pb.Root):
                                 'workers':worker_status
                             }
 
-        return [node_status]
+        return node_status
 
 
     @authenticated
