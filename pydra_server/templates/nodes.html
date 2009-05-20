@@ -94,6 +94,24 @@
                 width:100%;
             }
 
+            .toggle {
+                background-image:url({{MEDIA}}/images/icons/bullet_toggle_plus.png);
+                background-repeat:no-repeat;
+                float:left;
+                height:16px;
+                margin-left:3px;
+                margin-top:5px;
+                width:16px;
+            }
+
+            .toggle_expand {
+                background-image:url({{MEDIA}}/images/icons/bullet_toggle_minus.png);
+            }
+
+            .node_worker_status {
+                text-align:left;
+            }
+
             td.status .inner {
                 background-color:#cccccc;
                 border:1px solid black;
@@ -138,10 +156,12 @@
                 color:orange;
             }
 
+            
+
 
         </style>
 
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.2.6.js"></script>
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
         <script type="text/javascript">
 
             var worker_count = -1;
@@ -245,8 +265,36 @@
             }
 
             $(document).ready(function() {
-               update()
+                update();
+
+                // toggle buttons for hiding/showing worker details
+                $('.toggle').live('click',function(){
+                    $this = $(this);
+                    worker_id = this.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.id.slice(5);
+                    $workers = $('#nodes tr[id^=worker_'+worker_id+'_]');
+
+                    if ($this.hasClass('toggle_expand')) {
+                        $this.removeClass('toggle_expand');
+                        $workers.each(function(index, worker){
+                            $(worker).hide();
+                        });
+
+                    } else {
+                        $this.addClass('toggle_expand');
+                        $workers.each(function(index, worker){
+                            $(worker).show();
+                        });
+                    }
+                });
             });
+
+            function worker_expander($workers, index) {
+                $workers.eq(index).slideDown(300, function(){
+                    if (index+1 < $workers.size()) {
+                        worker_expander($workers, index+1)
+                    }
+                });
+            }
 
         </script>
 {% endblock %}
@@ -308,12 +356,12 @@
                             {% endif %}
                         </td>
                         <td class="port">{{node.port}}</td>
-                        <td class="node_worker_status status"><span class="connected">Unknown</span> of <span class="total">{{node|available_cores}}</span></td>
-                        <td>{{node|available_cores}}</td>
-                        <td>{{node.cores}}</td>
+                        <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node|available_cores}}</span></td>
+                        <td></td>
+                        <td></td>
                     </tr>
                         {% for id in node|node_range %}
-                            <tr id="worker_{{node.id}}_{{id}}" class="worker {% if forloop.last %}last{% endif %}">
+                            <tr id="worker_{{node.id}}_{{id}}" class="worker {% if forloop.last %}last{% endif %}" style="display:none;">
                                 <td colspan="3"></td>
                                 <td class="status"><div class="inner">Unknown</div></td>
                                 <td class="id">{{forloop.counter}} </td>
