@@ -55,9 +55,5 @@ using task_key to look it up
 """
 @register.filter(name='task_description')
 def task_description(tasks, key):
-    print '===================='
-    print tasks
-    print key
-    print '===================='
     return tasks[key].description
 register.filter('task_description',task_description)
