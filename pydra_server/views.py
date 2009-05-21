@@ -149,8 +149,8 @@ def jobs(request):
     handler for displaying jobs
     """
     tasks = pydra_controller.remote_list_tasks()
-    queue = TaskInstance.objects.queued()
-    running = TaskInstance.objects.running()
+    queue = pydra_controller.remote_list_queue()
+    running = pydra_controller.remote_list_running()
 
     return render_to_response('tasks.html', {
         'MEDIA_URL': settings.MEDIA_URL,

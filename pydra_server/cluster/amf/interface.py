@@ -199,6 +199,14 @@ class AMFInterface(pb.Root):
 
 
     @authenticated
+    def list_running(self, _):
+        """
+        lists tasks that are running
+        """
+        return self.master._running
+
+
+    @authenticated
     def run_task(self, _, key):
         """
         Runs a task.  It it first placed in the queue and the queue manager
