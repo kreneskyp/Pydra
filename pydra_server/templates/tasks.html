@@ -105,7 +105,6 @@
                     from queued to running, and any absent tasks have completed
                     or stopped.
                 */
-
                 $('#queue tr:gt(1), #running tr:gt(1)').each(function(row){
                     id = this.id.slice(9);
                     status = data[id];
@@ -388,7 +387,7 @@
             </thead>
 
             {% for task in queue %}
-                <tr id="{{task.id}}" class="{% cycle '' 'stripe' %}">
+                <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_key">{{task.task_key}}</td>
                     <td class="description">{{tasks|task_description:task.task_key}}</td>
