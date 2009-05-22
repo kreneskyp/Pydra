@@ -267,6 +267,14 @@ class Worker(pb.Referenceable):
                 self.__stop_flag = True
 
 
+    def task_status(self):
+        """
+        Returns status of task this task is performing
+        """
+        if self.__task_instance:
+            return self.__task_instance.progress()
+
+
     def receive_results(self, results, subtask_key, workunit_key):
         """
         Function called to make the subtask receive the results processed by another worker
@@ -315,6 +323,10 @@ class Worker(pb.Referenceable):
         The work unit is returned so another worker can finish it.
         """
         return self.return_work(subtask_key, workunit_key)
+
+    def remote_task_status(self):
+        return self.task_status()
+
 
 if __name__ == "__main__":
     master_host = sys.argv[1]

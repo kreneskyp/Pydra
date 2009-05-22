@@ -64,3 +64,10 @@ class WorkerAvatar(RSAAvatar):
         for a worker in the cluster to process the args sent
         """
         return self.server.request_worker(self, subtask_key, args, workunit_key)
+
+
+    def perspective_task_status(self):
+        """
+        returns the status (progress) of the task this worker is working on
+        """
+        return self.server.task_status(self)

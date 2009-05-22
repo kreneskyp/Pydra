@@ -59,6 +59,7 @@ from django.utils import simplejson
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 from pydra_server.cluster.amf.interface import AMFInterface
@@ -108,6 +109,10 @@ class Master(object):
         self._running = list(TaskInstance.objects.running())
         self._running_workers = {}
         self._queue = list(TaskInstance.objects.queued())
+
+        #task statuses
+        self._task_statuses = {}
+        self._next_task_status_update = datetime.datetime.now()
 
         #cluster management
         self.workers = {}
@@ -606,14 +611,14 @@ class Master(object):
             print '[debug] Worker:%s - Assigned to task: %s:%s %s' % (worker.name, task_key, subtask_key, args)
             d = worker.remote.callRemote('run_task', task_key, args, subtask_key, workunit_key, available_workers)
             d.addCallback(self.run_task_successful, worker, task_instance_id, subtask_key)
-            return 1
+            return worker
 
         # no worker was available
         # just return 0 (false), the calling function will decided what to do,
         # depending what called run_task, different error handling will apply
         else:
             print '[warning] No worker available'
-            return 0
+            return None
 
     def run_task_successful(self, results, worker, task_instance_id, subtask_key=None):
 
@@ -679,6 +684,69 @@ class Master(object):
 
         #attempt to advance the queue
         self.advance_queue()
+
+
+    def fetch_task_status(self):
+        """
+        updates the list of statuses.  this function is used because all
+        workers must be queried to receive status updates.  This results in a
+        list of deferred objects.  There is no way to block until the results
+        are ready.  instead this function updates all the statuses.  Subsequent
+        calls for status will be able to fetch the status.  It may be delayed 
+        by a few seconds but thats minor when considering a task that could run
+        for hours.
+        """
+
+        # limit updates so multiple controllers won't cause excessive updates
+        now = datetime.datetime.now()
+        if self._next_task_status_update < now:
+            workers = self.workers
+            for key, data in self._workers_working.items():
+                worker = workers[key]
+                task_instance_id = data[0]
+                deferred = worker.remote.callRemote('task_status')
+                deferred.addCallback(self.fetch_task_status_success, task_instance_id)
+            self.next_task_status_update = now + datetime.timedelta(0, 3)
+
+
+    def fetch_task_status_success(self, result, task_instance_id):
+        """
+        updates task status list with response from worker used in conjunction
+        with fetch_task_status()
+        """
+        self._task_statuses[task_instance_id] = result
+
+
+    def task_statuses(self):
+        """
+        Returns the status of all running tasks.  This is a detailed list
+        of progress and status messages.
+        """
+
+        # tell the master to fetch the statuses for the task.
+        # this may or may not complete by the time we process the list
+        self.fetch_task_status()
+
+        statuses = {}
+        for instance in self._queue:
+            statuses[instance.id] = {'s':STATUS_STOPPED}
+
+        for instance in self._running:
+            start = time.mktime(instance.started.timetuple())
+
+            # call worker to get status update
+            try:
+                progress = self._task_statuses[instance.id]
+
+            except KeyError:
+                # its possible that the progress does not exist yet. because
+                # the task has just started and fetch_task_status is not complete
+                pass
+                progress = -1
+
+            statuses[instance.id] = {'s':STATUS_RUNNING, 't':start, 'p':progress}
+
+        return statuses
 
 
     def worker_stopped(self, worker_key):

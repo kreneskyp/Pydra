@@ -32,11 +32,12 @@
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
 
             $(document).ready(function() {
-                //$('table[id^=taskstable-]').acts_as_tree_table({default_state:'collapsed'});
 
-                //$('span.complete').hide();
-                //$('span.progressbar').hide();
-                //$('span.progressbar').progressBar({barImage: 'http://doors.osuosl.org/media/images/progressbg_yellow.gif', boxImage:'http://doors.osuosl.org/media/images/progressbar.gif'});
+               $('#running .progress .bar')
+                    .progressBar({width:300,
+                                    barImage:'{{MEDIA}}/images/progressbg_yellow_300.gif',
+                                    boxImage:'{{MEDIA}}/images/progressbar_300.gif'
+                    });
 
                 $('.button_run').live('click', function(evt) {
                     $.post('run/', {'key':evt.target.parentNode.parentNode.id}, process_queued_task, 'json');
@@ -62,7 +63,13 @@
 
 
                 // construct html
-                html = '<tr id="instance_'+ task_instance +'"><td>'+task_instance+'</td><td>'+ task_name +'</td><td>'+task_description+'</td><td class="queue_time">'+ formated_time +'</td>';
+                html =  '<tr id="instance_'+ task_instance +'">';
+                html += '<td class="task_id">'+task_instance+'</td>';
+                html += '<td class="task_name">'+ task_name +'</td>';
+                html += '<td class="description">'+task_description+'</td>';
+                html += '<td class="progress" style="display:none;"><div class="bar"></div></td>';
+                html += '<td class="queue_time">' + formated_time +'</td>';
+
                 if (can_run_tasks) {
                     html += '<td class="buttons"><div class="button_cancel icon" title="cancel"></div></td>'
                 } else {
@@ -81,21 +88,6 @@
             var STATUS_PAUSED = 2;
             var STATUS_COMPLETE = 3;
 
-            var CLASS_FAILED = 'status-failed';
-            var CLASS_STOPPED = 'status-stopped';
-            var CLASS_RUNNING = 'status-running';
-            var CLASS_PAUSED = 'status-paused';
-            var CLASS_COMPLETE = 'status-complete';
-
-            function removeAllStatus(node){
-                node.removeClass(CLASS_FAILED);
-                node.removeClass(CLASS_STOPPED);
-                node.removeClass(CLASS_RUNNING);
-                node.removeClass(CLASS_PAUSED);
-                node.removeClass(CLASS_COMPLETE);
-            }
-
-
             /* process the progress message from the update */
             function processProgressData(data) {
                 /*
@@ -112,16 +104,33 @@
                     if (status == undefined) {
                         $(this).remove();
                     } else if (status['s'] == STATUS_RUNNING) {
+                        $this = $(this);
                         if (this.parentNode.parentNode.id == 'queue') {
+
                             // move row to running table
                             $('#running').append(this);
+
+                            //swap description with progress bar
+                            $this.children('.description').remove();
+                            $this.children('.progress').show();
+                            $this.children('.progress').children('.bar')
+                                .progressBar({width:300,
+                                              barImage:'{{MEDIA}}/images/progressbg_yellow_300.gif',
+                                              boxImage:'{{MEDIA}}/images/progressbar_300.gif'
+                                });
 
                             // insert time started element
                             started = new Date(parseInt(status['t'])*1000);
                             started = dateFormat(started, "yyyy-mm-dd HH:MM:ss")
-                            $(this).children('.queue_time').after('<td class="start_time">'+ started +'</td>')
+                            $this.children('.queue_time').after('<td class="start_time">'+ started +'</td>')
+
+                        } else {
+                            $this.children('.progress').children('.bar').progressBar(status['p']);
                         }
                     }
+
+                    //updatebars(data);
+
                 });
 
                 repaint_zebra_stripes('#queue');
@@ -149,104 +158,6 @@
                 });
             }
 
-
-            // function that updates progress bars
-            // this code is from the proof-of-concept version of this page
-            // it needs to be updated to work with this page.
-            function updatebar() {
-                statusMessage = JSON.parse(incommingJSON);
-                for (key in statusMessage){
-                    progressArray = statusMessage[key]['status'];
-
-                    for (i=0; i<progressArray.length; i++){
-                        // store array as vars for readability
-                        id          = progressArray[i]['id'];
-                        status      = progressArray[i]['status'];
-                        progress    = progressArray[i]['progress'];
-                        msg         = progressArray[i]['msg'];
-
-                        taskSelectString = '#'+key+' #task-' + key + '-' + id
-                        elt = $(taskSelectString);
-                        // check status and update if needed
-                        if (status == STATUS_STOPPED && !elt.hasClass(CLASS_STOPPED)) {
-                            // hide progress bar 
-                            if (elt.hasClass(CLASS_RUNNING) || elt.hasClass(CLASS_PAUSED)) {
-                                $(taskSelectString + ' span.progressbar').hide()
-                            }
-                            //hide completion message
-                            if (elt.hasClass(CLASS_COMPLETE)) {
-                                $(taskSelectString + ' span.complete').hide()
-                            }
-
-                            //set status
-                            removeAllStatus(elt);
-                            elt.addClass(CLASS_STOPPED);
-
-
-                        } else if (status == STATUS_RUNNING) {
-                            //hide completion message
-                            if (elt.hasClass(CLASS_COMPLETE)) {
-                                $(taskSelectString + ' span.complete').hide()
-                            }
-
-                            // show statusbar
-                            if (!(elt.hasClass(CLASS_RUNNING) || elt.hasClass(CLASS_PAUSED))) {
-                                $(taskSelectString + ' span.progressbar').show();
-                            }
-
-                            // expand tree if needed
-                            if (elt.hasClass('collapsed')) {
-                                elt.toggle();
-                            }
-
-                            //update progressbar
-                            $(taskSelectString + ' .progressbar').progressBar(progress);
-
-                            //set status
-                            removeAllStatus(elt);
-                            elt.addClass(CLASS_RUNNING);
-
-                        } else if (status == STATUS_PAUSED) {
-                            // show statusbar
-                            if (!(elt.hasClass(CLASS_RUNNING) || elt.hasClass(CLASS_PAUSED))) {
-                                $(taskSelectString + ' span.progressbar').show();
-                            }
-
-                            //hide completion message
-                            if (id.hasClass(CLASS_RUNNING) || id.hasClass(CLASS_PAUSED)) {
-                                $(taskSelectString + ' span.complete').hide()
-                            }
-
-                            //set status
-                            removeAllStatus(elt);
-                            elt.addClass(STATUS_PAUSED);
-
-                        } else if (status == STATUS_COMPLETE && !elt.hasClass(CLASS_COMPLETE)) {
-                            // hide statusbar
-                            if (elt.hasClass(CLASS_RUNNING) || elt.hasClass(CLASS_PAUSED)) {
-                                bar = $(taskSelectString + ' span.progressbar')
-                                bar.hide();
-                                bar.progressBar(0);
-                            }
-
-                            //show completion message
-                            $(taskSelectString + ' span.complete').show()
-
-                            // collapse tree if needed
-                            if (elt.hasClass('expanded')) {
-                                elt.toggle();
-                            }
-
-                            //set status
-                            removeAllStatus(elt);
-                            elt.addClass(CLASS_COMPLETE);
-
-                        } else if (status == STATUS_FAILED) {
-
-                        }
-                    }
-               }
-            }
 
             function update() {
                 $.getJSON('progress/', {}, processProgressData);
@@ -409,7 +320,7 @@
                 <tr>
                     <th class="task_id">ID</th>
                     <th class="task_name">Name</th>
-                    <th class="decription">Description</th>
+                    <th class="progress">Progress</th>
                     <th class="queue_time">Time Queued</th>
                     <th class="start_time">Time Started</th>
                     <th class="buttons"></th>
@@ -420,7 +331,7 @@
                 <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_name">{{task.task_key}}</td>
-                    <td class="description">{{tasks|task_description:task.task_key}}</td>
+                    <td class="progress"><div class="bar"></div></td>
                     <td class="queue_time">{{task.queued|date:"Y-m-d h:i:s"}}</td>
                     <td class="start_time">{{task.started|date:"Y-m-d h:i:s"}}</td>
                     <td class="buttons">

@@ -21,10 +21,9 @@ import datetime, time
 import hashlib
 
 from twisted.spread import pb
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 from twisted.python.randbytes import secureRandom
 from authenticator import AMFAuthenticator
-
 
 def authenticated(fn):
     """
@@ -221,23 +220,13 @@ class AMFInterface(pb.Root):
                }
 
     @authenticated
-    def task_status(self, _):
+    def task_statuses(self, _):
         """
         Returns the status of all running tasks.  This is a detailed list
         of progress and status messages.
         """
-        import time
-        from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING
-        statuses = {}
+        return self.master.task_statuses()
 
-        for instance in self.master._queue:
-            statuses[instance.id] = {'s':STATUS_STOPPED}
-
-        for instance in self.master._running:
-            start = time.mktime(instance.started.timetuple())
-            statuses[instance.id] = {'s':STATUS_RUNNING, 't':start}
-
-        return statuses
 
 
     @authenticated

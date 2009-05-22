@@ -167,7 +167,7 @@ def task_progress(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    data = pydra_controller.remote_task_status()
+    data = pydra_controller.remote_task_statuses()
     return HttpResponse(simplejson.dumps(data), mimetype='application/javascript');
 
 
