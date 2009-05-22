@@ -18,6 +18,9 @@
 """
 import time
 
+import logging
+logger = logging.getLogger('root')
+
 class AMFAuthenticator(object):
     """
     Class used to authenticate the request.  This is a hack of a class but
@@ -33,7 +36,7 @@ class AMFAuthenticator(object):
         self.auth = True
 
     def auth_failure(self, result):
-        print '[error] Unauthorized attempt to use service'
+        logger.error('Unauthorized attempt to use service')
         self.result = True
         self.auth = False
 

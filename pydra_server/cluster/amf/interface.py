@@ -25,6 +25,9 @@ from twisted.internet import reactor, defer
 from twisted.python.randbytes import secureRandom
 from authenticator import AMFAuthenticator
 
+import logging
+logger = logging.getLogger('root')
+
 def authenticated(fn):
     """
     decorator for marking functions as requiring authentication.
@@ -143,7 +146,7 @@ class AMFInterface(pb.Root):
         """
         Remote function just for determining that Master is responsive
         """
-        print '[debug] is alive'
+        logger.debug('is alive')
         return 1
 
 

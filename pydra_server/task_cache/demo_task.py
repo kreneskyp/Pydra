@@ -20,6 +20,8 @@
 from pydra_server.cluster.tasks.tasks import *
 import time
 
+import logging
+logger = logging.getLogger('root')
 
 class TestTask(Task):
     """
@@ -51,7 +53,7 @@ class TestTask(Task):
             time.sleep(3)
             self.count += 1
             value += 1
-            print 'value: %d   progress: %d%%' % (value , self.progress())
+            logger.info('value: %d   progress: %d%%' % (value , self.progress()))
 
         return {'data':value}
 
@@ -108,9 +110,9 @@ class TestParallelTask(ParallelTask):
         self._finished = []
 
     def work_unit_complete(self, data, results):
-        print '   Adding results:%s' % results
+        logger.info('   Adding results:%s' % results)
         self._finished.append(results)
 
     def work_complete(self):
-        print 'tabulating results!'
-        print self._finished
+        logger.info('tabulating results!')
+        logger.info(self._finished)

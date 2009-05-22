@@ -49,6 +49,13 @@ from subprocess import Popen
 from pydra_server.cluster.auth.rsa_auth import load_crypto
 from pydra_server.cluster.auth.master_avatar import MasterAvatar
 
+
+# init logging
+import settings
+from pydra_server.logging.logger import init_logging
+logger = init_logging(settings.LOG_FILENAME_NODE)
+
+
 class NodeServer:
     """
     Node - A Node manages a server in your cluster.  There is one instance of Node running per server.
@@ -74,7 +81,7 @@ class NodeServer:
         # get information about the server
         self.determine_info()
 
-        print '[info] Node - starting server on port %s' % self.port_base
+        logger.info('Node - starting server on port %s' % self.port_base)
 
 
     def get_service(self):

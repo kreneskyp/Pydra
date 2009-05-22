@@ -20,6 +20,9 @@
 from pydra_server.cluster.tasks.tasks import *
 from pydra_server.models import TaskInstance
 
+import logging
+logger = logging.getLogger('root')
+
 """ TaskManager - Class that tracks and controls tasks
 """
 class TaskManager():
@@ -174,9 +177,9 @@ class TaskManager():
                             task_key = key
 
                             self.register(task_key, task_class)
-                            print '[info] Loaded task: %s' % key
+                            logger.info('Loaded task: %s' % key)
                         except:
-                            print 'ERROR Loading task: %s' % key
+                            logger.error('ERROR Loading task: %s' % key)
 
 
 

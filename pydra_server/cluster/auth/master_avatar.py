@@ -19,6 +19,9 @@
 
 from rsa_auth import RSAAvatar
 
+import logging
+logger = logging.getLogger('root')
+
 class MasterAvatar(RSAAvatar):
     """
     Avatar that exposes and controls what a Master can do on this Node
@@ -31,7 +34,7 @@ class MasterAvatar(RSAAvatar):
         master_encrypt = server.master_pub_key.encrypt if server.master_pub_key else None
 
         RSAAvatar.__init__(self, node_encrypt, master_encrypt, no_key_first_use=True)
-        print '[info] Master connected to node'
+        logger.info('Master connected to node')
 
 
     # returns the status of this node

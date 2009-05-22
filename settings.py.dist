@@ -68,6 +68,14 @@ TEMPLATE_LOADERS = (
 #     'django.template.loaders.eggs.load_template_source',
 )
 
+#Logging
+import logging
+LOG_LEVEL = logging.DEBUG
+LOG_FILENAME_MASTER = '%s/master.log' % DOC_ROOT
+LOG_FILENAME_NODE   = '%s/node.log' % DOC_ROOT
+LOG_SIZE = 10000000
+LOG_BACKUP = 10
+
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -91,3 +99,5 @@ INSTALLED_APPS = (
     'dbsettings',
     'pydra_server',
 )
+
+

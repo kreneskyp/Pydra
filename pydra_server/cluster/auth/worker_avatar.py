@@ -20,6 +20,9 @@
 from rsa_auth import RSAAvatar
 from Crypto.PublicKey import RSA
 
+import logging
+logger = logging.getLogger('root')
+
 class WorkerAvatar(RSAAvatar):
     """
     Avatar used by Workers connecting to the Master.
@@ -38,7 +41,7 @@ class WorkerAvatar(RSAAvatar):
         self.remote = mind
 
     def detached(self, mind):
-        print '[info] worker:%s - disconnected' % self.name
+       logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
             self.server.remove_worker(self.name)
         self.remote = None

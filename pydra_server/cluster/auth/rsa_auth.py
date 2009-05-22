@@ -23,6 +23,9 @@ from twisted.conch.ssh.keys import Key
 from twisted.internet import threads
 import hashlib
 
+import logging
+logger = logging.getLogger('root')
+
 class RSAAvatar(pb.Avatar):
     """
     Avatar that includes remote functions for authentication via
@@ -106,16 +109,16 @@ class RSAAvatar(pb.Avatar):
             self.challenged = False
             if not verified:
                 #challenge failed, return error code
-                print '[ERROR] failed authentication challenge'
+                logger.error('failed authentication challenge')
                 return -1
 
-            print '[Info] verified'
+            logger.info('verified')
 
         else:
             # no challenge, this is the first time the client is connecting.
             # Allow the the user past.  This can only be reached if 
             # no_key_first_use == True
-            print '[Info] first time client has connected, allowing access without verification'
+            logger.info('first time client has connected, allowing access without verification')
 
         self.authenticated = True
         if self.authenticated_callback:
@@ -177,7 +180,7 @@ class RSAClient(object):
         """
         if result == -1:
             #authentication failed
-            print '[ERROR] %s - rejected authentication' % remote
+            logger.error('%s - rejected authentication' % remote)
             if self.errback:
                 threads.deferToThread(errback)
             return
@@ -186,7 +189,7 @@ class RSAClient(object):
             # init was called before 'info'.  There was no challenge
             # so the node will prevent a connection.  this is a defensive
             # mechanism to ensure a challenge was created before you init
-            print '[warn] %s - auth_result called before request, automatic rety' % remote
+            logger.warning('%s - auth_result called before request, automatic rety' % remote)
             d = remote.callRemote('auth_challenge')
             d.addCallback(self.auth_challenge, **kwargs)
             return
@@ -203,7 +206,7 @@ def generate_keys(size=4096):
 
         Keys can be reconstructed by RSA.construct(list)
         """
-        print "[info] Generating RSA keypair"
+        logging.info('Generating RSA keypair')
         from Crypto.PublicKey import RSA
         KEY_LENGTH = size
         rsa_key = RSA.generate(KEY_LENGTH, secureRandom)
