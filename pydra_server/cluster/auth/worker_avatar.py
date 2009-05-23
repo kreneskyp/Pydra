@@ -41,7 +41,7 @@ class WorkerAvatar(RSAAvatar):
         self.remote = mind
 
     def detached(self, mind):
-       logger.info('worker:%s - disconnected' % self.name)
+        logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
             self.server.remove_worker(self.name)
         self.remote = None
