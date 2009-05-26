@@ -730,6 +730,8 @@ class Master(object):
                     # was already removed
                     pass
 
+        #attempt to advance the queue
+        self.advance_queue()
 
     def fetch_task_status(self):
         """
