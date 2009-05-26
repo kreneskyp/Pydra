@@ -44,10 +44,9 @@
                 });
 
                 $('.button_cancel').live('click', function(evt) {
-                    $.post('cancel/', {'i':evt.target.parentNode.parentNode.id});
+                    $.post('cancel/', {'i':evt.target.parentNode.parentNode.id.slice(9)});
                 });
 
-                // AUTO UPDATES ARE DISABLED
                 update();
             });
 
@@ -279,7 +278,7 @@
                             <div class="button_run icon" title="Run Task"></div>
                             <a class="button_schedule" href="#" title="Task Schedule"><div class="icon"></div></a>
                         {% endif %}
-                        <a class="button_log" href="#" title="Task History"><div class="icon"></div></a>
+                        <a class="button_log" href="/jobs/history/?key={{key}}" title="Task History"><div class="icon"></div></a>
                     </td>
                 </tr>
             {% endfor %}
