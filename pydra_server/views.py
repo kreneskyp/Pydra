@@ -173,8 +173,8 @@ def task_history(request):
 
     return render_to_response('task_history.html', {
         'MEDIA_URL': settings.MEDIA_URL,
-        'history':history,
-        'task_key':request.GET['key']
+        'history':   history,
+        'task_key':  request.GET['key']
     }, context_instance=c)
 
 
