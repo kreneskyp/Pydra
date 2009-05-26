@@ -656,9 +656,9 @@ class ParallelTask(Task):
             self._assign_work_local()
 
 
-    def _work_unit_failed(self, index):
+    def _worker_failed(self, index):
         """
-        A work unit failed.  re-add the data to the list
+        A worker failed while working.  re-add the data to the list
         """
         logger.warning('Paralleltask - Worker failure during workunit')
         with self._lock:

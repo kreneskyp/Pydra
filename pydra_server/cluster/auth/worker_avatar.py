@@ -46,6 +46,14 @@ class WorkerAvatar(RSAAvatar):
             self.server.remove_worker(self.name)
         self.remote = None
 
+
+    def perspective_failed(self, message, workunit_key):
+        """
+        Called by workers when they task they were running threw an exception
+        """
+        return self.server.task_failed(self.name, message, workunit_key)
+
+
     def perspective_send_results(self, results, workunit_key):
         """
         Called by workers when they have completed their task and need to report the results.

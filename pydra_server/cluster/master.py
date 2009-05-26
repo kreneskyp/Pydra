@@ -60,7 +60,7 @@ import settings
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED
+from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 from pydra_server.cluster.amf.interface import AMFInterface
@@ -666,7 +666,7 @@ class Master(object):
             if not subtask_key:
                 with self._lock_queue:
                     task_instance = TaskInstance.objects.get(id=task_instance_id)
-                    task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
+                    task_instance.completed = datetime.datetime.now()
                     task_instance.completion_type = STATUS_COMPLETE
                     task_instance.save()
 
@@ -692,6 +692,43 @@ class Master(object):
 
         #attempt to advance the queue
         self.advance_queue()
+
+
+    def task_failed(self, worker_key, results, workunit_key):
+        """
+        Called by workers when the task they were running throws an exception
+        """
+        with self._lock:
+            task_instance_id, task_key, args, subtask_key, workunit_key = self._workers_working[worker_key]
+            logger.info('Worker:%s - failed: %s:%s (%s)' % (worker_key, task_key, subtask_key, workunit_key))
+
+
+            # cancel the task and send notice to all other workers to stop
+            # working on this task.  This may be partially recoverable but that
+            # is not included for now.
+            with self._lock_queue:
+
+                # release the worker back into the idle pool
+                del self._workers_working[worker_key]
+                self._workers_idle.append(worker_key)
+
+                task_instance = TaskInstance.objects.get(id=task_instance_id)
+                task_instance.completed = datetime.datetime.now()
+                task_instance.completion_type = STATUS_FAILED
+                task_instance.save()
+
+                for worker_key, worker_task in self._workers_working.items():
+                    if worker_task[0] == task_instance_id:
+                        worker = self.workers[worker_key]
+                        logger.debug('signalling worker to stop: %s' % worker_key)
+                        worker.remote.callRemote('stop_task')
+
+                #remove task instance from running queue
+                try:
+                    self._running.remove(task_instance)
+                except ValueError:
+                    # was already removed
+                    pass
 
 
     def fetch_task_status(self):

@@ -84,6 +84,7 @@ class Worker(pb.Referenceable):
     def __init__(self, master_host, master_port, node_key, worker_key):
         self.id = id
         self.__task = None
+        self.__task_instance = None
         self.__results = None
         self.__stop_flag = None
         self.__lock = Lock()
@@ -174,7 +175,7 @@ class Worker(pb.Referenceable):
         self.__task_instance.__init__()
         self.__task_instance.parent = self
 
-        return self.__task_instance.start(args, subtask_key, self.work_complete)
+        return self.__task_instance.start(args, subtask_key, self.work_complete, errback=self.work_failed)
 
 
     def stop_task(self):
@@ -182,7 +183,8 @@ class Worker(pb.Referenceable):
         Stops the current task
         """
         logger.info('%s - Received STOP command' % self.worker_key)
-        self.__task_instance._stop()
+        if self.__task_instance:
+            self.__task_instance._stop()
 
 
     def status(self):
@@ -227,6 +229,23 @@ class Worker(pb.Referenceable):
                 # master disapeared, hold results until it requests them
                 else:
                     self.__results = results
+
+
+    def work_failed(self, results):
+        """
+        Callback that there was an exception thrown by the task
+        """
+        self.__task = None
+
+        with self.__lock_connection:
+            if self.master:
+                deferred = self.master.callRemote("failed", results, self.__workunit_key)
+                #deferred.addErrback(self.send_failed_failed, results, self.__workunit_key)
+
+            # master disapeared, hold failure until it comes back online and requests it
+            else:
+                #TODO implement me
+                pass
 
 
     def send_results_failed(self, results, task_results, workunit_key):
@@ -299,7 +318,7 @@ class Worker(pb.Referenceable):
 
     def return_work(self, subtask_key, workunit_key):
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
-        subtask.parent._work_unit_failed(workunit_key)
+        subtask.parent._worker_failed(workunit_key)
 
 
     def get_worker(self):
