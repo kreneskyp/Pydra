@@ -60,7 +60,7 @@ import settings
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING
+from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 from pydra_server.cluster.amf.interface import AMFInterface
@@ -561,8 +561,9 @@ class Master(object):
 
                 self._running.remove(task_instance)
 
-            task_instance.completion_type=-1
+            task_instance.completion_type = STATUS_CANCELLED
             task_instance.save()
+
             return 1
 
 
@@ -585,6 +586,7 @@ class Master(object):
                 #task started, update its info and remove it from the queue
                 logger.info('Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key))
                 task_instance.started = datetime.datetime.now()
+                task_instance.completion_type = STATUS_RUNNING
                 task_instance.save()
 
                 del self._queue[0]
@@ -665,7 +667,7 @@ class Master(object):
                 with self._lock_queue:
                     task_instance = TaskInstance.objects.get(id=task_instance_id)
                     task_instance.completed = time.strftime('%Y-%m-%d %H:%M:%S')
-                    task_instance.completion_type = 1
+                    task_instance.completion_type = STATUS_COMPLETE
                     task_instance.save()
 
                     #remove task instance from running queue
