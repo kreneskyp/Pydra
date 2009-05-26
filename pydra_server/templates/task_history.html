@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+<!--
+    Copyright 2009 Oregon State University
+
+    This file is part of Pydra.
+
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+{% load pydra_extras %}
+
+{% block head %}
+    {{ block.super }}
+        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
+
+        <script>
+            var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
+
+            $(document).ready(function() {
+                $('.button_rerun').live('click', function(evt) {
+                    $.post('/jobs/run/', {'key':'{{task_key}}'});
+                });
+            });
+        </script>
+
+        <style>
+            #content { padding-top:30px; }
+
+            .pagination {
+                height:23px;
+                margin-left:auto;
+                margin-right:auto;
+                width:140px;
+            }
+
+            .prev { float:left; }
+            .next { float:right; }
+
+            #history {
+                border: 0px solid black;
+                border-spacing:0;
+                border-collapse:collapse;
+                margin-top:5px;
+                width:100%;
+            }
+
+            th {
+                background-color:#888888;
+                border:1px solid black;
+                color:white;
+            }
+
+            th.title { background-color:#666666; }
+
+            td {
+                border-bottom: 1px dotted #444444;
+                border-left: 1px dotted #444444;
+                border-right:1px dotted #444444;
+            }
+
+            td, th {
+                padding-left:5px;
+                padding-right:5px;
+            }
+
+            tr.stripe td { background-color:#f6f9fb }
+
+            .buttons { width: 5.25em; }
+
+            .task_status { width:18px; padding-right:1px;}
+            .task_id     { width:70px; }
+            .queue_time, .start_time, .buttons, .completion_time {
+                text-align:center;
+            }
+            .queue_time, .start_time, .completion_time {
+                width:11em;
+            }
+
+            .buttons a, .buttons a:hover, .buttons a:visited, .buttons a:active {
+                color:blue;
+            }
+
+            .button_run{
+                background-image:url({{MEDIA}}/images/icons/cog_go.png);
+            }
+
+            .button_log .icon {
+                background-image:url({{MEDIA}}/images/icons/book_open.png);
+            }
+
+            .button_cancel {
+                background-image:url({{MEDIA}}/images/icons/delete.png);
+            }
+
+
+        </style>
+{% endblock %}
+
+{% block submenu %}
+{% endblock %}
+
+{% block content %}
+
+        <div class="pagination">
+          {% if history.prev %}<a class="prev" href="/jobs/history/?key={{task_key}}&page={{history.page|add:"-1"}}" href="3"><< Prev</a>{% endif %}
+          {% if history.next %}<a class="next" href="/jobs/history/?key={{task_key}}&page={{history.page|add:1}}" href="3">Next >></a>{% endif %}
+        </div>
+
+        <table id="history">
+            <thead>
+                <tr><th colspan="100%" class="title">Task History</th></tr>
+                <tr>
+                    <th class="task_status"></th>
+                    <th class="task_id">ID</th>
+                    <th class="description">Description</th>
+                    <th class="queue_time">Queued</th>
+                    <th class="start_time">Started</th>
+                    <th class="completion_time">Completed</th>
+                    <th class="buttons"></th>
+                </tr>
+            </thead>
+
+            {% for instance in history.instances %}
+                <tr id="instance_{{instance.id}}" class="{% cycle '' 'stripe' %}">
+                    <td class="task_status">{{instance.completion_type|task_status}}</td>
+                    <td class="task_id">{{instance.id}}</td>
+                    <td class="description"></td>
+                    <td class="queue_time">{{instance.queued|default:"--"}}</td>
+                    <td class="start_time">{{instance.started|default:"--"}}</td>
+                    <td class="completion_time">{{instance.completed|default:"--"}}</td>
+                    <td class="buttons">
+                        {% if perms.pydra_server.can_run_tasks %}
+                            <div class="button_rerun icon" title="Run Task"></div>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+
+{% endblock %}
