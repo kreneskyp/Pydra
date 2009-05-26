@@ -100,7 +100,7 @@ class Task(object):
         self._status = STATUS_STOPPED
         self._reset()
 
-    def start(self, args={}, subtask_key=None, callback=None, callback_args={}):
+    def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
         """
         starts the task.  This will spawn the work in a workunit thread.
         """
@@ -121,6 +121,10 @@ class Task(object):
         else:
             logger.debug('Task - starting task: %s' % args)
             self.work_deferred = threads.deferToThread(self.work, args, callback, callback_args)
+
+        if errback:
+            self.work_deferred.addErrback(errback)
+
 
         return 1
 
@@ -464,6 +468,16 @@ class ParallelTask(Task):
         results = self._work(**args)
 
         return results
+
+
+    def progress(self):
+        """
+        progress - returns the progress as a number 0-100.
+
+        A parallel task's progress is a derivitive of its workunits:
+           COMPLETE_WORKUNITS / TOTAL_WORKUNITS
+        """
+        return -1
 
 
     def _stop(self):
