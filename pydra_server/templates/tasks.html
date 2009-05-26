@@ -276,6 +276,7 @@
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_key">{{task.task_key}}</td>
                     <td class="description">{{tasks|task_description:task.task_key}}</td>
+                    <td class="progress" style="display:none"><div class="bar"></div></td>
                     <td class="queue_time">{{task.queued|date:"Y-m-d h:i:s"}}</td>
                     <td class="buttons">
                         {% if perms.pydra_server.can_manage_queue %}
