@@ -66,14 +66,15 @@
                 border: 0px;
             }
 
-            a:link { 
-                color:white; 
-                text-decoration:none; 
-            }
-            a.menuitem                   { color:white;  text-decoration:none; }
-            a.menuitme:visited           { color:white; text-decoration:none; }
-            a.menuitme:hover             { color:white; text-decoration:underline; }
-            a.menuitme:active            { color:white; text-decoration:none;}
+            a                       { text-decoration:none; }
+            a:visited               { text-decoration:none; }
+            a:hover                 { text-decoration:underline; }
+            a:active                { text-decoration:none;}
+
+            a.menuitem              { color:white; text-decoration:none; }
+            a.menuitme:visited      { color:white; text-decoration:none; }
+            a.menuitme:hover        { color:white; text-decoration:underline; }
+            a.menuitme:active       { color:white; text-decoration:none;}
 
 
             span.mainmenuitem { border-color: #d1d1d1; }
@@ -115,6 +116,27 @@
                 text-decoration:none; 
             }
 
+            .icon, .button {
+                background-repeat:no-repeat;
+                float:left;
+                height:16px;
+                margin-right:5px;
+                width:16px;
+            }
+
+            .button { cursor:pointer; }
+
+            .button_run { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
+            .button_rerun { background-image:url({{MEDIA}}/images/icons/arrow_refresh.png); }
+            .button_schedule .button { background-image:url({{MEDIA}}/images/icons/time.png); }
+            .button_log .button { background-image:url({{MEDIA}}/images/icons/book_open.png); }
+            .button_cancel { background-image:url({{MEDIA}}/images/icons/delete.png); }
+
+            .icon.task_status_cancelled { background-image:url({{MEDIA}}/images/icons/delete.png); }
+            .icon.task_status_failed    { background-image:url({{MEDIA}}/images/icons/exclamation.png); }
+            .icon.task_status_stopped   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
+            .icon.task_status_running   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
+            .icon.task_status_complete  { background-image:url({{MEDIA}}/images/icons/accept.png); }
         </style>
     {% endblock %}
     <head>

@@ -25,6 +25,10 @@ from twisted.internet import reactor, defer
 from twisted.python.randbytes import secureRandom
 from authenticator import AMFAuthenticator
 
+from django.core.paginator import Paginator, InvalidPage, EmptyPage
+
+from pydra_server.models import TaskInstance
+
 import logging
 logger = logging.getLogger('root')
 
@@ -222,6 +226,29 @@ class AMFInterface(pb.Root):
                 'time':time.mktime(task_instance.queued.timetuple())
                }
 
+
+    @authenticated
+    def task_history(self, _, key, page):
+
+        instances = TaskInstance.objects.filter(task_key=key).order_by('-completed').order_by('-started')
+        paginator = Paginator(instances, 10)
+
+         # If page request (9999) is out of range, deliver last page of results.
+        try:
+            paginated = paginator.page(page)
+
+        except (EmptyPage, InvalidPage):
+            page = paginator.num_pages
+            paginated = paginator.page(page)
+
+        return {
+                'prev':paginated.has_previous(),
+                'next':paginated.has_next(),
+                'page':page,
+                'instances':[instance for instance in paginated.object_list]
+               }
+
+
     @authenticated
     def task_statuses(self, _):
         """
@@ -229,7 +256,6 @@ class AMFInterface(pb.Root):
         of progress and status messages.
         """
         return self.master.task_statuses()
-
 
 
     @authenticated

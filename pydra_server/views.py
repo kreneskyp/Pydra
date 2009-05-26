@@ -160,6 +160,24 @@ def jobs(request):
     }, context_instance=RequestContext(request, processors=[pydra_processor, settings_processor]))
 
 
+def task_history(request):
+    c = RequestContext(request, processors=[pydra_processor, settings_processor])
+
+    # Make sure page request is an int. If not, deliver first page.
+    try:
+        page = int(request.GET['page'])
+    except KeyError:
+        page = 1
+
+    history = pydra_controller.remote_task_history(request.GET['key'], page)
+
+    return render_to_response('task_history.html', {
+        'MEDIA_URL': settings.MEDIA_URL,
+        'history':history,
+        'task_key':request.GET['key']
+    }, context_instance=c)
+
+
 def task_progress(request):
     """
     Handler for retrieving status 

@@ -37,6 +37,9 @@ urlpatterns = patterns('',
     (r'^jobs/cancel/$', cancel_task),
     (r'^jobs/progress/$', task_progress),
 
+    # job history urls
+    (r'^jobs/history/$', task_history), 
+
     #authentication
     (r'^accounts/login/$', login),
     (r'^accounts/logout/$', logout, {'next_page':'/jobs'}),

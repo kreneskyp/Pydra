@@ -25,6 +25,7 @@ import time
 import logging
 logger = logging.getLogger('root')
 
+STATUS_CANCELLED = -2;
 STATUS_FAILED = -1;
 STATUS_STOPPED = 0;
 STATUS_RUNNING = 1;

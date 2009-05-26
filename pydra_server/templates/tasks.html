@@ -81,6 +81,7 @@
             }
 
 
+            var STATUS_CANCELLED = -2;
             var STATUS_FAILED = -1;
             var STATUS_STOPPED = 0;
             var STATUS_RUNNING = 1;
@@ -224,32 +225,6 @@
                 color:blue;
             }
 
-            .icon {
-                background-repeat:no-repeat;
-                cursor:pointer;
-                float:left;
-                height:16px;
-                margin-right:5px;
-                width:16px;
-            }
-
-            .button_run{
-                background-image:url({{MEDIA}}/images/icons/cog_go.png);
-            }
-
-            .button_schedule .icon {
-                background-image:url({{MEDIA}}/images/icons/time.png);
-            }
-
-            .button_log .icon {
-                background-image:url({{MEDIA}}/images/icons/book_open.png);
-            }
-
-            .button_cancel {
-                background-image:url({{MEDIA}}/images/icons/delete.png);
-            }
-
-
         </style>
 {% endblock %}
 
@@ -275,10 +250,10 @@
                     <td class="last_run">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
                     <td class="buttons">
                         {% if perms.pydra_server.can_run_tasks %}
-                            <div class="button_run icon" title="Run Task"></div>
-                            <a class="button_schedule" href="#" title="Task Schedule"><div class="icon"></div></a>
+                            <div class="button_run button" title="Run Task"></div>
+                            <a class="button_schedule" href="#" title="Task Schedule"><div class="button"></div></a>
                         {% endif %}
-                        <a class="button_log" href="/jobs/history/?key={{key}}" title="Task History"><div class="icon"></div></a>
+                        <a class="button_log" href="/jobs/history/?key={{key}}" title="Task History"><div class="button"></div></a>
                     </td>
                 </tr>
             {% endfor %}
@@ -307,7 +282,7 @@
                             <input type="button" value="Up"/>
                             <input type="button" value="Down"/>
                         {% endif %}
-                        {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel icon" title="cancel"></div>{% endif %}
+                        {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel button" title="cancel"></div>{% endif %}
                     </td>
                 </tr>
             {% endfor %}
@@ -334,7 +309,7 @@
                     <td class="queue_time">{{task.queued|date:"Y-m-d h:i:s"}}</td>
                     <td class="start_time">{{task.started|date:"Y-m-d h:i:s"}}</td>
                     <td class="buttons">
-                        {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel icon" title="cancel"></div>{% endif %}
+                        {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel button" title="cancel"></div>{% endif %}
                     </td>
                 </tr>
             {% endfor %}
