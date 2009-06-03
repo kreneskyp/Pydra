@@ -67,16 +67,19 @@
                 */
                 $('.button_form_run').live('click', function(evt) {
                     task_key = evt.target.parentNode.parentNode.id.slice(5);
-                    $inputs = $('#form_'+ task_key +' input');
+                    $form = $('#form_'+ task_key);
+                    $inputs = $form.find(' input');
                     args = {};
                     for (i=0; i<$inputs.length; i++) {
                         input = $inputs.get(i);
                         args[input.id.slice(3)]= $(input).val();
                     }
 
+                    //clear errors
+                    $form.find('.errors').empty();
+
                     post_args = {'key':task_key, 'args':JSON.stringify(args)};
                     $.post('run/', post_args, process_queued_task, 'json');
-                    $('#form_'+ task_key).hide();
                 });
 
                 /*
@@ -95,8 +98,10 @@
                     $(evt.target.parentNode).children('input')
                         .each(function(){this.blur();})
 
-                    // hide the window
-                    $(evt.target.parentNode.parentNode).hide();
+                    // hide the window and clear errors
+                    $form = $(evt.target.parentNode.parentNode)
+                    $form.hide();
+                    $form.find('.errors').empty();
                 });
 
 
@@ -134,16 +139,42 @@
 
                 });
 
-
                 update();
             });
 
+
+            /*
+                displays errors for an input form
+            */
+            function process_queue_errors(data) {
+                errors = data['errors'];
+                key = data['task_key'];
+                $form = $('#form_' + key);
+
+                $errors = $form.find('.errors');
+                $errors.empty();
+
+                for (key in errors) {
+                    html = "<li><strong>"+ key + " - </strong>" + errors[key][0] + "</li>";
+                    $errors.append(html);
+                }
+            }
+
+
             /* processes the response when queuing a task */
             function process_queued_task (data){
+
+                // check for errors
+                if (data['errors'] != undefined)
+                    return process_queue_errors(data);
+
                 // create html for entry
                 task_name = data['task_key']
                 task_instance = data['instance_id']
                 task_description = $('#' + task_name).find('.description').html();
+
+                // hide form if any
+                $('#form_'+ task_key).hide();
 
                 time = new Date(parseInt(data['time'])*1000);
                 formated_time = dateFormat(time, "yyyy-mm-dd HH:MM:ss")
@@ -357,6 +388,8 @@
                 right:7px;
             }
 
+            .input_form .errors { color:#c83737; }
+
         </style>
         <!--[if IE]>
 
@@ -410,6 +443,7 @@
                             <div class="button_close button"></div>
                             <h2><span class="label">Run:</span> {{key}}</h2>
                             <div class="description">{{task.description}}</div>
+                            <ul class="errors"></ul>
                             <table>
                                 {{task.form|no_escape}}
                             </table>
