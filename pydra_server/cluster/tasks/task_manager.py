@@ -17,6 +17,8 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from django.template import Context, loader
+
 from pydra_server.cluster.tasks.tasks import *
 from pydra_server.models import TaskInstance
 
@@ -114,7 +116,15 @@ class TaskManager():
             except (KeyError, IndexError):
                 last_run = None
 
-            message[key] = {'description':self.registry[key].description ,'last_run':last_run}
+            # render the form if the task has one
+            if self.registry[key].form:
+                t = loader.get_template('task_parameter_form.html')
+                c = Context ({'form':self.registry[key].form()})
+                rendered_form = t.render(c)
+            else:
+                rendered_form = None
+
+            message[key] = {'description':self.registry[key].description ,'last_run':last_run, 'form':rendered_form}
 
         return message
 

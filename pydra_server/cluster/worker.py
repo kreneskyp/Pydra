@@ -169,13 +169,19 @@ class Worker(pb.Referenceable):
 
         self.available_workers = available_workers
 
-        logger.info('Worker:%s - starting task: %s:%s' % (self.worker_key, key,subtask_key))
+        logger.info('Worker:%s - starting task: %s:%s  %s' % (self.worker_key, key,subtask_key, args))
         #create an instance of the requested task
         self.__task_instance = object.__new__(self.available_tasks[key])
         self.__task_instance.__init__()
         self.__task_instance.parent = self
 
-        return self.__task_instance.start(args, subtask_key, self.work_complete, errback=self.work_failed)
+        # process args to make sure they are no longer unicode
+        clean_args = {}
+        if args:
+            for key, arg in args.items():
+                clean_args[key.__str__()] = arg
+
+        return self.__task_instance.start(clean_args, subtask_key, self.work_complete, errback=self.work_failed)
 
 
     def stop_task(self):

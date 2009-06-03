@@ -23,10 +23,11 @@
 
 {% block head %}
     {{ block.super }}
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.progressbar.js"></script>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery.acts_as_tree_table.js"></script>
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/date.format.js"></script>
+        <script src="{{MEDIA}}/js/jquery-1.3.2.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="{{MEDIA}}/js/json2.js" type="text/javascript" charset="utf-8"></script>
+        <script src="{{MEDIA}}/js/jquery.progressbar.js" type="text/javascript" charset="utf-8"></script>
+        <script src="{{MEDIA}}/js/date.format.js" type="text/javascript" charset="utf-8"></script>
+        <script src="{{MEDIA}}/js/jquery.qtip-1.0.0-rc3.min.js" type="text/javascript" charset="utf-8"></script>
 
         <script>
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
@@ -39,13 +40,100 @@
                                     boxImage:'{{MEDIA}}/images/progressbar_300.gif'
                     });
 
+                /*
+                  Run - runs a task.  If there is a form attached to the task
+                        it will be displayed for the user to enter values.
+                */
                 $('.button_run').live('click', function(evt) {
-                    $.post('run/', {'key':evt.target.parentNode.parentNode.id}, process_queued_task, 'json');
+                    key = evt.target.parentNode.parentNode.id;
+                    $form = $('#form_' + key);
+                    if ($form.length) {
+                        $('.input_form').hide();
+                        html_width = $('html').width();
+                        left = (html_width/2) - ($form.width()/2);
+                        $form.css('left',left);
+                        $form.show();
+                    } else {
+                        $.post('run/', {'key':key}, process_queued_task, 'json');
+                    }
                 });
 
+
+                /* 
+                   Run (from form) - Process an input form and submit the task.
+                         This involves iterating all elements in the form and
+                         building a dictionary of the values.  This dictionary
+                         will be fed into the Task as its starting args.
+                */
+                $('.button_form_run').live('click', function(evt) {
+                    task_key = evt.target.parentNode.parentNode.id.slice(5);
+                    $inputs = $('#form_'+ task_key +' input');
+                    args = {};
+                    for (i=0; i<$inputs.length; i++) {
+                        input = $inputs.get(i);
+                        args[input.id.slice(3)]= $(input).val();
+                    }
+
+                    post_args = {'key':task_key, 'args':JSON.stringify(args)};
+                    $.post('run/', post_args, process_queued_task, 'json');
+                    $('#form_'+ task_key).hide();
+                });
+
+                /*
+                    Cancel Task - sends a request to cancel a task, may not happen right away
+                */
                 $('.button_cancel').live('click', function(evt) {
                     $.post('cancel/', {'i':evt.target.parentNode.parentNode.id.slice(9)});
                 });
+
+
+                /*
+                    Input Form Close - hide the input form
+                */
+                $('.button_close').live('click', function(evt) {
+                    // blur each input to ensure the tooltips hide
+                    $(evt.target.parentNode).children('input')
+                        .each(function(){this.blur();})
+
+                    // hide the window
+                    $(evt.target.parentNode.parentNode).hide();
+                });
+
+
+                /* Setup tooltips for all inputs on all forms */
+                $('.input_form input').each(function (){
+                    $parent = $(this.parentNode)
+                    title = $parent.attr('title')
+                    $parent.attr('title','');
+
+                    $(this).qtip({
+                        content: title,
+                        position: {
+                            corner: {
+                                tooltip: 'leftMiddle',
+                                target: 'rightMiddle'
+                            }
+                        },
+                        show: {
+                            when: {event:'focus'},// show on focus
+                        },
+                        hide: false, // Don't hide on mouseout
+                        style: {
+                            border: {
+                                width: 2,
+                                radius: 5
+                            },
+                            padding: 10, 
+                            textAlign: 'center',
+                            tip: true, // Give it a speech bubble tip with automatic corner detection
+                            name: 'green' // Style it according to the preset 'green' style
+                        }
+                    })
+                    //standard blur event handler since qtip one is broken.
+                    .blur(function(){$(this).qtip('hide')});
+
+                });
+
 
                 update();
             });
@@ -165,10 +253,8 @@
             }
 
         </script>
-        <link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}/jquery.acts_as_tree_table.css" />
-        <style>
-            * { font-family: Helvetica, Arial, Tahoma; font-size: 12px; font-color: #444; line-height: 25px; padding: 0px; margin: 0px; }
 
+        <style>
             #content {
                 padding-top:30px;
             }
@@ -225,7 +311,64 @@
                 color:blue;
             }
 
+            .input_form {
+                background-color:rgba(100, 100, 100, 0.4);
+                display:none;
+                margin-left:auto;
+                margin-right:auto;
+                min-width:300px;
+                padding:8px;
+                position:absolute;
+                text-align:center;
+                top:140px;
+                -moz-border-radius: 10px;
+                -webkit-border-radius: 10px;
+            }
+
+            .inner {
+                background-color:white;
+                padding:15px;
+                border:1px solid #333333;
+                opacity: 1;
+                -moz-border-radius: 5px;
+                -webkit-border-radius: 5px;
+            }
+
+            .input_form h2, .input_form h2 .label { font-size:115%; }
+            .input_form h2 { font-weight:normal;                 border-bottom: 1px solid #666666;}
+            .input_form h2 .label { color:green; }
+            .input_form td { border:0px; }
+            .input_form .description { 
+                border-bottom: 1px solid #666666;
+                color:#444444;
+                font-size:95%;
+                margin-bottom:15px;
+                text-align:justify;
+            }
+
+            .input_form input {
+                border: 1px solid #bbbbbb;
+            }
+            .input_form label { color:#444444; font-size:90%; font-weight:bold }
+            .input_form button { margin-top:10px; }
+            .input_form .button_close {
+                position:absolute;
+                top:12px;
+                right:7px;
+            }
+
         </style>
+        <!--[if IE]>
+
+        <style type="text/css">
+            .input_form {
+                background:transparent;
+                filter:progid:DXImageTransform.Microsoft.gradient(startColorstr=#99000050,endColorstr=#99000050);
+                zoom: 1;
+                }
+        </style>
+
+<![endif]-->
 {% endblock %}
 
 {% block submenu %}
@@ -258,6 +401,24 @@
                 </tr>
             {% endfor %}
         </table>
+
+        <div id="form_container">
+            {% for key,task in tasks.items %}
+                {% if task.form %}
+                    <div id="form_{{key}}" class="input_form">
+                        <div class="inner">
+                            <div class="button_close button"></div>
+                            <h2><span class="label">Run:</span> {{key}}</h2>
+                            <div class="description">{{task.description}}</div>
+                            <table>
+                                {{task.form|no_escape}}
+                            </table>
+                            <button class="button_form_run">Run</button>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
 
         <table id="queue">
             <thead>

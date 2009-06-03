@@ -76,6 +76,7 @@ class Task(object):
     _callbackargs = None
     workunit = None
     STOP_FLAG = False
+    form = None
 
     msg = None
     description = 'Default description about Task baseclass.'

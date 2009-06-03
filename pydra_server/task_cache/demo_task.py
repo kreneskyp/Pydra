@@ -23,6 +23,16 @@ import time
 import logging
 logger = logging.getLogger('root')
 
+from django import forms
+class TestTaskInput(forms.Form):
+    """
+    Form object used to render an interface that captures input
+    for TestTask.
+    """
+    start = forms.IntegerField(initial='0', help_text='Start counting with this number')
+    end   = forms.IntegerField(initial='5', help_text='End counting with this number')
+
+
 class TestTask(Task):
     """
     Simple Task used for testing
@@ -34,6 +44,7 @@ class TestTask(Task):
     count = 0
     stop = 5
     description = 'A Demo task that counts to 5, taking a nap after each number'
+    form = TestTaskInput
 
     def __init__(self, msg='Demo Task'):
         Task.__init__(self, msg)
@@ -44,10 +55,21 @@ class TestTask(Task):
         """
         self.count=0
 
-        if not (kwargs and kwargs.has_key('data')):
-            value = 0
-        else :
-            value = kwargs['data']
+        try:
+            try:
+                value = kwargs['start']
+            except KeyError:
+                value = 0
+
+            try:
+                self.stop = kwargs['end'] - value
+            except KeyError:
+                pass
+        except Exception, e:
+            logger.error('wtf?')
+            logger.error(e)
+
+        logger.info('counting from %s to %s' % (value, value+self.stop))
 
         while self.count < self.stop and not self.STOP_FLAG:
             time.sleep(3)
@@ -55,7 +77,7 @@ class TestTask(Task):
             value += 1
             logger.info('value: %d   progress: %d%%' % (value , self.progress()))
 
-        return {'data':value}
+        return {'start':value}
 
     def progress(self):
         """

@@ -103,3 +103,11 @@ def task_status(code):
 register.filter('task_status', task_status)
 
 
+"""
+Filter that renders string with no escaping
+"""
+@register.filter(name='no_escape')
+def no_escape(string):
+    return mark_safe(string)
+register.filter('no_escape', no_escape)
+

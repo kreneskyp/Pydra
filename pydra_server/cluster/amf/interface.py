@@ -213,15 +213,38 @@ class AMFInterface(pb.Root):
 
 
     @authenticated
-    def run_task(self, _, key):
+    def run_task(self, _, task_key, args=None):
         """
         Runs a task.  It it first placed in the queue and the queue manager
-        will run it when appropriate
+        will run it when appropriate.
+
+        Args should be a dictionary of values.  It is acceptable for this to be
+        improperly typed data.  ie. Integer given as a String.  This function
+        will parse and clean the args using the form class for the Task
         """
-        task_instance =  self.master.queue_task(key)
+
+        # args coming from the controller need to be parsed by the form. This
+        # will give proper typing to the data and allow validation.
+        if args:
+            task = self.master.available_tasks[task_key]
+            form_instance = task.form(args)
+            if form_instance.is_valid():
+                # repackage properly cleaned data
+                args = {}
+                for key, val in form_instance.cleaned_data.items():
+                    args[key] = val
+
+            else:
+                # not valid, report errors.
+                return {
+                    'task_key':task_key,
+                    'errors':form_instance.errors
+                }
+
+        task_instance =  self.master.queue_task(task_key, args=args)
 
         return {
-                'task_key':key,
+                'task_key':task_key,
                 'instance_id':task_instance.id,
                 'time':time.mktime(task_instance.queued.timetuple())
                }

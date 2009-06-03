@@ -520,7 +520,7 @@ class Master(object):
         information in the database.  If the cluster has idle resources it will start the task
         immediately, otherwise it will queue the task until it is ready.
         """
-        logger.info('Task:%s:%s - Queued' % (task_key, subtask_key))
+        logger.info('Task:%s:%s - Queued:  %s' % (task_key, subtask_key, args))
 
         #create a TaskInstance instance and save it
         task_instance = TaskInstance()

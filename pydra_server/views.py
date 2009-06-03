@@ -196,10 +196,16 @@ def run_task(request):
     """
     key = request.POST['key']
 
+    try:
+        args = simplejson.loads(request.POST['args'])
+    except KeyError:
+        # task might not have args
+        args = None
+
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    json = simplejson.dumps(pydra_controller.remote_run_task(key))
+    json = simplejson.dumps(pydra_controller.remote_run_task(key, args))
 
     return HttpResponse(json, mimetype='application/javascript')
 
