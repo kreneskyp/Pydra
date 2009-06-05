@@ -23,7 +23,6 @@ from django.contrib import admin
 admin.autodiscover()
 
 
-
 urlpatterns = patterns('',
     (r'^', include('pydra_server.urls')),
     (r'^admin/(.*)', admin.site.root),
