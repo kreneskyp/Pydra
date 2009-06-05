@@ -11,7 +11,7 @@ class IntermediateResultsFiles():
     # mapreduce-i9t-(taks_id)-(partition)
     pattern = "mapreduce-i9t-%s-%d-%s"
 
-    def __init__(self, dir, task_id, reducers=1):
+    def __init__(self, task_id, reducers, dir=None):
         self.task_id = task_id
         self.reducers = reducers
         self.dir = dir
@@ -89,13 +89,17 @@ class IntermediateResultsFiles():
 class MapReduceTask(Task):
     input = None
     output = None
-    im = None
+
+    intermediate = IntermediateResultsFiles
+    intermediate_kwargs = {'dir': None }
+
+    reducers = 1
 
     description = "Abstract Map-Reduce Task"
 
     def __init__(self, msg=None, sequential=True):
+        Task.__init__(self, msg)
         self.sequential = sequential
-        self.subtasks = []
 
     def map(self, input, output, **kwargs):
         pass
@@ -107,19 +111,21 @@ class MapReduceTask(Task):
 
     def _work(self, **kwargs):
 
+        im = self.intermediate(self.msg, self.reducers, **self.intermediate_kwargs)
+
         for id, i in enumerate(self.input):
             mapid = 'map%d' % id
-            maptask = FunctionTask(mapid, self.map, mapid, i, self.im)
+            maptask = FunctionTask(mapid, self.map, mapid, i, im)
             maptask.parent = self
 
             logger.debug('   Starting maptask: %s' % maptask)
             if self.sequential:
-                result = maptask.work(args=kwargs, callback=self.im.flush,
+                result = maptask.work(args=kwargs, callback=im.flush,
                                                    callback_args={'from_task': mapid})
             else:
                 raise NotImplementedError
 
-        for id, i in enumerate(self.im):
+        for id, i in enumerate(im):
             reduceid = 'reduce%d' % id
             reducetask = FunctionTask(reduceid, self.reduce, reduceid, i, self.output)
             reducetask.parent = self

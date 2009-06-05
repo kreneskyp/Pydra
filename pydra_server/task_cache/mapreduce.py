@@ -12,10 +12,15 @@ class CountWords(MapReduceTask):
 
     output = {} # XXX will not work
 
-    im = IntermediateResultsFiles('/mnt/shared', 'countwords', reducers=1)
+    intermediate = IntermediateResultsFiles
+    intermediate_kwargs = {'dir': '/mnt/shared'}
+
+    reducers = 2
 
     description = 'Simple Map-Reduce Task to count the words in a input'
 
+    def __init__(self, msg='countwords'):
+        MapReduceTask.__init__(self, msg)
 
     def map(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
