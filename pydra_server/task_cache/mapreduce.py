@@ -16,6 +16,7 @@ class CountWords(MapReduceTask):
     intermediate_kwargs = {'dir': '/mnt/shared'}
 
     reducers = 2
+    sequential = False
 
     description = 'Simple Map-Reduce Task to count the words in a input'
 
@@ -24,16 +25,17 @@ class CountWords(MapReduceTask):
 
     def map(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
-        logger.debug(' map called')
+        logger.debug('      map started')
 
         for word in input:
             # emmit (word, 1)
             output[word.strip()] = 1
 
+        logger.debug('      map finished')
 
     def reduce(self, input, output, **kwargs):
         """sum occurances or each word"""
-        logger.debug(' reduce called')
+        logger.debug('      reduce started')
 
         d = {}
 
@@ -45,4 +47,6 @@ class CountWords(MapReduceTask):
         for word, num in d.iteritems():
             # emmit output (word, num)
             output[word] = num
+
+        logger.debug('      reduce finished')
 

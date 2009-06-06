@@ -2,9 +2,18 @@
 from tasks import Task
 
 import cPickle as pickle
-import os, logging
+import os, logging, time
 
 logger = logging.getLogger('root')
+
+class AppendableDict(dict):
+
+    def __setitem__(self, key, value):
+        if not self.has_key(key):
+            super(AppendableDict, self).__setitem__(key, [])
+        
+        super(AppendableDict, self).__getitem__(key).append(value)
+
 
 class IntermediateResultsFiles():
     """this must mimic iterator and dictionary"""
@@ -15,7 +24,6 @@ class IntermediateResultsFiles():
         self.task_id = task_id
         self.reducers = reducers
         self.dir = dir
-        self._dict = {}
 
         # XXX quickfix (storage of partition files)
         self._partitions = {}
@@ -23,13 +31,13 @@ class IntermediateResultsFiles():
     def partition(self, key):
         return hash(str(key)) % self.reducers
 
-    def flush(self, results=None, from_task=None):
-        # XXX results is ignored
-        logger.debug(" IM.flush() %s" % str(self._dict))
+    def flush(self, result=None, adict=None, mapid=None):
+
+        logger.debug("im: flushing %s" % str(adict))
 
         pdict = {}
 
-        for k, vs in self._dict.iteritems():
+        for k, vs in adict.iteritems():
 
             p = self.partition(k)
 
@@ -40,7 +48,7 @@ class IntermediateResultsFiles():
 
         for p, tuples in pdict.iteritems():
 
-            filename = self.pattern % (self.task_id, p, from_task)
+            filename = self.pattern % (self.task_id, p, mapid)
 
             # XXX quickfix (storage of partition files)
             if p in self._partitions:
@@ -48,32 +56,25 @@ class IntermediateResultsFiles():
             else:
                 self._partitions[p] = [filename]
 
-            logger.debug(" IM.flush(): dumping to %s" % filename)
+            logger.debug("im: dumping %s to %s" % (str(tuples), filename))
             with open(os.path.join(self.dir, filename), "w") as f:
                 for tuple in tuples:
                     pickle.dump(tuple, f)
 
-        self._dict = {}
-
-    def __setitem__(self, key, value):
-        if self._dict.has_key(key):
-            self._dict[key].append(value)
-
-        else:
-            self._dict[key] = [value]
 
     def __iter__(self):
         return self
 
     def _partition_iter(self, files):
         for filename in files:
-            logger.debug(" IM.next().next(): loading from %s" % filename)
+            logger.debug("im: loading from %s" % filename)
             with open(os.path.join(self.dir, filename)) as f:
                 try:
                     while True:
                         yield pickle.load(f)
 
                 except EOFError:
+                    logger.debug("im: loading from %s done" % filename)
                     pass
 
     def next(self):
@@ -97,9 +98,13 @@ class MapReduceTask(Task):
 
     description = "Abstract Map-Reduce Task"
 
-    def __init__(self, msg=None, sequential=True):
+    sequential = True
+
+    def __init__(self, msg=None):
         Task.__init__(self, msg)
-        self.sequential = sequential
+        self.map_tasks = {}
+        self.reduce_tasks = {}
+        self.im = None
 
     def map(self, input, output, **kwargs):
         pass
@@ -109,34 +114,74 @@ class MapReduceTask(Task):
         for k, v in input:
             output[k] = v
 
+    def map_stage_callback(self, result, adict=None, mapid=None):
+        logger.debug('   map_stage_callback: %s' % mapid)
+        self.im.flush(result, adict=adict, mapid=mapid)
+
+        try:
+            del self.map_tasks[mapid]
+        except KeyError:
+            logger.debug('   map_stage_callback: no such task -> %s' % mapid)
+
+
+    def reduce_stage_callback(self, result, reduceid=None):
+        logger.debug('   reduce_stage_callback: %s' % reduceid)
+
+        try:
+            del self.reduce_tasks[reduceid]
+        except KeyError:
+            logger.debug('   reduce_stage_callback: no such task -> %s' % reduceid)
+
+
     def _work(self, **kwargs):
 
-        im = self.intermediate(self.msg, self.reducers, **self.intermediate_kwargs)
+        self.im = im = self.intermediate(self.msg, self.reducers, **self.intermediate_kwargs)
+        logger.debug('mapreduce: map stage')
 
         for id, i in enumerate(self.input):
+
+            mout = AppendableDict()
+
             mapid = 'map%d' % id
-            maptask = FunctionTask(mapid, self.map, mapid, i, im)
+            maptask = FunctionTask(mapid, self.map, mapid, i, mout)
             maptask.parent = self
 
-            logger.debug('   Starting maptask: %s' % maptask)
-            if self.sequential:
-                result = maptask.work(args=kwargs, callback=im.flush,
-                                                   callback_args={'from_task': mapid})
-            else:
-                raise NotImplementedError
+            self.map_tasks[mapid] = maptask
 
+            logger.debug('   starting maptask: %s' % mapid)
+            if self.sequential:
+                result = maptask.work(args=kwargs)
+                im.flush(None, adict=mout, mapid=mapid)
+                del self.map_tasks[mapid]
+            else:
+                maptask.start(args=kwargs, callback=self.map_stage_callback,
+                                callback_args={'adict': mout, 'mapid': mapid, })
+
+        while self.map_tasks:
+            logger.debug('mapreduce: waiting for map stage to finish')
+            time.sleep(1)
+
+        logger.debug('mapreduce: reduce stage')
         for id, i in enumerate(im):
             reduceid = 'reduce%d' % id
             reducetask = FunctionTask(reduceid, self.reduce, reduceid, i, self.output)
             reducetask.parent = self
 
-            logger.debug('   Starting reducetask: %s' % reducetask)
+            self.reduce_tasks[reduceid] = reducetask
+
+            logger.debug('   starting reducetask: %s' % reduceid)
             if self.sequential:
                 result = reducetask.work(args=kwargs)
+                del self.reduce_tasks[reduceid]
             else:
-                raise NotImplementedError
+                reducetask.start(args=kwargs, callback=self.reduce_stage_callback,
+                                            callback_args={'reduceid': reduceid})
 
-        logger.debug("finished map-reduce, what do you want more?")
+        while self.reduce_tasks:
+            logger.debug('mapreduce: waiting for reduce stage to finish')
+            time.sleep(1)
+
+        logger.debug('mapreduce: finished')
         logger.info(self.output)
 
 
