@@ -174,7 +174,7 @@
                 task_description = $('#' + task_name).find('.description').html();
 
                 // hide form if any
-                $('#form_'+ task_key).hide();
+                $('#form_'+ task_name).hide();
 
                 time = new Date(parseInt(data['time'])*1000);
                 formated_time = dateFormat(time, "yyyy-mm-dd HH:MM:ss")
