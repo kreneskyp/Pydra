@@ -64,7 +64,8 @@ def settings_processor(request):
 
     return {
         'VERSION':settings.VERSION,
-        'MEDIA':settings.MEDIA_URL
+        'MEDIA':settings.MEDIA_URL,
+        'ROOT':settings.SITE_ROOT
     }
 
 

@@ -155,10 +155,6 @@
                 font-weight:bold;
                 color:orange;
             }
-
-            
-
-
         </style>
 
         <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
@@ -258,7 +254,7 @@
 
             function update() {
                 //ajax call to status
-                $.getJSON('{{SITE_ROOT}}/nodes/status/',{},process_status_update);
+                $.getJSON('{{ROOT}}/nodes/status/',{},process_status_update);
 
                 //rerun this update in 5 seconds
                 setTimeout('update()', 5000);
