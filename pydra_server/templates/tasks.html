@@ -54,7 +54,7 @@
                         $form.css('left',left);
                         $form.show();
                     } else {
-                        $.post('run/', {'key':key}, process_queued_task, 'json');
+                        $.post('{{ROOT}}/jobs/run/', {'key':key}, process_queued_task, 'json');
                     }
                 });
 
@@ -79,14 +79,14 @@
                     $form.find('.errors').empty();
 
                     post_args = {'key':task_key, 'args':JSON.stringify(args)};
-                    $.post('run/', post_args, process_queued_task, 'json');
+                    $.post('{{ROOT}}/jobs/run/', post_args, process_queued_task, 'json');
                 });
 
                 /*
                     Cancel Task - sends a request to cancel a task, may not happen right away
                 */
                 $('.button_cancel').live('click', function(evt) {
-                    $.post('cancel/', {'i':evt.target.parentNode.parentNode.id.slice(9)});
+                    $.post('{{ROOT}}/jobs/cancel/', {'i':evt.target.parentNode.parentNode.id.slice(9)});
                 });
 
 
@@ -174,7 +174,7 @@
                 task_description = $('#' + task_name).find('.description').html();
 
                 // hide form if any
-                $('#form_'+ task_key).hide();
+                $('#form_'+ task_name).hide();
 
                 time = new Date(parseInt(data['time'])*1000);
                 formated_time = dateFormat(time, "yyyy-mm-dd HH:MM:ss")
@@ -279,7 +279,7 @@
 
 
             function update() {
-                $.getJSON('progress/', {}, processProgressData);
+                $.getJSON('{{ROOT}}/jobs/progress/', {}, processProgressData);
                 setTimeout('update()', 5000);
             }
 
@@ -429,7 +429,7 @@
                             <div class="button_run button" title="Run Task"></div>
                             <a class="button_schedule" href="#" title="Task Schedule"><div class="button"></div></a>
                         {% endif %}
-                        <a class="button_log" href="/jobs/history/?key={{key}}" title="Task History"><div class="button"></div></a>
+                        <a class="button_log" href="{{ROOT}}/jobs/history/?key={{key}}" title="Task History"><div class="button"></div></a>
                     </td>
                 </tr>
             {% endfor %}
