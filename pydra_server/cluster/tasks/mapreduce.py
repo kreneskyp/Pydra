@@ -1,5 +1,5 @@
 
-from tasks import Task
+from tasks import Task, TaskNotFoundException
 
 import cPickle as pickle
 import os, logging, time
@@ -106,6 +106,12 @@ class MapReduceTask(Task):
         self.reduce_tasks = {}
         self.im = None
 
+        self.maptask = MapTask('MapTask', self.map)
+        self.maptask.parent = self
+
+        self.reducetask = ReduceTask('ReduceTask', self.reduce)
+        self.reducetask.parent = self
+
     def map(self, input, output, **kwargs):
         pass
 
@@ -114,9 +120,9 @@ class MapReduceTask(Task):
         for k, v in input:
             output[k] = v
 
-    def map_stage_callback(self, result, adict=None, mapid=None):
+    def map_stage_callback(self, result, output=None, mapid=None):
         logger.debug('   map_stage_callback: %s' % mapid)
-        self.im.flush(result, adict=adict, mapid=mapid)
+        self.im.flush(result, adict=output, mapid=mapid)
 
         try:
             del self.map_tasks[mapid]
@@ -124,8 +130,9 @@ class MapReduceTask(Task):
             logger.debug('   map_stage_callback: no such task -> %s' % mapid)
 
 
-    def reduce_stage_callback(self, result, reduceid=None):
+    def reduce_stage_callback(self, result, output=None, reduceid=None):
         logger.debug('   reduce_stage_callback: %s' % reduceid)
+        self.output.update(output)
 
         try:
             del self.reduce_tasks[reduceid]
@@ -138,24 +145,36 @@ class MapReduceTask(Task):
         self.im = im = self.intermediate(self.msg, self.reducers, **self.intermediate_kwargs)
         logger.debug('mapreduce: map stage')
 
+        worker = self.get_worker()
+        logger.debug("mapreduce: workers available: %d" % worker.available_workers)
+
         for id, i in enumerate(self.input):
 
             mout = AppendableDict()
 
             mapid = 'map%d' % id
-            maptask = FunctionTask(mapid, self.map, mapid, i, mout)
-            maptask.parent = self
-
-            self.map_tasks[mapid] = maptask
+            self.map_tasks[mapid] = 1
 
             logger.debug('   starting maptask: %s' % mapid)
+            map_args = {
+                        'input': i,
+                        'output': mout,
+                       }
+
             if self.sequential:
-                result = maptask.work(args=kwargs)
+                result = self.maptask.work(args=map_args)
                 im.flush(None, adict=mout, mapid=mapid)
                 del self.map_tasks[mapid]
             else:
-                maptask.start(args=kwargs, callback=self.map_stage_callback,
-                                callback_args={'adict': mout, 'mapid': mapid, })
+                
+                self.maptask.start(args=map_args, callback=self.map_stage_callback,
+                                callback_args={'output': mout, 'mapid': mapid, })
+
+                # XXX experiments
+                #logger.debug("mapreduce: requesting worker for map-task: %s" % maptask.get_key())
+                #self.parent.request_worker(self.maptask.get_key(), {}, id)
+                #logger.debug("mapreduce: worker aquired")
+                # XXX experiments end
 
         while self.map_tasks:
             logger.debug('mapreduce: waiting for map stage to finish')
@@ -163,19 +182,24 @@ class MapReduceTask(Task):
 
         logger.debug('mapreduce: reduce stage')
         for id, i in enumerate(im):
-            reduceid = 'reduce%d' % id
-            reducetask = FunctionTask(reduceid, self.reduce, reduceid, i, self.output)
-            reducetask.parent = self
+            rout = {}
 
-            self.reduce_tasks[reduceid] = reducetask
+            reduceid = 'reduce%d' % id
+            self.reduce_tasks[reduceid] = 1
 
             logger.debug('   starting reducetask: %s' % reduceid)
+            reduce_args = {
+                            'input': i,
+                            'output': rout,
+                          }
+
             if self.sequential:
-                result = reducetask.work(args=kwargs)
+                result = self.reducetask.work(args=reduce_args)
+                self.output.update(rout)
                 del self.reduce_tasks[reduceid]
             else:
-                reducetask.start(args=kwargs, callback=self.reduce_stage_callback,
-                                            callback_args={'reduceid': reduceid})
+                self.reducetask.start(args=reduce_args, callback=self.reduce_stage_callback,
+                                    callback_args={'output': rout,'reduceid': reduceid})
 
         while self.reduce_tasks:
             logger.debug('mapreduce: waiting for reduce stage to finish')
@@ -184,6 +208,24 @@ class MapReduceTask(Task):
         logger.debug('mapreduce: finished')
         logger.info(self.output)
 
+    def get_subtask(self, task_path):
+        if len(task_path) == 1:
+            if task_path[0] == self.__class__.__name__:
+                return self
+            else:
+                raise TaskNotFoundException("Task not found")
+
+        # pop this classes name off the list
+        task_path.pop(0)
+
+        # what if it is MapTask
+        try:
+            return self.maptask.get_subtask(task_path)
+        except TaskNotFoundException:
+            pass
+
+        # what if it is ReduceTask
+        return self.reducetask.get_subtask(task_path)
 
     def progress(self):
         return -1
@@ -191,14 +233,19 @@ class MapReduceTask(Task):
 
 class FunctionTask(Task):
 
-    def __init__(self, msg, fun, id, input, output):
-        self.fun = fun
-        self.input = input
-        self.output = output
-        self.id = id
-
+    def __init__(self, msg, fun):
+        Task.__init__(self, msg)
         self.msg = msg
+        self.fun = fun
 
     def _work(self, **kwargs):
-        return self.fun(self.input, self.output, **kwargs)
+        return self.fun(**kwargs)
+
+
+class MapTask(FunctionTask):
+    pass
+
+
+class ReduceTask(FunctionTask):
+    pass
 

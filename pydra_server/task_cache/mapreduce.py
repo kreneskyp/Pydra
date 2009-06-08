@@ -5,10 +5,10 @@ logger = logging.getLogger('root')
 
 class CountWords(MapReduceTask):
 
-    input = {
-            'list_one': ['one', 'two', 'three', 'two', 'three', 'four'],
-            'list_two': ['four', 'three', 'four', 'four'],
-            }.itervalues()
+    input = ( 
+                ['one', 'two', 'three', 'two', 'three', 'four'],
+                ['four', 'three', 'four', 'four'],
+            )
 
     output = {} # XXX will not work
 
