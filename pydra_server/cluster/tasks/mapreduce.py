@@ -1,8 +1,11 @@
 
-from tasks import Task, TaskNotFoundException
+from tasks import Task, TaskNotFoundException, \
+    STATUS_RUNNING, STATUS_COMPLETE
+
+from twisted.internet import reactor
 
 import cPickle as pickle
-import os, logging, time
+import os, logging
 
 logger = logging.getLogger('root')
 
@@ -104,7 +107,8 @@ class MapReduceTask(Task):
         Task.__init__(self, msg)
         self.map_tasks = {}
         self.reduce_tasks = {}
-        self.im = None
+
+        self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
 
         self.maptask = MapTask('MapTask', self.map)
         self.maptask.parent = self
@@ -140,13 +144,27 @@ class MapReduceTask(Task):
             logger.debug('   reduce_stage_callback: no such task -> %s' % reduceid)
 
 
-    def _work(self, **kwargs):
+    def work(self, args, callback, callback_args={}):
+        """
+        overidden to prevent early cleanup. MapReduceTask doesn not implement _work() and dont expec user to provide its own. Instead it requires user to provade map() and reduce() methods.
+        Cleanup is moved to task_complete() wich will be called when there is no mo work remaining.
+        """
 
-        self.im = im = self.intermediate(self.msg, self.reducers, **self.intermediate_kwargs)
-        logger.debug('mapreduce: map stage')
+        self.__callback = callback
+        self._callback_args = callback_args
+
+        self._status = STATUS_RUNNING
 
         worker = self.get_worker()
         logger.debug("mapreduce: workers available: %d" % worker.available_workers)
+
+        # let's start the processing
+        self.map_stage()
+
+
+    def map_stage(self):
+
+        logger.debug('mapreduce: map stage')
 
         for id, i in enumerate(self.input):
 
@@ -163,7 +181,7 @@ class MapReduceTask(Task):
 
             if self.sequential:
                 result = self.maptask.work(args=map_args)
-                im.flush(None, adict=mout, mapid=mapid)
+                self.im.flush(None, adict=mout, mapid=mapid)
                 del self.map_tasks[mapid]
             else:
                 
@@ -176,12 +194,19 @@ class MapReduceTask(Task):
                 #logger.debug("mapreduce: worker aquired")
                 # XXX experiments end
 
-        while self.map_tasks:
+        # call reduce stage
+        self.reduce_stage()
+
+
+    def reduce_stage(self):
+
+        if self.map_tasks:
             logger.debug('mapreduce: waiting for map stage to finish')
-            time.sleep(1)
+            reactor.callLater(1, self.reduce_stage)
+            return
 
         logger.debug('mapreduce: reduce stage')
-        for id, i in enumerate(im):
+        for id, i in enumerate(self.im):
             rout = {}
 
             reduceid = 'reduce%d' % id
@@ -201,12 +226,28 @@ class MapReduceTask(Task):
                 self.reducetask.start(args=reduce_args, callback=self.reduce_stage_callback,
                                     callback_args={'output': rout,'reduceid': reduceid})
 
-        while self.reduce_tasks:
+        # call final stage
+        self.task_complete()
+
+
+    def task_complete(self):
+        """
+        Should be called when all map and reduce task have completed
+        """
+
+        if self.reduce_tasks:
             logger.debug('mapreduce: waiting for reduce stage to finish')
-            time.sleep(1)
+            reactor.callLater(1, self.task_complete)
 
         logger.debug('mapreduce: finished')
         logger.info(self.output)
+
+        self._status = STATUS_COMPLETE
+
+        #make a callback, if any
+        if self.__callback:
+            self.__callback(self.output)
+
 
     def get_subtask(self, task_path):
         if len(task_path) == 1:
