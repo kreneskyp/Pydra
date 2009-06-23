@@ -90,12 +90,12 @@ class MapReduceTask_Test(unittest.TestCase):
         """
 
         # test for MapTask
-        expected = 'CountWords.MapTask'
+        expected = 'CountWords.MapWords'
         key = self.mapreduce_task.maptask.get_key()
         self.assertEqual(key, expected, 'Generated key [%s] does not match the expected key [%s]' % (key, expected) )
 
         # test for ReduceTask
-        expected = 'CountWords.ReduceTask'
+        expected = 'CountWords.ReduceWords'
         key = self.mapreduce_task.reducetask.get_key()
         self.assertEqual(key, expected, 'Generated key [%s] does not match the expected key [%s]' % (key, expected) )
 
@@ -124,13 +124,13 @@ class MapReduceTask_Test(unittest.TestCase):
              * that the task key returns an error if given an incorrect key
         """
         # correct key for maptask
-        key = 'CountWords.MapTask'
+        key = 'CountWords.MapWords'
         expected = self.mapreduce_task.maptask
         returned = self.mapreduce_task.get_subtask(key.split('.'))
         self.assertEqual(returned, expected, 'MapTask retrieved was not the expected Task')
 
         # correct key for reducetask
-        key = 'CountWords.ReduceTask'
+        key = 'CountWords.ReduceWords'
         expected = self.mapreduce_task.reducetask
         returned = self.mapreduce_task.get_subtask(key.split('.'))
         self.assertEqual(returned, expected, 'ReduceTask retrieved was not the expected Task')
@@ -160,4 +160,47 @@ class MapReduceTask_Test(unittest.TestCase):
         returned = self.mapreduce_task.reducetask.get_worker()
         self.assert_(returned, 'no worker was returned')
         self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+
+
+class IdentityMapTask(MapTask):
+
+    def _work(self, input, output, **kwargs):
+
+        for k, v in input:
+            output[k] = v
+
+
+class IdentityReduceTask(ReduceTask):
+
+    def _work(self, input, output, **kwargs):
+
+        for k, v in input:
+            output[k] = v
+
+
+class NullIM():
+
+    def flush(self, output, mapid):
+        return output, mapid
+
+
+class MapTask_Test(unittest.TestCase):
+
+    def setUp(self):
+        self.im = NullIM()
+        self.maptask = IdentityMapTask("IdentityMapTask", self.im)
+        self.worker = WorkerProxy()
+        self.maptask.parent = self.worker
+
+    def test_work_maptask(self):
+        a = { 'a': 1, 'b': 1, }
+        id = 'identity_map'
+
+        flush_results = self.maptask.work(args={'input': a.iteritems(), 'id': id})
+        output, mapid = flush_results
+
+        self.assertEqual(mapid, id, "mapid differs from id")
+
+        for k, v in a.iteritems():
+            self.assert_(v in output[k])
 

@@ -112,6 +112,9 @@ class MapReduceTask(Task):
     input = None
     output = None
 
+    map = None
+    reduce = None
+
     intermediate = IntermediateResultsFiles
     intermediate_kwargs = {'dir': None }
 
@@ -129,21 +132,11 @@ class MapReduceTask(Task):
 
         self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
 
-        self.maptask = MapTask('MapTask', self.map, self.im)
+        self.maptask = self.map('MapTask', self.im)
         self.maptask.parent = self
 
-        self.reducetask = ReduceTask('ReduceTask', self.reduce)
+        self.reducetask = self.reduce('ReduceTask')
         self.reducetask.parent = self
-
-
-    def map(self, input, output, **kwargs):
-        pass
-
-
-    def reduce(self, input, output, **kwargs):
-        # default *identity* reduce function
-        for k, v in input:
-            output[k] = v
 
 
     def map_callback(self, result, mapid=None, local=False):
@@ -309,17 +302,7 @@ class MapReduceTask(Task):
         return -1
 
 
-class FunctionTask(Task):
-
-    def __init__(self, msg, fun):
-        Task.__init__(self, msg)
-        self.msg = msg
-        self.fun = fun
-
-
-    def _work(self, **kwargs):
-        return self.fun(**kwargs)
-
+class MapReduceSubtask(Task):
 
     def _generate_key(self):
         if issubclass(self.parent.__class__, (MapReduceTask,)):
@@ -332,25 +315,47 @@ class FunctionTask(Task):
         return key
 
 
-class MapTask(FunctionTask):
+class MapTask(MapReduceSubtask):
 
-    def __init__(self, msg, fun, im):
-        FunctionTask.__init__(self, msg, fun)
+    def __init__(self, msg, im):
+        MapReduceSubtask.__init__(self, msg)
         self.im = im
 
 
-    def _work(self, **kwargs):
-        output = AppendableDict()
+    def work(self, args={}, callback=None, callback_args={}):
+        """
+        Overwrites Task.work() beacuse MapTask needs to provide special input and output
+        dictionaries. And it is necesairy to flush intermediate results after self._work()
+        """
+        logger.debug('%s - MapTask - in MapTask.work()'  % self.get_worker().worker_key)
+        self._status = STATUS_RUNNING
 
-        id = kwargs['id']
-        kwargs['output'] = output
+        output = AppendableDict()
+        args['output'] = output
+
+        id = args['id']
 
         logger.debug("%s._work()" % id)
 
-        result = self.fun(**kwargs)
-        return self.im.flush(output, id)
+        self._work(**args) # XXX ignoring results
+
+        results = self.im.flush(output, id) # XXX partitions are our results
+
+        self._status = STATUS_COMPLETE
+        logger.debug('%s - MapTask - work complete' % self.get_worker().worker_key)
+
+        self.work_deferred = None
+
+        #make a callback, if any
+        if callback:
+            logger.debug('%s - MapTask - Making callback' % self)
+            callback(results, **callback_args)
+        else:
+            logger.warning('%s - MapTask - NO CALLBACK TO MAKE: %s' % (self, callback))
+
+        return results
 
 
-class ReduceTask(FunctionTask):
+class ReduceTask(MapReduceSubtask):
     pass
 

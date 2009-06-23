@@ -1,31 +1,13 @@
-from pydra_server.cluster.tasks.mapreduce import MapReduceTask, IntermediateResultsFiles
+from pydra_server.cluster.tasks.mapreduce import MapReduceTask, MapTask, ReduceTask, \
+        IntermediateResultsFiles
 
 import logging
 logger = logging.getLogger('root')
 
-class CountWords(MapReduceTask):
 
-    input = ( 
-                ['one', 'two', 'three', 'two', 'three', 'four'],
-                ['four', 'three', 'four', 'four'],
-                ['four', 'three', 'four', 'four'],
-            )
+class MapWords(MapTask):
 
-    output = {} # XXX will not work
-
-    intermediate = IntermediateResultsFiles
-    intermediate_kwargs = {'dir': '/mnt/shared'}
-
-    reducers = 2
-    #sequential = True
-
-    description = 'Simple Map-Reduce Task to count the words in a input'
-
-    def __init__(self, msg='countwords'):
-        MapReduceTask.__init__(self, msg)
-
-
-    def map(self, input, output, **kwargs):
+    def _work(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
 
         for word in input:
@@ -33,7 +15,9 @@ class CountWords(MapReduceTask):
             output[word.strip()] = 1
 
 
-    def reduce(self, input, output, **kwargs):
+class ReduceWords(ReduceTask):
+
+    def _work(self, input, output, **kwargs):
         """sum occurances or each word"""
 
         d = {}
@@ -45,4 +29,29 @@ class CountWords(MapReduceTask):
         for word, num in d.iteritems():
             # emmit output (word, num)
             output[word] = num
+
+
+class CountWords(MapReduceTask):
+
+    input = ( 
+                ['one', 'two', 'four', 'two', 'four', 'seven'],
+                ['seven', 'four', 'seven', 'seven'],
+                ['seven', 'four', 'seven', 'seven'],
+            )
+
+    output = {} # XXX will not work
+
+    map = MapWords
+    reduce = ReduceWords
+
+    intermediate = IntermediateResultsFiles
+    intermediate_kwargs = {'dir': '/mnt/shared'}
+
+    reducers = 2
+    #sequential = True
+
+    description = 'Simple Map-Reduce Task to count the words in a input'
+
+    def __init__(self, msg='countwords'):
+        MapReduceTask.__init__(self, msg)
 
