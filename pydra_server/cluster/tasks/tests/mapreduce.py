@@ -50,9 +50,10 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
         im.update_partitions(p1)
         im.update_partitions(p2)
 
+        # reduce
         c = { 'a': 0, 'b': 0, 'c': 0 }
         for p in im:
-            for k, v in p:
+            for k, v in im._partition_iter(p):
                 c[k] += 1
 
         self.assertEqual(c['a'], 1)
@@ -184,13 +185,23 @@ class NullIM():
         return output, mapid
 
 
+    def _partition_iter(self, fs):
+        return fs.iteritems()
+
+
 class MapTask_Test(unittest.TestCase):
 
     def setUp(self):
         self.im = NullIM()
-        self.maptask = IdentityMapTask("IdentityMapTask", self.im)
+
         self.worker = WorkerProxy()
+
+        self.maptask = IdentityMapTask("IdentityMapTask", self.im)
         self.maptask.parent = self.worker
+
+        self.reducetask = IdentityReduceTask("IdentityReduceTask", self.im)
+        self.reducetask.parent = self.worker
+
 
     def test_work_maptask(self):
         a = { 'a': 1, 'b': 1, }
@@ -203,4 +214,13 @@ class MapTask_Test(unittest.TestCase):
 
         for k, v in a.iteritems():
             self.assert_(v in output[k])
+
+
+    def test_work_reducetask(self):
+        a = { 'a': 1, 'b': 1, }
+
+        results = self.reducetask.work(args={'partition': a})
+
+        for k, v in a.iteritems():
+            self.assert_(v == results[k])
 

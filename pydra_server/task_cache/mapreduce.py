@@ -39,7 +39,7 @@ class CountWords(MapReduceTask):
                 ['seven', 'four', 'seven', 'seven'],
             )
 
-    output = {} # XXX will not work
+    output = {}
 
     map = MapWords
     reduce = ReduceWords
