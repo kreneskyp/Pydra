@@ -12,6 +12,18 @@ import os, logging
 logger = logging.getLogger('root')
 
 class AppendableDict(dict):
+    """Extended dictionary which can hold multiple values within one key.
+
+    Values are kept in a list.
+
+    >>> a = AppendableDict()
+    >>> a['key'] = 1
+    >>> a
+    {'key': [1]}
+    >>> a['key'] = 2
+    >>> a
+    {'key': [1, 2]} 
+    """
 
     def __setitem__(self, key, value):
         if not self.has_key(key):
@@ -21,7 +33,28 @@ class AppendableDict(dict):
 
 
 class IntermediateResultsFiles():
-    """this must mimic iterator and dictionary"""
+    """Storing intermediate results in flat files.
+
+    map stage:
+    * map task output is a dictionary (which must be pick-able);
+    * when map._work() is completed output dictionary is flushed;
+    * flush() partitions items depending on a partition() function
+      and dumps them into a unique file, returns partition-dictionary;
+    * every map task flush partition-dictionary is collected and provided
+      to update_partitions() function for future iterator generation.
+
+    partition:
+    * number of partitions equals number of reducers;
+    * partition must assure that a specific key will be processed by
+      one and only one reduce task.
+
+    reduce stage:
+    * next() method returns list of all files within one partition;
+    * list of files is provided to _partition_iter() for every reduce task;
+    * _partition_iter() returns iterator which is used as a input iterator
+      for a reduce task;
+    * iterator loads from (key, values) tuples from a files.
+    """
 
     # mapreduce-i9t-(taks_id)-(partition)
     pattern = "mapreduce-i9t-%s-%d-%s"
@@ -37,10 +70,13 @@ class IntermediateResultsFiles():
 
 
     def partition(self, key):
+        """partition key depending on a number of a reducers"""
         return hash(str(key)) % self.reducers
 
 
     def flush(self, output, mapid):
+        """dumps a dictionary to a files.
+        returns corresponding partitions-dictionary"""
 
         logger.debug("im: flushing %s" % str(output))
 
@@ -85,6 +121,8 @@ class IntermediateResultsFiles():
 
 
     def _partition_iter(self, files):
+        """returns an iterator for a reduce task input"""
+
         for filename in files:
             logger.debug("im: loading from %s" % filename)
             with open(os.path.join(self.dir, filename)) as f:
@@ -98,6 +136,7 @@ class IntermediateResultsFiles():
 
 
     def next(self):
+        """return next partition's files list"""
         try:
             with self._lock:
                 p, fs = self._partitions.popitem()
@@ -140,6 +179,8 @@ class MapReduceTask(Task):
 
 
     def map_callback(self, result, mapid=None, local=False):
+        """called on a map task completion"""
+
         logger.debug('   map_callback %s: %s' % (mapid, result))
         self.im.update_partitions(result)
 
@@ -148,10 +189,13 @@ class MapReduceTask(Task):
         except KeyError:
             logger.debug('   map_callback: no such task -> %s' % mapid)
 
+        # more work?
         self.map_next(local)
 
 
     def reduce_callback(self, result, reduceid=None, local=False):
+        """called on a reduce task completion"""
+
         logger.debug('   reduce_callback %s: %s' % (reduceid, result))
         self.output.update(result)
 
@@ -160,13 +204,30 @@ class MapReduceTask(Task):
         except KeyError:
             logger.debug('   reduce_callback: no such task -> %s' % reduceid)
 
+        # more work?
         self.reduce_next(local)
 
 
     def work(self, args, callback, callback_args={}):
-        """
-        overridden to prevent early cleanup. MapReduceTask does not implement _work() and don't expect user to provide its own. Instead it requires user to provide map and reduce attributes which should be classes inherited from MapTask and ReduceTask respectively.
-        Cleanup is moved to task_complete() wich will be called when there is no mo work remaining.
+        """overridden to prevent early cleanup.
+        
+        MapReduceTask does not implement _work() and don't expect user to provide its own. Instead it requires user to provide map and reduce attributes which should be classes derived from MapTask and ReduceTask respectively.
+
+        Cleanup is moved to task_complete() which will be called when there is no more work remaining.
+        map:
+        * work(): initialization and calling map_next() for every worker available;
+        * map_next(): checking if any data to process and starting a map task,
+          if no more data available, call reduce_stage();
+        * map_callback(): updating results (partition) and calling map_next() for more work.
+        
+        reduce:
+        * reduce_stage: calling reduce_next() for every worker available;
+        * reduce_next(): checking if any data to process and starting a reduce task,
+          if no more data available, call task_complete();
+        * reduce_callback(): updating results (output) and calling reduce_next() for more work.
+
+        task_complete:
+        * cleanup and callbacks.
         """
 
         self.__callback = callback
@@ -192,6 +253,7 @@ class MapReduceTask(Task):
 
 
     def map_next(self, local=False):
+        """more work for a map task"""
 
         try:
             id, i = self._input_iter.next()
@@ -227,6 +289,7 @@ class MapReduceTask(Task):
 
 
     def reduce_stage(self):
+        """starting a reduce stage"""
 
         if self.map_tasks:
             logger.debug('mapreduce: waiting for map stage to finish')
@@ -246,6 +309,7 @@ class MapReduceTask(Task):
 
 
     def reduce_next(self, local=False):
+        """more work for reduce task"""
 
         try:
             id, p = self._partition_iter.next()
@@ -281,8 +345,11 @@ class MapReduceTask(Task):
 
 
     def _work_unit_complete(self, result, id):
-        logger.debug("mapreduce: REMOTE got result %s from %s" % (result, id))
+        """retrieving results form remote task"""
 
+        logger.debug("mapreduce: got REMOTE result %s from %s" % (result, id))
+
+        #check if map or reduce task
         if id in self.map_tasks:
             self.map_callback(result, id, local=False)
 
@@ -335,6 +402,10 @@ class MapReduceTask(Task):
 
 
 class MapReduceSubtask(Task):
+    """map-reduce subtask base class.
+
+    It stores intermediate results (self.im) and overrides _generate_key()
+    to assure proper subtask identification"""
 
     def __init__(self, msg, im):
         Task.__init__(self, msg)
@@ -356,8 +427,9 @@ class MapTask(MapReduceSubtask):
 
     def work(self, args={}, callback=None, callback_args={}):
         """
-        Overwrites Task.work() beacuse MapTask needs to provide special input and output
-        dictionaries. And it is necesairy to flush intermediate results after self._work()
+        Overwrites Task.work() because MapTask needs to provide special input and output
+        dictionaries. And it is necessary to self.im.flush() intermediate results after
+        self._work().
         """
         logger.debug('%s - MapTask - in MapTask.work()'  % self.get_worker().worker_key)
         self._status = STATUS_RUNNING
@@ -366,7 +438,6 @@ class MapTask(MapReduceSubtask):
         args['output'] = output
 
         id = args['id']
-
         logger.debug("%s._work()" % id)
 
         self._work(**args) # ignoring results
@@ -393,7 +464,7 @@ class ReduceTask(MapReduceSubtask):
     def work(self, args={}, callback=None, callback_args={}):
         """
         Overwrites Task.work() beacuse ReduceTask needs to provide special input
-        dictionaries.
+        dictionaries (from self.im).
         """
         logger.debug('%s - ReduceTask - in ReduceTask.work()'  % self.get_worker().worker_key)
         self._status = STATUS_RUNNING
@@ -402,7 +473,6 @@ class ReduceTask(MapReduceSubtask):
         output = args['output'] = {}
 
         #id = args['id']
-
         #logger.debug("%s._work()" % id)
 
         self._work(**args) # ignoring results

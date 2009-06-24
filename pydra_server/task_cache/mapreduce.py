@@ -18,7 +18,7 @@ class MapWords(MapTask):
 class ReduceWords(ReduceTask):
 
     def _work(self, input, output, **kwargs):
-        """sum occurances or each word"""
+        """sum occurances of each word"""
 
         d = {}
 

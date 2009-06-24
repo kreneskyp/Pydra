@@ -180,6 +180,7 @@ class IdentityReduceTask(ReduceTask):
 
 
 class NullIM():
+    """dummy intermediate results class"""
 
     def flush(self, output, mapid):
         return output, mapid
@@ -189,7 +190,7 @@ class NullIM():
         return fs.iteritems()
 
 
-class MapTask_Test(unittest.TestCase):
+class MapReduceSubtask_Test(unittest.TestCase):
 
     def setUp(self):
         self.im = NullIM()
