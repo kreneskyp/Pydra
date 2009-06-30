@@ -64,7 +64,7 @@ class NodeServer:
     """
     def __init__(self):
         self.workers = {}
-        self.port_base = 11881
+        self.port = 11890
         self.host='localhost'
         self.password_file = 'node.password'
         self.node_key = None
@@ -100,7 +100,7 @@ class NodeServer:
         p = portal.Portal(realm, [checker])
 
         factory = pb.PBServerFactory(p)
-        return internet.TCPServer(11890, factory)
+        return internet.TCPServer(self.port, factory)
 
 
     def determine_info(self):
