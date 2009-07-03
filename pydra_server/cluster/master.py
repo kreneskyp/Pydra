@@ -109,7 +109,7 @@ class Master(object):
 
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('./master.key')
-        self.rsa_client = RSAClient(self.priv_key, callback=self.init_node)
+        self.rsa_client = RSAClient(self.priv_key, callback=self.send_key_node)
 
         #load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -326,6 +326,39 @@ class Master(object):
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
 
+    def send_key_node(self, node):
+        """
+        Exchanges keys with the node prior to initializing it.  This will
+        happen on every connection.  If the key has been deleted from the
+        node it will allow it to re-pair.
+        """
+        pub_key = self.pub_key
+        #twisted.bannana doesnt handle large ints very well
+        #we'll encode it with json and split it up into chunks
+        from django.utils import simplejson
+        import math
+        dumped = simplejson.dumps(pub_key)
+        chunk = 100
+        split = [dumped[i*chunk:i*chunk+chunk] for i in range(int(math.ceil(len(dumped)/(chunk*1.0))))]
+        pub_key = split
+
+        d = node.ref.callRemote('exchange_keys', pub_key)
+        d.addCallback(self.receive_key_node, node=node)
+
+
+    def receive_key_node(self, pub_key, node):
+        """
+        Receives the public key from the node
+        """
+        # if there is a public key from the node, unpack it and save it
+        dec = [self.priv_key.decrypt(chunk) for chunk in pub_key]
+        json_key = ''.join(dec)
+        node.pub_key = json_key
+        node.save()
+
+        self.init_node(node)
+
+
     def init_node(self, node):
         """
         Start the initialization sequence with the node.  The first
@@ -350,25 +383,6 @@ class Master(object):
         #node key to be used by node and its workers
         node_key_str = '%s:%s' % (node.host, node.port)
 
-
-        # if the node has never been 'seen' before it needs the Master's key
-        # encrypt it and send it the key
-        if not node.seen:
-            logger.info('Node has not been seen before, sending it the Master Pub Key')
-            pub_key = self.pub_key
-            #twisted.bannana doesnt handle large ints very well
-            #we'll encode it with json and split it up into chunks
-            from django.utils import simplejson
-            import math
-            dumped = simplejson.dumps(pub_key)
-            chunk = 100
-            split = [dumped[i*chunk:i*chunk+chunk] for i in range(int(math.ceil(len(dumped)/(chunk*1.0))))]
-            pub_key = split
-
-        else:
-            pub_key = None
-
-
         # add all workers
         for i in range(node.cores):
             worker_key = '%s:%i' % (node_key_str, i)
@@ -376,7 +390,7 @@ class Master(object):
 
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, self.port, node_key_str, pub_key)
+        d = node.ref.callRemote('init', self.host, self.port, node_key_str)
         d.addCallback(self.node_ready, node)
 
 
@@ -385,14 +399,6 @@ class Master(object):
         Called when a call to initialize a Node is successful
         """
         logger.info('node:%s - ready' % node)
-
-        # if there is a public key from the node, unpack it and save it
-        if result:
-            dec = [self.priv_key.decrypt(chunk) for chunk in result]
-            json_key = ''.join(dec)
-            node.pub_key = json_key
-            node.seen = True
-            node.save()
 
 
     def worker_authenticated(self, worker_avatar):

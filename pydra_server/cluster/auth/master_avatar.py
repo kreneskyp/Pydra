@@ -49,11 +49,17 @@ class MasterAvatar(RSAAvatar):
             return self.server.info
 
 
-
-    def perspective_init(self, master_host, master_port, node_key, master_pub_key=None):
+    def perspective_init(self, master_host, master_port, node_key):
         """
         Initializes a node.  The server sends its connection information and
         credentials for the node
         """
         if self.authenticated:
-            return self.server.init_node(master_host, master_port, node_key, master_pub_key)
+            return self.server.init_node(master_host, master_port, node_key)
+
+
+    def perspective_exchange_keys(self, master_pub_key):
+        """
+        Exchanges key pairs with the server
+        """
+        return self.server.exchange_keys(master_pub_key)
