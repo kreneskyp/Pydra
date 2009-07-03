@@ -1,11 +1,12 @@
-from pydra_server.cluster.tasks.mapreduce import MapReduceTask, MapTask, ReduceTask, \
+from pydra_server.cluster.tasks.tasks import Task
+from pydra_server.cluster.tasks.mapreduce import MapReduceTask, \
         IntermediateResultsFiles
 
 import logging
 logger = logging.getLogger('root')
 
 
-class MapWords(MapTask):
+class MapWords(Task):
 
     def _work(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
@@ -15,7 +16,7 @@ class MapWords(MapTask):
             output[word.strip()] = 1
 
 
-class ReduceWords(ReduceTask):
+class ReduceWords(Task):
 
     def _work(self, input, output, **kwargs):
         """sum occurances of each word"""

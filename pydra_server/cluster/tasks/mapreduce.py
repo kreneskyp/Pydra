@@ -2,7 +2,7 @@
 from tasks import Task, TaskNotFoundException, \
     STATUS_RUNNING, STATUS_COMPLETE
 
-from twisted.internet import reactor
+from twisted.internet import reactor, threads
 
 from threading import Lock
 
@@ -171,10 +171,10 @@ class MapReduceTask(Task):
 
         self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
 
-        self.maptask = self.map('MapTask', self.im)
+        self.maptask = MapWrapper(self.map('MapTask'), self.im)
         self.maptask.parent = self
 
-        self.reducetask = self.reduce('ReduceTask', self.im)
+        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im)
         self.reducetask.parent = self
 
 
@@ -401,29 +401,73 @@ class MapReduceTask(Task):
         return -1
 
 
-class MapReduceSubtask(Task):
-    """map-reduce subtask base class.
+class MapReduceWrapper():
+    """map-reduce wrapper base class.
 
-    It stores intermediate results (self.im) and overrides _generate_key()
-    to assure proper subtask identification"""
+    It expects to work() to do some speciall stuff before and after subtask (self.task) real wrok() method.
 
-    def __init__(self, msg, im):
-        Task.__init__(self, msg)
+    It stores intermediate results helper (self.im) and overrides:
+    * _generate_key() to assure proper subtask identification,
+    * get_subtask() to return self instead of subtask directly,
+    * start() to run special self.work() instead of subtask's"""
+
+    def __init__(self, task, im):
+        self.task = task
+        self.task.parent = self
+
         self.im = im
 
 
     def _generate_key(self):
+        key = self.task._generate_key()
+
         if issubclass(self.parent.__class__, (MapReduceTask,)):
             base = self.parent.get_key()
-            key = '%s.%s' % (base, self.__class__.__name__)
-
-        else:
-            key = Task._generate_key(self)
+            key = '%s.%s' % (base, key)
 
         return key
 
+    def get_key(self):
+        return self._generate_key()
 
-class MapTask(MapReduceSubtask):
+
+    def get_worker(self):
+        return self.parent.get_worker()
+
+
+    def get_subtask(self, task_path):
+        """It is pretending it's the wrapped task."""
+
+        # this is a wrapper
+        if len(task_path) == 1 and task_path[0] == self.task.__class__.__name__:
+            return self
+
+        # not looking for the task we are wrapping
+        return self.task.get_subtask(task_path)
+
+
+    def __repr__(self):
+        return self.task.__repr__()
+
+    def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
+        """
+        starts the task.  This will spawn the work in a workunit thread.
+        """
+
+        # only start if not already running
+        if self.task._status == STATUS_RUNNING:
+            return
+
+        logger.debug('MapReduceWrapper - starting task: %s' % args)
+        self.work_deferred = threads.deferToThread(self.work, args, callback, callback_args)
+
+        if errback:
+            self.work_deferred.addErrback(errback)
+
+        return 1
+
+
+class MapWrapper(MapReduceWrapper):
 
     def work(self, args={}, callback=None, callback_args={}):
         """
@@ -431,8 +475,7 @@ class MapTask(MapReduceSubtask):
         dictionaries. And it is necessary to self.im.flush() intermediate results after
         self._work().
         """
-        logger.debug('%s - MapTask - in MapTask.work()'  % self.get_worker().worker_key)
-        self._status = STATUS_RUNNING
+        logger.debug('%s - MapWrapper.work()'  % self.task.get_worker().worker_key)
 
         output = AppendableDict()
         args['output'] = output
@@ -440,34 +483,30 @@ class MapTask(MapReduceSubtask):
         id = args['id']
         logger.debug("%s._work()" % id)
 
-        self._work(**args) # ignoring results
+        self.task.work(args) # ignoring results
 
         results = self.im.flush(output, id) # partitions are our results
 
-        self._status = STATUS_COMPLETE
-        logger.debug('%s - MapTask - work complete' % self.get_worker().worker_key)
-
-        self.work_deferred = None
+        logger.debug('%s - MapWrapper - work complete' % self.task.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
-            logger.debug('%s - MapTask - Making callback' % self)
+            logger.debug('%s - MapWrapper - Making callback' % self)
             callback(results, **callback_args)
         else:
-            logger.warning('%s - MapTask - NO CALLBACK TO MAKE: %s' % (self, callback))
+            logger.warning('%s - MapWrapper - NO CALLBACK TO MAKE: %s' % (self, callback))
 
         return results
 
 
-class ReduceTask(MapReduceSubtask):
+class ReduceWrapper(MapReduceWrapper):
 
     def work(self, args={}, callback=None, callback_args={}):
         """
         Overwrites Task.work() beacuse ReduceTask needs to provide special input
         dictionaries (from self.im).
         """
-        logger.debug('%s - ReduceTask - in ReduceTask.work()'  % self.get_worker().worker_key)
-        self._status = STATUS_RUNNING
+        logger.debug('%s - ReduceWrapper.work()'  % self.task.get_worker().worker_key)
 
         args['input'] = self.im._partition_iter(args['partition'])
         output = args['output'] = {}
@@ -475,20 +514,17 @@ class ReduceTask(MapReduceSubtask):
         #id = args['id']
         #logger.debug("%s._work()" % id)
 
-        self._work(**args) # ignoring results
+        self.task.work(args) # ignoring results
         results = output
 
-        self._status = STATUS_COMPLETE
-        logger.debug('%s - ReduceTask - work complete' % self.get_worker().worker_key)
-
-        self.work_deferred = None
+        logger.debug('%s - ReduceWrapper - work complete' % self.task.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
-            logger.debug('%s - ReduceTask - Making callback' % self)
+            logger.debug('%s - ReduceWrapper - Making callback' % self)
             callback(results, **callback_args)
         else:
-            logger.warning('%s - ReduceTask - NO CALLBACK TO MAKE: %s' % (self, callback))
+            logger.warning('%s - ReduceWrapper - NO CALLBACK TO MAKE: %s' % (self, callback))
 
         return results
 

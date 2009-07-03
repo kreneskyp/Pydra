@@ -3,6 +3,7 @@ import unittest
 import tempfile, shutil
 
 from pydra_server.cluster.tasks.mapreduce import *
+from pydra_server.cluster.tasks.tasks import Task
 from pydra_server.task_cache.mapreduce import *
 from proxies import *
 
@@ -111,7 +112,7 @@ class MapReduceTask_Test(unittest.TestCase):
         key = 'CountWords'
         expected = self.mapreduce_task
         returned = self.mapreduce_task.get_subtask(key.split('.'))
-        self.assertEqual(returned, expected, 'Subtask retrieved was not the expected Task')
+        self.assert_(returned is expected, 'Subtask retrieved was not the expected Task')
 
         # incorrect Key
         key = 'FakeTaskThatDoesNotExist'
@@ -128,13 +129,13 @@ class MapReduceTask_Test(unittest.TestCase):
         key = 'CountWords.MapWords'
         expected = self.mapreduce_task.maptask
         returned = self.mapreduce_task.get_subtask(key.split('.'))
-        self.assertEqual(returned, expected, 'MapTask retrieved was not the expected Task')
+        self.assert_(returned is expected, 'MapTask retrieved was not the expected Task')
 
         # correct key for reducetask
         key = 'CountWords.ReduceWords'
         expected = self.mapreduce_task.reducetask
         returned = self.mapreduce_task.get_subtask(key.split('.'))
-        self.assertEqual(returned, expected, 'ReduceTask retrieved was not the expected Task')
+        self.assert_(returned is expected, 'ReduceTask retrieved was not the expected Task')
 
         # incorrect Key
         key = 'CountWords.FakeTaskThatDoesNotExist'
@@ -147,7 +148,7 @@ class MapReduceTask_Test(unittest.TestCase):
         """
         returned = self.mapreduce_task.get_worker()
         self.assert_(returned, 'no worker was returned')
-        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
+        self.assert_(returned is self.worker, 'worker retrieved was not the expected worker')
 
 
     def test_get_worker_mapreducetask_child(self):
@@ -163,7 +164,7 @@ class MapReduceTask_Test(unittest.TestCase):
         self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
 
 
-class IdentityMapTask(MapTask):
+class IdentityMapTask(Task):
 
     def _work(self, input, output, **kwargs):
 
@@ -171,7 +172,7 @@ class IdentityMapTask(MapTask):
             output[k] = v
 
 
-class IdentityReduceTask(ReduceTask):
+class IdentityReduceTask(Task):
 
     def _work(self, input, output, **kwargs):
 
@@ -190,21 +191,21 @@ class NullIM():
         return fs.iteritems()
 
 
-class MapReduceSubtask_Test(unittest.TestCase):
+class MapReduceWrapper_Test(unittest.TestCase):
 
     def setUp(self):
         self.im = NullIM()
 
         self.worker = WorkerProxy()
 
-        self.maptask = IdentityMapTask("IdentityMapTask", self.im)
+        self.maptask = MapWrapper(IdentityMapTask("IdentityMapTask"), self.im)
         self.maptask.parent = self.worker
 
-        self.reducetask = IdentityReduceTask("IdentityReduceTask", self.im)
+        self.reducetask = ReduceWrapper(IdentityReduceTask("IdentityReduceTask"), self.im)
         self.reducetask.parent = self.worker
 
 
-    def test_work_maptask(self):
+    def test_work_mapwrapper(self):
         a = { 'a': 1, 'b': 1, }
         id = 'identity_map'
 
@@ -217,11 +218,25 @@ class MapReduceSubtask_Test(unittest.TestCase):
             self.assert_(v in output[k])
 
 
-    def test_work_reducetask(self):
+    def test_work_reducewrapper(self):
         a = { 'a': 1, 'b': 1, }
 
         results = self.reducetask.work(args={'partition': a})
 
         for k, v in a.iteritems():
             self.assert_(v == results[k])
+
+
+    def test_get_subtask(self):
+        # checking if the wrappper returns self instead of a task its wrapping
+
+        key = "IdentityMapTask"
+        expected = self.maptask
+        returned = self.maptask.get_subtask(key.split('.'))
+        self.assert_(returned is expected, 'MapTask retrieved was not the expected Task')
+
+        key = "IdentityReduceTask"
+        expected = self.reducetask
+        returned = self.reducetask.get_subtask(key.split('.'))
+        self.assert_(returned is expected, 'ReduceTask retrieved was not the expected Task')
 
