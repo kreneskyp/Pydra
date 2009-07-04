@@ -155,9 +155,9 @@ def jobs(request):
 
     return render_to_response('tasks.html', {
         'MEDIA_URL': settings.MEDIA_URL,
-        'tasks': tasks,
-        'queue': queue,
-        'running': running,
+        'tasks': tasks if tasks else None,
+        'queue': queue if queue else None,
+        'running': running if running else None,
     }, context_instance=RequestContext(request, processors=[pydra_processor, settings_processor]))
 
 
