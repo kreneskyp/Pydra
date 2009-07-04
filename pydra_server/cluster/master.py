@@ -109,7 +109,7 @@ class Master(object):
 
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('./master.key')
-        self.rsa_client = RSAClient(self.priv_key, callback=self.send_key_node)
+        self.rsa_client = RSAClient(self.priv_key, self.pub_key, callback=self.init_node)
 
         #load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -267,8 +267,7 @@ class Master(object):
 
                 # Authenticate with the node
                 pub_key = node.load_pub_key()
-                pub_key_encrypt = pub_key.encrypt if pub_key else None
-                self.rsa_client.auth(node.ref, pub_key_encrypt, node=node)
+                self.rsa_client.auth(node.ref, self.receive_key_node, server_key=pub_key, node=node)
 
             #failures
             else:
@@ -326,37 +325,13 @@ class Master(object):
                 self.reconnect_call_ID = reactor.callLater(reconnect_delay, self.connect)
 
 
-    def send_key_node(self, node):
-        """
-        Exchanges keys with the node prior to initializing it.  This will
-        happen on every connection.  If the key has been deleted from the
-        node it will allow it to re-pair.
-        """
-        pub_key = self.pub_key
-        #twisted.bannana doesnt handle large ints very well
-        #we'll encode it with json and split it up into chunks
-        from django.utils import simplejson
-        import math
-        dumped = simplejson.dumps(pub_key)
-        chunk = 100
-        split = [dumped[i*chunk:i*chunk+chunk] for i in range(int(math.ceil(len(dumped)/(chunk*1.0))))]
-        pub_key = split
-
-        d = node.ref.callRemote('exchange_keys', pub_key)
-        d.addCallback(self.receive_key_node, node=node)
-
-
-    def receive_key_node(self, pub_key, node):
+    def receive_key_node(self, key, node=None, **kwargs):
         """
         Receives the public key from the node
         """
-        # if there is a public key from the node, unpack it and save it
-        dec = [self.priv_key.decrypt(chunk) for chunk in pub_key]
-        json_key = ''.join(dec)
-        node.pub_key = json_key
+        logger.debug("saving public key from node: %s" % node)
+        node.pub_key = key
         node.save()
-
-        self.init_node(node)
 
 
     def init_node(self, node):
