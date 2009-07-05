@@ -153,6 +153,15 @@ def jobs(request):
     queue = pydra_controller.remote_list_queue()
     running = pydra_controller.remote_list_running()
 
+    if tasks in (-1,-2,-3,-4):
+        tasks = None
+
+    if queue in (-1,-2,-3,-4):
+        queue = None
+
+    if running in (-1,-2,-3,-4):
+        running = None
+
     return render_to_response('tasks.html', {
         'MEDIA_URL': settings.MEDIA_URL,
         'tasks': tasks if tasks else None,
