@@ -162,9 +162,17 @@
 
             var worker_count = -1;
 
+            var error_messages = [];
+            error_messages[-1] = 'Error: Controller Authentication Failed.';
+            error_messages[-2] = 'Error: Unable to connect to Master Node.';
+            error_messages[-3] = 'Error: Exception thrown in remote function.';
+            error_messages[-4] = 'Error: RSA Key not found in Master.key,  Controller is unable to authenticate.';
+
             function process_status_update(data) {
-                if (data == false) {
-                    $('#master_errors').show();
+                if (error_messages[data] != undefined) {
+                    $('#master_errors')
+                            .html(error_messages[data])
+                            .show();
                 } else {
                     $('#master_errors').hide();
                     process_worker_updates(data)
@@ -305,7 +313,6 @@
 {% block content %}
 
         <div id="master_errors" {% if controller.is_alive %}style="display:none;"{% endif %}>
-            Master Node is not running.
         </div>
 
 

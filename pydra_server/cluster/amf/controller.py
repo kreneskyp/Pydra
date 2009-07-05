@@ -27,6 +27,15 @@ from django.utils import simplejson
 from pydra_server.cluster.auth.rsa_auth import load_crypto
 import httplib
 
+
+# Statuses for the controller
+
+CONTROLLER_ERROR_AUTH_FAIL = -1
+CONTROLLER_ERROR_DISCONNECTED = -2
+CONTROLLER_ERROR_IN_REMOTE_FUNCTION = -3
+CONTROLLER_ERROR_NO_RSA_KEY = -4
+
+
 class RemoteMethodProxy():
     """
     RemoteMethodProxy is a proxy used for calling remote methods exposed over
@@ -57,29 +66,32 @@ class RemoteMethodProxy():
                     result = self.func(*new_args)
                 except (httplib.CannotSendRequest, socket.error):
                     print '[error] RemoteMethodProxy - error sending request, reconnect failed'
-                    return False
+                    return CONTROLLER_ERROR_DISCONNECTED
 
             if result:
                 if (result.__class__.__name__ == 'ErrorFault'):
                     print '[error] ErrorFault: ', result
-                    return -2
+                    return CONTROLLER_ERROR_IN_REMOTE_FUNCTION
 
                 return result[0]
 
-            #authenticate required
+            # authenticate required
+            if not self.controller.pub_key:
+                return CONTROLLER_ERROR_NO_RSA_KEY
+
             if (self.controller._authenticate()):
                 # authenticated reissue command
                 result = self.func(*new_args)
                 if (result.__class__.__name__ == 'ErrorFault'):
                     print '[error] ErrorFault: ', result
-                    return -2
+                    return CONTROLLER_ERROR_IN_REMOTE_FUNCTION
 
                 return result[0]
 
             else:
                 # authenticate failed
                 print '[ERROR] AMFController - authentication failed'
-                return -1
+                return CONTROLLER_ERROR_AUTH_FAIL
 
 
 
@@ -109,7 +121,7 @@ class AMFController(object):
         self.master_port = master_port
 
         # load rsa crypto
-        self.pub_key, self.priv_key = load_crypto('./master.key')
+        self.pub_key, self.priv_key = load_crypto('./master.key', False)
 
         print '[Info] Pydra Controller Started'
         self.connect()
@@ -117,16 +129,12 @@ class AMFController(object):
 
     def __getattr__(self, key):
         """
-        Overridden to lookup some functions as properties
+        Overridden to return some functions as properties and all services 
+        wrapped in a proxy object that handles authentication.
         """
-        #check to see if this is a function acting as a property
         if key in self.services_exposed_as_properties:
-            #try:
-                return RemoteMethodProxy(self.service.__getattr__(key), self)()
-            #except:
-            #    return False
-
-        # return a proxy for remote_ methods
+            return RemoteMethodProxy(self.service.__getattr__(key), self)()
+            
         if key[:7] == 'remote_':
             return RemoteMethodProxy(self.service.__getattr__(key[7:]), self)
 
