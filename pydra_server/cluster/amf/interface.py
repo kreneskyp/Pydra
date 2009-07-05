@@ -142,7 +142,7 @@ class AMFInterface(pb.Root):
         # destroy challenge, each challenge is one use only.
         self.sessions[user]['challenge'] = None
 
-        return self.authenticated
+        return self.sessions[user]['auth']
 
 
     @authenticated
