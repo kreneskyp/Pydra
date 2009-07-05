@@ -4,3 +4,4 @@
 *.key
 *.pid
 settings.py
+*.pem
