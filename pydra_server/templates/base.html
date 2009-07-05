@@ -91,12 +91,29 @@
             a.mainmenuitem:active            { text-decoration:none;}
 
             #content {
-                padding-top:10px;
+                padding-top:10px;                
+            }
+
+            #content, #master_errors {
                 margin-left:auto;
                 margin-right:auto;
                 min-width:800px;
                 width:800px;
                 width:80%;
+            }
+
+            #master_errors {
+                background-color:#ee9c98;
+                border: 2px solid #c83737;
+                color:#550000;
+                display:none;
+                font-weight:bold;
+                font-size:110%;
+                margin-top:20px;
+                margin-bottom:20px;
+                padding-top:5px;
+                padding-bottom:5px;
+                text-align:center;
             }
 
             #pydra {
@@ -138,8 +155,45 @@
             .icon.task_status_stopped   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
             .icon.task_status_running   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
             .icon.task_status_complete  { background-image:url({{MEDIA}}/images/icons/accept.png); }
+
         </style>
     {% endblock %}
+
+        <script>
+            var error_messages = [];
+            error_messages[-1] = 'Error: Controller Authentication Failed.';
+            error_messages[-2] = 'Error: Unable to connect to Master Node.';
+            error_messages[-3] = 'Error: Exception thrown in remote function.';
+            error_messages[-4] = 'Error: RSA Key not found in Master.key,  Controller is unable to authenticate.';
+
+            /*
+                Check a response from an ajax call for errors making a remote
+                call via the Controller/Interface.  Most ajax calls will result
+                in these calls.  This common function allows error messages
+                to be handled in a sane way.
+            */
+            function check_response_for_controller_errors(response) {
+                if (error_messages[response] != undefined) {
+                    $('#master_errors')
+                            .html(error_messages[response])
+                            .show();
+                    return false;
+                } else {
+                    $('#master_errors').hide();
+                    return true;
+                }
+            }
+
+            $(document).ready(function() {
+                /* Display error from controller in view handler */
+                {% if controller_error %}
+                    $('#master_errors')
+                        .html(error_messages[{{controller_error}}])
+                        .show();
+                {% endif %}
+            });
+        </script>
+
     <head>
 
         <div id="headerContainer">
@@ -163,6 +217,9 @@
                 {% endblock %}
             </div>
         {% endblock %}
+        </div>
+
+        <div id="master_errors">
         </div>
 
         <div id="content">

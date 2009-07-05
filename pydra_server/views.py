@@ -30,7 +30,7 @@ from django.http import HttpResponse
 import math
 
 from pydra_server.models import Node, TaskInstance, pydraSettings
-from cluster.amf.controller import AMFController
+from cluster.amf.controller import AMFController, ControllerException
 from forms import NodeForm
 from models import pydraSettings
 import settings
@@ -142,31 +142,44 @@ def node_status(request):
         'MEDIA_URL': settings.MEDIA_URL
     }, [pydra_processor])
 
-    return HttpResponse(simplejson.dumps(pydra_controller.remote_node_status()), mimetype='application/javascript')
+    try:
+        response = simplejson.dumps(pydra_controller.remote_node_status())
+    except ControllerException, e:
+        response = e.code
+
+    return HttpResponse(response, mimetype='application/javascript')
 
 
 def jobs(request):
     """
     handler for displaying jobs
     """
-    tasks = pydra_controller.remote_list_tasks()
-    queue = pydra_controller.remote_list_queue()
-    running = pydra_controller.remote_list_running()
+    error = None
 
-    if tasks in (-1,-2,-3,-4):
+    try:
+        tasks = pydra_controller.remote_list_tasks()
+    except ControllerException, e:
         tasks = None
+        error = e.code
 
-    if queue in (-1,-2,-3,-4):
+    try:
+        queue = pydra_controller.remote_list_queue()
+    except ControllerException, e:
         queue = None
+        error = e.code
 
-    if running in (-1,-2,-3,-4):
+    try:
+        running = pydra_controller.remote_list_running()
+    except ControllerException, e:
         running = None
+        error = e.code
 
     return render_to_response('tasks.html', {
         'MEDIA_URL': settings.MEDIA_URL,
         'tasks': tasks if tasks else None,
         'queue': queue if queue else None,
         'running': running if running else None,
+        'controller_error': error
     }, context_instance=RequestContext(request, processors=[pydra_processor, settings_processor]))
 
 
@@ -179,12 +192,18 @@ def task_history(request):
     except KeyError:
         page = 1
 
-    history = pydra_controller.remote_task_history(request.GET['key'], page)
+    error = None
+    try:
+        history = pydra_controller.remote_task_history(request.GET['key'], page)
+    except ControllerException, e:
+        history = None
+        error = e.code
 
     return render_to_response('task_history.html', {
         'MEDIA_URL': settings.MEDIA_URL,
         'history':   history,
-        'task_key':  request.GET['key']
+        'task_key':  request.GET['key'],
+        'controller_error': error
     }, context_instance=c)
 
 
@@ -195,8 +214,12 @@ def task_progress(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    data = pydra_controller.remote_task_statuses()
-    return HttpResponse(simplejson.dumps(data), mimetype='application/javascript');
+    try:
+        data = simplejson.dumps(pydra_controller.remote_task_statuses())
+    except ControllerException, e:
+        data = e.code
+
+    return HttpResponse(data, mimetype='application/javascript');
 
 
 @user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
@@ -215,9 +238,12 @@ def run_task(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    json = simplejson.dumps(pydra_controller.remote_run_task(key, args))
+    try:
+        response = simplejson.dumps(pydra_controller.remote_run_task(key, args))
+    except ControllerException, e:
+        response = e.code
 
-    return HttpResponse(json, mimetype='application/javascript')
+    return HttpResponse(response, mimetype='application/javascript')
 
 
 @user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
@@ -230,4 +256,9 @@ def cancel_task(request):
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    return HttpResponse(pydra_controller.remote_cancel_task(id), mimetype='application/javascript')
+    try:
+        response = pydra_controller.remote_cancel_task(id)
+    except ControllerException, e:
+        response = e.code
+
+    return HttpResponse(response, mimetype='application/javascript')

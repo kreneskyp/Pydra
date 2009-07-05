@@ -28,12 +28,27 @@ from pydra_server.cluster.auth.rsa_auth import load_crypto
 import httplib
 
 
-# Statuses for the controller
-
+# errors for the controller
 CONTROLLER_ERROR_AUTH_FAIL = -1
 CONTROLLER_ERROR_DISCONNECTED = -2
 CONTROLLER_ERROR_IN_REMOTE_FUNCTION = -3
 CONTROLLER_ERROR_NO_RSA_KEY = -4
+CONTROLLER_ERROR_UNKNOWN = -5
+
+CONTROLLER_ERROR_MESSAGES = {
+            CONTROLLER_ERROR_AUTH_FAIL:'CONTROLLER_ERROR_AUTH_FAIL',
+            CONTROLLER_ERROR_DISCONNECTED:'CONTROLLER_ERROR_DISCONNECTED',
+            CONTROLLER_ERROR_IN_REMOTE_FUNCTION:'CONTROLLER_ERROR_IN_REMOTE_FUNCTION',
+            CONTROLLER_ERROR_NO_RSA_KEY:'CONTROLLER_ERROR_NO_RSA_KEY',
+            CONTROLLER_ERROR_UNKNOWN:'CONTROLLER_ERROR_UNKNOWN',
+}
+
+class ControllerException(Exception):
+    def __init__(self, code=CONTROLLER_ERROR_UNKNOWN):
+        self.code = code
+    
+    def __repr__(self):
+        print 'ControllerException (%s): %s' (self.code, CONTROLLER_ERROR_MESSAGES[self.code])
 
 
 class RemoteMethodProxy():
@@ -66,32 +81,32 @@ class RemoteMethodProxy():
                     result = self.func(*new_args)
                 except (httplib.CannotSendRequest, socket.error):
                     print '[error] RemoteMethodProxy - error sending request, reconnect failed'
-                    return CONTROLLER_ERROR_DISCONNECTED
+                    raise ControllerException(CONTROLLER_ERROR_DISCONNECTED)
 
             if result:
                 if (result.__class__.__name__ == 'ErrorFault'):
                     print '[error] ErrorFault: ', result
-                    return CONTROLLER_ERROR_IN_REMOTE_FUNCTION
+                    raise ControllerException(CONTROLLER_ERROR_IN_REMOTE_FUNCTION)
 
                 return result[0]
 
             # authenticate required
             if not self.controller.pub_key:
-                return CONTROLLER_ERROR_NO_RSA_KEY
+                raise ControllerException(CONTROLLER_ERROR_NO_RSA_KEY)
 
             if (self.controller._authenticate()):
                 # authenticated reissue command
                 result = self.func(*new_args)
                 if (result.__class__.__name__ == 'ErrorFault'):
                     print '[error] ErrorFault: ', result
-                    return CONTROLLER_ERROR_IN_REMOTE_FUNCTION
+                    raise ControllerException(CONTROLLER_ERROR_IN_REMOTE_FUNCTION)
 
                 return result[0]
 
             else:
                 # authenticate failed
                 print '[ERROR] AMFController - authentication failed'
-                return CONTROLLER_ERROR_AUTH_FAIL
+                raise ControllerException(CONTROLLER_ERROR_AUTH_FAIL)
 
 
 
@@ -133,7 +148,10 @@ class AMFController(object):
         wrapped in a proxy object that handles authentication.
         """
         if key in self.services_exposed_as_properties:
-            return RemoteMethodProxy(self.service.__getattr__(key), self)()
+            try:
+                return RemoteMethodProxy(self.service.__getattr__(key), self)()
+            except ControllerException, e:
+                return e.code
             
         if key[:7] == 'remote_':
             return RemoteMethodProxy(self.service.__getattr__(key[7:]), self)
