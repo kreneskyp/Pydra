@@ -99,7 +99,7 @@ class Worker(pb.Referenceable):
         # load crypto for authentication
         # workers use the same keys as their parent Node
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False)
+        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
 
         #load tasks that are cached locally

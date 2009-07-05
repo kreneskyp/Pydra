@@ -297,7 +297,7 @@ def generate_keys(size=4096):
         return pub_l, pri_l
 
 
-def load_crypto(path, create=True, key_size=4096):
+def load_crypto(path, create=True, key_size=4096, both=True):
         """
         Loads RSA keys from the specified path, optionally creating
         new keys.  It automatically detects whether it is a keypair
@@ -336,5 +336,5 @@ def load_crypto(path, create=True, key_size=4096):
             finally:
                 if key_file:
                     key_file.close()
-
-        return None
+        
+        return None,None if both else None
