@@ -336,5 +336,4 @@ def load_crypto(path, create=True, key_size=4096, both=True):
             finally:
                 if key_file:
                     key_file.close()
-        
-        return None,None if both else None
+        return (None,None) if both else None
