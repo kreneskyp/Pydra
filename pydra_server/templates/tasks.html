@@ -222,9 +222,10 @@
                 */
 
                 // check for controller errors
-                if (!check_response_for_controller_errors(data))
+                if (!check_response_for_controller_errors(data)){
                     $('.input_form').hide();
                     return;
+                }
 
                 $('#queue tr:gt(1), #running tr:gt(1)').each(function(row){
                     id = this.id.slice(9);
