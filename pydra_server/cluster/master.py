@@ -723,6 +723,10 @@ class Master(object):
         calls for status will be able to fetch the status.  It may be delayed 
         by a few seconds but thats minor when considering a task that could run
         for hours.
+
+        For now, statuses are only queried for Main Workers.  Including 
+        statuses of subtasks requires additional logic and overhead to pass the
+        intermediate results to the main worker.
         """
 
         # limit updates so multiple controllers won't cause excessive updates
@@ -730,10 +734,11 @@ class Master(object):
         if self._next_task_status_update < now:
             workers = self.workers
             for key, data in self._workers_working.items():
-                worker = workers[key]
-                task_instance_id = data[0]
-                deferred = worker.remote.callRemote('task_status')
-                deferred.addCallback(self.fetch_task_status_success, task_instance_id)
+                if not data[3]:
+                    worker = workers[key]
+                    task_instance_id = data[0]
+                    deferred = worker.remote.callRemote('task_status')
+                    deferred.addCallback(self.fetch_task_status_success, task_instance_id)
             self.next_task_status_update = now + datetime.timedelta(0, 3)
 
 
