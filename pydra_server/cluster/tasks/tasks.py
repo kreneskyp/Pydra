@@ -441,6 +441,8 @@ class ParallelTask(Task):
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
+    _workunit_complete = 0      # count of workunits completed
+    _workunit_total = 0         # total count of workunits
     subtask = None              # subtask that is parallelized
     subtask_key = None          # cached key from subtask
 
@@ -478,7 +480,10 @@ class ParallelTask(Task):
         A parallel task's progress is a derivitive of its workunits:
            COMPLETE_WORKUNITS / TOTAL_WORKUNITS
         """
-        return -1
+        if self._workunit_total == 0:
+            return 0
+
+        return (self._workunit_complete+0.0) / self._workunit_total * 100
 
 
     def _stop(self):
@@ -509,6 +514,8 @@ class ParallelTask(Task):
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
             logger.debug('Paralleltask - data was passed in!!!!')
+
+        self._workunit_total = len(self._data)
 
         self.subtask_key = self.subtask._generate_key()
 
@@ -625,6 +632,7 @@ class ParallelTask(Task):
         with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
+            self._workunit_complete += 1
 
             # remove the workunit from _in_progress
             del self._data_in_progress[index]
@@ -648,6 +656,7 @@ class ParallelTask(Task):
         with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
+            self._workunit_complete += 1
 
             # remove the workunit from _in_progress
             del self._data_in_progress[index]
