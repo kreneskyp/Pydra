@@ -60,7 +60,7 @@ import settings
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.cluster.tasks.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
+from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 from pydra_server.cluster.amf.interface import AMFInterface
