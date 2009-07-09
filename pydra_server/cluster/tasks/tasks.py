@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from util import deprecated
+from pydra_server.util import deprecated
 from pydra_server.cluster.tasks import TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 
@@ -28,14 +28,8 @@ logger = logging.getLogger('root')
 """ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 deprecating rather than just moving so that all instance can be found and fixed
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! """
-from pydra_server.cluster.tasks import TaskNotFoundException as TaskNotFoundException_import
+from pydra_server.cluster.tasks import TaskNotFoundException as TaskNotFoundException_imported
 TaskNotFoundException = deprecated(TaskNotFoundException_imported, 'Moved to tasks/__init__.py')
-
-from parallel_task import ParallelTask as ParallelTask_imported
-ParallelTask = deprecated(ParallelTask_imported,'Moved to parallel_task.py')
-
-from task_container import ContainerTask as ContainerTask_imported
-ContainerTask = deprecated(ContainerTask_imported,'Moved to task_container.py')
 
 
 class Task(object):

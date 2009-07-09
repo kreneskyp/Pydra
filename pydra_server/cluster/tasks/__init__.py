@@ -30,3 +30,13 @@ class TaskNotFoundException(Exception):
 
     def __str__(self):
         return repr(self.parameter)
+
+
+from tasks import Task as Task_imported
+Task = Task_imported
+
+from parallel_task import ParallelTask as ParallelTask_imported
+ParallelTask = ParallelTask_imported
+
+from task_container import TaskContainer as TaskContainer_imported
+TaskContainer = TaskContainer_imported

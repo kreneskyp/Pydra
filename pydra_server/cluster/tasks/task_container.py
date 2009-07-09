@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.tasks import TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
+from pydra_server.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 
 import logging
@@ -222,12 +222,4 @@ class TaskContainer(Task):
 
         # its not any other status, it must be stopped
         return STATUS_STOPPED
-
-
-def CreateTaskContainer(subtasks):
-    """
-    Utility function for creating a generic TaskContainer
-    """
-
-    return type('TaskContainer', (TaskContainer,), {'subtasks'=subtasks})
 

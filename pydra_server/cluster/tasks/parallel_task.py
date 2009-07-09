@@ -21,6 +21,7 @@ from __future__ import with_statement
 from threading import Thread, Lock
 from twisted.internet import reactor, threads
 
+from pydra_server.cluster.tasks.tasks import Task
 from pydra_server.cluster.tasks import TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 

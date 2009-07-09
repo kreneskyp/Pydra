@@ -18,7 +18,8 @@
 """
 
 
-from pydra_server.cluster.tasks.tasks import *
+from pydra_server.cluster.tasks import Task, TaskContainer, ParallelTask
+
 import time
 
 import logging
