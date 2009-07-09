@@ -229,6 +229,3 @@ class Task(object):
 
     def __eq__(self, val):
         return self.__repr__() == val.__repr__()
-
-
-

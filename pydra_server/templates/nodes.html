@@ -44,20 +44,6 @@
                 border-spacing:0px;
             }
 
-            #master_errors {
-                background-color:#ee9c98;
-                border: 2px solid #c83737;
-                color:#550000;
-                font-weight:bold;
-                font-size:110%;
-                margin-top:20px;
-                margin-bottom:20px;
-                padding-top:5px;
-                padding-bottom:5px;
-                text-align:center;
-                width:100%;
-            }
-
             #header_top th {
                 color:white;
                 background-color:#666666;
@@ -161,13 +147,10 @@
         <script type="text/javascript">
 
             var worker_count = -1;
-
+            
             function process_status_update(data) {
-                if (data == false) {
-                    $('#master_errors').show();
-                } else {
-                    $('#master_errors').hide();
-                    process_worker_updates(data)
+                if (check_response_for_controller_errors(data)) {
+                    process_worker_updates(data);
                 }
             }
 
@@ -303,11 +286,6 @@
 {% endblock %}
 
 {% block content %}
-
-        <div id="master_errors" {% if controller.is_alive %}style="display:none;"{% endif %}>
-            Master Node is not running.
-        </div>
-
 
         <table id="cluster">
             <tr>

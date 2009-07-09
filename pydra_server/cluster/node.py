@@ -73,7 +73,7 @@ class NodeServer:
 
         #load crypto keys for authentication
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False)
+        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
 
         #load tasks that are cached locally
         self.available_tasks = {}

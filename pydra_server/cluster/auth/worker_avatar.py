@@ -32,10 +32,10 @@ class WorkerAvatar(RSAAvatar):
         self.server = server
 
         node_key = node.load_pub_key()
-        node_encrypt = node_key.encrypt if node_key else None
-        master_encrypt = RSA.construct(server.pub_key).encrypt if server.pub_key else None
+        node_key = node_key if node_key else None
+        master_key = RSA.construct(server.pub_key) if server.pub_key else None
 
-        RSAAvatar.__init__(self, master_encrypt, node_encrypt, server.worker_authenticated, True)
+        RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
     def attached(self, mind):
         self.remote = mind

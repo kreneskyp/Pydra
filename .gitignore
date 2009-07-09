@@ -1,0 +1,7 @@
+*~
+*.pyc
+*.log
+*.key
+*.pid
+settings.py
+*.pem

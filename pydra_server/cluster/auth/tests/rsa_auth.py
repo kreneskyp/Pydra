@@ -134,7 +134,7 @@ class RSA_KeyPair_Test(unittest.TestCase):
             self.create_key_file(pub)
 
             #get the public key data back
-            pub_key = load_crypto(KEY_FILE, False)
+            pub_key = load_crypto(KEY_FILE, False, both=False)
             priv_key = RSA.construct(priv)
 
             self.verify_keys(pub_key, priv_key)
@@ -167,7 +167,7 @@ class RSA_KeyPair_Test(unittest.TestCase):
         """
         self.destroy_key_files()
         try:
-            priv = load_crypto(KEY_FILE, False)
+            priv = load_crypto(KEY_FILE, False, both=False)
 
             self.assertFalse(priv, 'Private key should not have been created')
 
@@ -243,7 +243,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Tests challenge function when there is no key, but the first_use flag is set.
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, no_key_first_use=True, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
 
         # challenge should be None, no_key_first_use is a flag to allow keyless access the first
@@ -286,7 +286,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function when first_use_flag is set
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, no_key_first_use=True, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         result = avatar.perspective_auth_response(None)
         self.assertFalse(result, 'auth_response should return None if handshake is successful')
@@ -296,7 +296,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test sending a response before a challenge has been created
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, no_key_first_use=True, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
         result = avatar.perspective_auth_response(None)
         self.assertEqual(result, 0, 'auth_response should return error (0) when called before auth_challenge')
 

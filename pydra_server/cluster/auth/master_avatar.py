@@ -30,11 +30,44 @@ class MasterAvatar(RSAAvatar):
         self.name = name
         self.server = server
 
-        node_encrypt = server.priv_key.encrypt if server.priv_key else None
-        master_encrypt = server.master_pub_key.encrypt if server.master_pub_key else None
+        node_key = server.priv_key if server.priv_key else None
+        node_pub_key = server.pub_key if server.pub_key else None
+        self.master_key = server.master_pub_key if server.master_pub_key else None
 
-        RSAAvatar.__init__(self, node_encrypt, master_encrypt, no_key_first_use=True)
+        RSAAvatar.__init__(self, node_key, node_pub_key, self.master_key, save_key=self.save_key)
         logger.info('Master connected to node')
+
+
+    def save_key(self, json_key):
+        """
+        Callback to save public key from the master        
+        
+        only save the key if its new.  It is safe to update the key if 
+        the master is authenticated but that process is complicated.
+        it requires logic to ensure that all Nodes receive the new key
+        for now we're avoiding that.
+        """
+        if not self.master_key:
+            import os
+            import simplejson
+            from Crypto.PublicKey import RSA
+            from twisted.conch.ssh.keys import Key
+
+            key = simplejson.loads(json_key)
+            key = [long(x) for x in key]
+            rsa_key = RSA.construct(key)
+            self.master_key = rsa_key
+            self.server.master_pub_key = rsa_key
+
+            key_file = None
+            try:            
+                key_file = file('./node.master.key', 'w')
+                logger.info('saving new master key')
+                key_file = key_file.write(json_key)
+                os.chmod('./node.master.key', 0400)                
+            finally:
+                if key_file:
+                    key_file.close()
 
 
     # returns the status of this node
@@ -56,10 +89,3 @@ class MasterAvatar(RSAAvatar):
         """
         if self.authenticated:
             return self.server.init_node(master_host, master_port, node_key)
-
-
-    def perspective_exchange_keys(self, master_pub_key):
-        """
-        Exchanges key pairs with the server
-        """
-        return self.server.exchange_keys(master_pub_key)

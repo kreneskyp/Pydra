@@ -99,7 +99,7 @@ class Worker(pb.Referenceable):
         # load crypto for authentication
         # workers use the same keys as their parent Node
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False)
+        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
 
         #load tasks that are cached locally
@@ -144,7 +144,7 @@ class Worker(pb.Referenceable):
         logger.info('worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port))
 
         # Authenticate with the master
-        self.rsa_client.auth(result, self.master_pub_key.encrypt)
+        self.rsa_client.auth(result, None, self.master_pub_key)
 
 
     def connect_failed(self, result):
