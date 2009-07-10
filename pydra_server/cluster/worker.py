@@ -310,6 +310,7 @@ class Worker(pb.Referenceable):
         """
         Function called to make the subtask receive the results processed by another worker
         """
+        logger.info('Worker:%s - received REMOTE results for: %s' % (self.worker_key, subtask_key))
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
         subtask.parent._work_unit_complete(results, workunit_key)
 
