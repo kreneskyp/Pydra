@@ -31,6 +31,9 @@ class WorkerProxy():
     def get_worker(self):
         return self
 
+    def get_key(self):
+        return None
+
 
 class StartupAndWaitTask(Task):
     """

@@ -21,8 +21,7 @@ from __future__ import with_statement
 from threading import Thread, Lock
 from twisted.internet import reactor, threads
 
-from pydra_server.cluster.tasks.tasks import Task
-from pydra_server.cluster.tasks import TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
+from pydra_server.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 
 import logging
@@ -51,7 +50,7 @@ class ParallelTask(Task):
 
 
 
-    def work(self, args, callback, callback_args={}):
+    def work(self, args, callback=None, callback_args={}):
         """
         overridden to prevent early task cleanup.  ParallelTasl._work() returns immediately even though 
         work is likely running in the background.  There appears to be no effective way to block without 

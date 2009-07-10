@@ -17,19 +17,14 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from twisted.internet import reactor, threads
 from pydra_server.util import deprecated
-from pydra_server.cluster.tasks import TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
-    STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
+from pydra_server.cluster.tasks import TaskNotFoundException,\
+    STATUS_CANCELLED, STATUS_CANCELLED,STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,\
+    STATUS_PAUSED,STATUS_COMPLETE
 
 import logging
 logger = logging.getLogger('root')
-
-
-""" !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-deprecating rather than just moving so that all instance can be found and fixed
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! """
-from pydra_server.cluster.tasks import TaskNotFoundException as TaskNotFoundException_imported
-TaskNotFoundException = deprecated(TaskNotFoundException_imported, 'Moved to tasks/__init__.py')
 
 
 class Task(object):
@@ -53,6 +48,18 @@ class Task(object):
 
     msg = None
     description = 'Default description about Task baseclass.'
+
+    def _generate_key(self):
+        """
+        Generate the key for this task using a recursive algorithm.
+        """
+        key = self.__class__.__name__
+        base = self.parent.get_key()
+        if base:
+            key = '%s.%s' % (base, key)
+
+        return key
+
 
     def __init__(self, msg=None):
         self.msg = msg
@@ -172,40 +179,6 @@ class Task(object):
         This is used so that subtasks can be selected.
         """
         return self._generate_key()
-
-
-    def _generate_key(self):
-        """
-        Generate the key for this task using a recursive algorithm.
-        """
-        #check to see if this tasks parent is a ParallelTask
-        # a ParallelTask can only have one child so the key is 
-        # just the classname
-        if issubclass(self.parent.__class__, (ParallelTask,)):
-            #recurse to parent
-            base = self.parent.get_key()
-            #combine
-            key = '%s.%s' % (base, self.__class__.__name__)
-
-
-        #check to see if this tasks parent is a TaskContainer
-        # TaskContainers can have multiple children who might
-        # all have the same class.  Use the index of the task
-        elif issubclass(self.parent.__class__, (TaskContainer,)):
-            #recurse to parent
-            base = self.parent.get_key()
-            #combine
-            index = self.parent.subtasks.index(self)
-            key = '%s.%i' % (base, index)
-
-        #The only other choice is that the parent is a Worker
-        # in which case this is the root instance, just return
-        # its class name
-        else:
-            key = self.__class__.__name__
-
-        self.key = key
-        return key
 
 
     def get_subtask(self, task_path):

@@ -33,12 +33,29 @@ class SubTaskWrapper():
 
         percentage - the percentage of work the task accounts for.
     """
-    def __init__(self, task, percentage):
+    def __init__(self, task, parent, percentage):
         self.task = task
         self.percentage = percentage
+        self.parent = parent
 
     def get_subtask(self, task_path):
         return self.task.get_subtask(task_path)
+
+    def get_key(self):
+        """
+        Returns the index of this wrapper
+        """
+        index = self.parent.subtasks.index(self)
+        base = self.parent.get_key()
+
+        return '%s.%s' % (base, index)
+
+    def get_worker(self):
+        """
+        Retrieves the worker running this task.  This function is recursive and bubbles
+        up through the task tree till the worker is reached
+        """
+        return self.parent.get_worker()
 
     def __repr__(self):
         return self.task.__repr__()
@@ -63,9 +80,9 @@ class TaskContainer(Task):
         """
         Adds a task to the container
         """
-        subtask = SubTaskWrapper(task, percentage)
+        subtask = SubTaskWrapper(task, self, percentage)
         self.subtasks.append(subtask)
-        task.parent=self
+        task.parent=subtask
         task.id = '%s-%d' % (self.id,len(self.subtasks))
 
     def reset(self):
@@ -74,12 +91,15 @@ class TaskContainer(Task):
 
     def get_subtask(self, task_path):
         """
-        Overridden to deal with the oddity of how ContainerTask children are indicated
-        in keys.  Children are indicated as integer indexes because there may be
-        more than one of the same class.  Task.get_subtask(...) will break if the first
-        element in the task_path is an integer.  If the task_path indicates the child
-        of a ContainerTask the index will be replaced with the actual class before
-        being passed on to the child
+        Overridden to deal with the oddity of how ContainerTask children are
+        indicated in keys.  Children are indicated as integer followed by
+        another entry for the class itself. indexes because there may be more
+        than one of the same class.  Task.get_subtask(...) will break if the
+        first element in the task_path is an integer.
+
+        If the task_path indicates the child of a ContainerTask the index will
+        also be popped off in this function and the subsequent call with go
+        directly to the subtask rather than through the wrapper
         """
         if len(task_path) == 1:
             if task_path[0] == self.__class__.__name__:
@@ -90,16 +110,12 @@ class TaskContainer(Task):
         # pop this classes name off the list
         task_path.pop(0)
 
-        # get index then swap index and class name
         try:
-            index = int(task_path[0])
-            child_class = self.subtasks[index].task.__class__.__name__
+            # get index and recurse into subtask
+            index = int(task_path.pop(0))
+            return self.subtasks[index].task.get_subtask(task_path)
         except (ValueError, IndexError):
             raise TaskNotFoundException("Task not found")
-        task_path[0] = child_class
-
-        # recurse down into the child
-        return self.subtasks[index].get_subtask(task_path)
 
 
     def _work(self, **kwargs):
@@ -110,6 +126,7 @@ class TaskContainer(Task):
             if self.sequential:
                 #sequential task, run the task work directly (default)
                 result = subtask.task.work(args=result)
+
             else:
                 #parallel task, run the subtask in its own thread
                 result = subtask.task.start(args=result)
@@ -129,10 +146,10 @@ class TaskContainer(Task):
 
     def progress(self):
         """
-        progress - returns the progress as a number 0-100.  
+        progress - returns the progress as a number 0-100.
 
         A container task's progress is a derivitive of its children.
-        the progress of the child counts for a certain percentage of the 
+        the progress of the child counts for a certain percentage of the
         progress of the parent.  This weighting can be set manually or
         divided evenly by calculatePercentage()
         """
@@ -151,7 +168,7 @@ class TaskContainer(Task):
             else:
                 percentage = auto_percentage
 
-            # if task is done it complete 100% of its work 
+            # if task is done it complete 100% of its work
             if subtask.task._status == STATUS_COMPLETE:
                 progress += 100*percentage
 

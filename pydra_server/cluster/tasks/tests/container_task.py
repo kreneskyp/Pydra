@@ -350,7 +350,7 @@ class TaskContainer2_Test(unittest.TestCase):
         Verifies that the task key used to look up the task is generated correctly
         """
         for i in range(len(self.container_task.subtasks)):
-            expected = 'TestContainerTask.%i' % i
+            expected = 'TestContainerTask.%i.TestTask' % i
             key = self.container_task.subtasks[i].task.get_key()
             self.assertEqual(key, expected, 'Generated key [%s] does not match the expected key [%s]' % (key, expected) )
 
@@ -380,12 +380,14 @@ class TaskContainer2_Test(unittest.TestCase):
         """
         # correct key
         for i in range(len(self.container_task.subtasks)):
-            key = 'TestContainerTask.%i' % i
+            key = 'TestContainerTask.%i.TestTask' % i
             expected = self.container_task.subtasks[i].task
             returned = self.container_task.get_subtask(key.split('.'))
             self.assertEqual(returned, expected, 'Subtask retrieved was not the expected Task')
 
         # incorrect Key
+        key = 'TestContainerTask.10.TestTask'
+        self.assertRaises(TaskNotFoundException, self.container_task.get_subtask, key.split('.'))
         key = 'TestContainerTask.10'
         self.assertRaises(TaskNotFoundException, self.container_task.get_subtask, key.split('.'))
 

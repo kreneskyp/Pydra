@@ -333,6 +333,14 @@ class Worker(pb.Referenceable):
         """
         return self
 
+
+    def get_key(self):
+        """
+        recursive task key generation function.  This stops the recursion
+        """
+        return None
+
+
     def remote_status(self):
         return self.status()
 
