@@ -322,7 +322,6 @@ class Worker(pb.Referenceable):
         logger.info('Worker:%s - requesting worker for: %s' % (self.worker_key, subtask_key))
         deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
 
-
     def return_work(self, subtask_key, workunit_key):
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
         subtask.parent._worker_failed(workunit_key)

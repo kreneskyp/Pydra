@@ -39,6 +39,7 @@ class SubTaskWrapper():
         self.parent = parent
 
     def get_subtask(self, task_path):
+        print '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
         return self.task.get_subtask(task_path)
 
     def get_key(self):
@@ -57,8 +58,19 @@ class SubTaskWrapper():
         """
         return self.parent.get_worker()
 
+
+    def request_worker(self, *args, **kwargs):
+        return self.parent.request_worker(*args, **kwargs)
+
+
+    def _stop(self, *args, **kwargs):
+        return self.task._stop(*args, **kwargs)
+
+
     def __repr__(self):
         return self.task.__repr__()
+
+
 
 
 class TaskContainer(Task):

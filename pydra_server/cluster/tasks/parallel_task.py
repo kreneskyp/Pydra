@@ -140,7 +140,7 @@ class ParallelTask(Task):
                 else:
                     #check for more work
                     if len(self._data_in_progress) or len(self._data):
-                        logger.debug('Paralleltask - still has more work: %s :  %s' % (self._data, self._data_in_progress))
+                        logger.debug('Paralleltask - still has more work: %s :  %s' % (len(self._data), self._data_in_progress))
                         reactor.callLater(5, self.more_work)
 
                     #all work is done, call the task specific function to combine the results 
@@ -171,6 +171,7 @@ class ParallelTask(Task):
         if not data == None:
             logger.debug('Paralleltask - assigning remote work')
             self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
+
 
 
     def _assign_work_local(self):

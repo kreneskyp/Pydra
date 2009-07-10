@@ -155,13 +155,13 @@ class Task(object):
         return self._status
 
 
-    def request_worker(self, task_key, args):
+    def request_worker(self, *args, **kwargs):
         """
         Requests a worker for a subtask from the tasks parent.  calling this on any task will
         cause requests to bubble up to the root task whose parent will be the worker
         running the task.
         """
-        self.parent.request_worker(self, task_key, args)
+        return self.parent.request_worker(*args, **kwargs)
 
 
     def get_worker(self):
