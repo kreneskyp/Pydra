@@ -153,18 +153,19 @@ class TaskManager():
     Auto-discover any tasks that are in the tasks directory
     """
     def autodiscover(self):
-        import imp
-        import os
-        import inspect
+        import imp, os, sys, inspect
+        from pydra_server.models import *
 
         # Step 1: get all python files in the tasks directory
-        files = os.listdir('./pydra_server/task_cache')
+        print pydraSettings.tasks_dir
+        files = os.listdir(pydraSettings.tasks_dir)
+        sys.path.append(pydraSettings.tasks_dir)
 
         # Step 2: iterate through all the python files importing each one and 
         #         and add it as an available Task
         for filename in files:
             if filename <> '__init__.py' and filename[-3:] == '.py':
-                module = 'pydra_server.task_cache.%s' % filename[:-3]
+                module = filename[:-3]
                 tasks = __import__(module, {}, {}, ['Task'])
 
                 # iterate through the objects in  the module to find Tasks

@@ -31,6 +31,7 @@ try:
     class PydraSettings(dbsettings.Group):
         host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect', default='localhost')
         port        = dbsettings.IntegerValue('port','Port for this server', default=18800)
+        tasks_dir = dbsettings.StringValue('tasks_dir', 'tasks directory','Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
     pydraSettings = PydraSettings('Pydra')
 
 except ProgrammingError:
