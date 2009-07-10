@@ -38,6 +38,13 @@ class MasterAvatar(RSAAvatar):
         logger.info('Master connected to node')
 
 
+    def perspective_get_key(self):
+        """
+        Return the node's public key, so we can do a duplicate detection on the
+        master side
+        """
+        return self.chunks()
+
     def save_key(self, json_key):
         """
         Callback to save public key from the master        

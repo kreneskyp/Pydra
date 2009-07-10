@@ -29,6 +29,7 @@ urlpatterns = patterns('',
 
     # node urls
     (r'^nodes/$', nodes),
+    (r'^nodes/discover/$', discover),
     (r'^nodes/edit/(\d?)$', node_edit),
     (r'^nodes/status/$', node_status),
 

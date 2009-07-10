@@ -1,4 +1,5 @@
-"""
+{% extends "base.html" %}
+<!--
     Copyright 2009 Oregon State University
 
     This file is part of Pydra.
@@ -15,17 +16,17 @@
 
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
-"""
-
-from django.conf.urls.defaults import *
-from django.contrib import admin
-
-admin.autodiscover()
-
-
-urlpatterns = patterns('',
-    (r'^', include('pydra_server.urls')),
-    (r'^admin/(.*)', admin.site.root),
-    (r'^settings/', include('dbsettings.urls')),
-
-)
+-->
+{% block content %}
+{% if known_nodes %}
+    Please put the checkbox next to the Node's you would like to see added and hit submit.
+    <form method="post" action=".">
+    {% for field in known_nodes %}
+        <p>{{ field.0 }}:{{ field.1 }} <input type="checkbox" name="{{ field.0 }}:{{ field.1 }}"></p>
+    {% endfor %}
+    <input type="submit">
+    </form>
+{% else %}
+    There appear to be no non active discovered nodes.
+{% endif %}
+{% endblock %}

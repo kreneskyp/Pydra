@@ -46,6 +46,12 @@ import datetime
 
 from threading import Lock
 
+# should be executed before any other reactor stuff to prevent from using non
+# glib2 event loop which we need for dbus
+
+from twisted.internet import glib2reactor
+glib2reactor.install()
+
 from zope.interface import implements
 from twisted.cred import portal, checkers
 from twisted.spread import pb
@@ -56,6 +62,8 @@ from twisted.web import server, resource
 from twisted.cred import credentials
 from django.utils import simplejson
 import settings
+import dbus, avahi
+from dbus.mainloop.glib import DBusGMainLoop
 
 from pydra_server.models import Node, TaskInstance
 from pydra_server.cluster.constants import *
@@ -123,6 +131,7 @@ class Master(object):
         #cluster management
         self.workers = {}
         self.nodes = self.load_nodes()
+        self.known_nodes = set()
         self._workers_idle = []
         self._workers_working = {}
 
@@ -143,6 +152,54 @@ class Master(object):
 
         self.host = 'localhost'
         self.port = 18800
+        self.autodiscovery()
+
+    def autodiscovery(self, callback=None):
+        """
+        set up the dbus loop, and add the callbacks for adding nodes on the fly
+
+        based on http://avahi.org/wiki/PythonBrowseExample
+        """
+        from pydra_server.models import pydraSettings
+
+        def service_resolved(*args):
+            # at this point we have all the info about the node we need
+            if pydraSettings.multicast_all:
+
+                # add the node (without the restart)
+                Node.objects.create(host=args[7], port=args[8])
+                self.connect()
+            else:
+                self.known_nodes.add((args[7], args[8]))
+
+        def print_error(*args):
+            logger.info("Couldn't resolve avahi name: %s" % str(args))
+
+        def node_found(interface, protocol, name, stype, domain, flags):
+            if flags & avahi.LOOKUP_RESULT_LOCAL:
+                    # local service, skip
+                    pass
+
+            server.ResolveService(interface, protocol, name, stype,
+                domain, avahi.PROTO_UNSPEC, dbus.UInt32(0),
+                reply_handler=service_resolved, error_handler=print_error)
+
+
+        # initialize dbus stuff needed for discovery
+        loop = DBusGMainLoop()
+
+        bus = dbus.SystemBus(mainloop=loop)
+
+        server = dbus.Interface( bus.get_object(avahi.DBUS_NAME, '/'),
+                'org.freedesktop.Avahi.Server')
+
+        sbrowser = dbus.Interface(bus.get_object(avahi.DBUS_NAME,
+                server.ServiceBrowserNew(avahi.IF_UNSPEC,
+                    avahi.PROTO_UNSPEC, '_pydra._tcp', 'local', dbus.UInt32(0))),
+                avahi.DBUS_INTERFACE_SERVICE_BROWSER)
+
+        sbrowser.connect_to_signal("ItemNew", node_found)
+
 
     def get_services(self):
         """
@@ -215,6 +272,13 @@ class Master(object):
         with self._lock:
             self.connecting=True
 
+            # make sure the verious states are in sync
+            for i in Node.objects.all():
+                if i.id not in self.nodes:
+                    self.nodes[i.id] = i
+                if (i.host, i.port) in self.known_nodes:
+                    self.known_nodes.discard((i.host, i.port))
+
             "Begin the connection process"
             connections = []
             self.attempts = []
@@ -261,13 +325,9 @@ class Master(object):
             if result[0]:
                 # save reference for remote calls
                 node.ref = result[1]
+                d = node.ref.callRemote('get_key')
+                d.addCallback(self.check_node, node)
 
-
-                logger.info('node:%s:%s - connected' % (node.host, node.port))
-
-                # Authenticate with the node
-                pub_key = node.load_pub_key()
-                self.rsa_client.auth(node.ref, self.receive_key_node, server_key=pub_key, node=node)
 
             #failures
             else:
@@ -282,6 +342,21 @@ class Master(object):
 
         else:
             self.reconnect_count = 0
+
+    def check_node(self, key, node):
+        # node.pub_key is set only for paired nodes, make sure we don't attempt
+        # to pair with a known pub key
+        duplicate = ''.join(key) in [i.pub_key for i in self.nodes.values()]
+        if duplicate and not node.pub_key:
+            logger.info('deleting %s:%s - duplicate' % (node.host, node.port))
+            node.delete()
+            return
+
+        # Authenticate with the node
+        pub_key = node.load_pub_key()
+        self.rsa_client.auth(node.ref, self.receive_key_node, server_key=pub_key, node=node)
+
+        logger.info('node:%s:%s - connected' % (node.host, node.port))
 
 
     def reconnect_nodes(self, reset_counter=False):
