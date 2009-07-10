@@ -73,7 +73,7 @@ class NodeServer:
 
         #load crypto keys for authentication
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
+        self.master_pub_key = load_crypto('./node.master.key', create=False, both=False)
 
         #load tasks that are cached locally
         self.available_tasks = {}
@@ -135,61 +135,6 @@ class NodeServer:
             #start the workers
             self.start_workers()
             self.initialized = True
-
-
-    def exchange_keys(self, master_pub_key):
-        """
-        Exchange public keys with the master.  This allows the Master
-        to authenticate in the future using the keypair handshake
-        """
-        from django.utils import simplejson
-        from Crypto.PublicKey import RSA
-        from twisted.conch.ssh.keys import Key
-        import math
-        logger.info('Exchanging keys with master')
-        key_file = None
-        try:
-
-            # reconstruct key array, it was already encoded
-            # with json so no need to encode it here
-            json_key = ''.join(master_pub_key)
-
-            key = simplejson.loads(json_key)
-            key = [long(x) for x in key]
-            rsa_key = RSA.construct(key)
-
-            # only save the key if its new or changed
-            if self.master_pub_key:
-                cur = Key(self.master_pub_key).data()
-                new = Key(rsa_key).data()
-                save_key = cur['n'] != new['n'] or cur['e'] != new['e']
-                if save_key:
-                    os.chmod('./node.master.key', 0600)
-            else:
-                save_key = True
-
-            if save_key:
-                key_file = file('./node.master.key', 'w')
-                logger.info('saving new master key')
-                key_file = key_file.write(json_key)
-                os.chmod('./node.master.key', 0400)
-                self.master_pub_key = rsa_key
-
-        finally:
-            if key_file:
-                key_file.close()
-
-        #send the nodes public key.  serialize it and encrypt it
-        #the key must be broken into chunks for it to be signed
-        #for ease recompiling it we'll store the chunks as a list
-        json_key = simplejson.dumps(self.pub_key)
-        key_chunks = []
-        chunk = 128
-        for i in range(int(math.ceil(len(json_key)/(chunk*1.0)))):
-            enc = self.master_pub_key.encrypt(json_key[i*chunk:i*chunk+chunk], None)
-            key_chunks.append(enc[0])
-
-        return key_chunks
 
 
     def start_workers(self):
