@@ -134,6 +134,25 @@ def node_edit(request, id=None):
     }, context_instance=RequestContext(request, processors=[settings_processor]))
 
 
+@user_passes_test(lambda u: u.has_perm('pydra_server.can_edit_nodes'))
+def discover(request):
+    """
+    allow users to activate the nodes that have been discovered via avahi
+    """
+    from django import forms
+    global pydra_controller
+
+    if request.method == 'POST':
+        reconnect = False
+        for i in request.POST.keys():
+            host, port = i.split(':')
+            if not Node.objects.filter(host=host, port=port):
+                Node.objects.create(host=host, port=port)
+                reconnect = True
+        if reconnect:
+            pydra_controller.remote_connect()
+    return render_to_response('discover.html', {'known_nodes': pydra_controller.remote_list_known_nodes()})
+
 def node_status(request):
     """
     Retrieves Status of nodes

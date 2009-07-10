@@ -46,6 +46,7 @@ from twisted.application import service, internet
 
 import os
 from subprocess import Popen
+import platform, dbus, avahi
 from pydra_server.cluster.auth.rsa_auth import load_crypto
 from pydra_server.cluster.auth.master_avatar import MasterAvatar
 
@@ -54,6 +55,45 @@ from pydra_server.cluster.auth.master_avatar import MasterAvatar
 import settings
 from pydra_server.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_NODE)
+
+class ZeroconfService:
+    """A simple class to publish a network service with zeroconf using
+    avahi.
+
+    Shamelessly stolen from http://stackp.online.fr/?p=35 
+    """
+
+    def __init__(self, name, port, stype="_http._tcp",
+                 domain="", host="", text=""):
+        self.name = name
+        self.stype = stype
+        self.domain = domain
+        self.host = host
+        self.port = port
+        self.text = text
+
+    def publish(self):
+        bus = dbus.SystemBus()
+        server = dbus.Interface(
+                         bus.get_object(
+                                 avahi.DBUS_NAME,
+                                 avahi.DBUS_PATH_SERVER),
+                        avahi.DBUS_INTERFACE_SERVER)
+
+        g = dbus.Interface(
+                    bus.get_object(avahi.DBUS_NAME,
+                                   server.EntryGroupNew()),
+                    avahi.DBUS_INTERFACE_ENTRY_GROUP)
+
+        g.AddService(avahi.IF_UNSPEC, avahi.PROTO_UNSPEC,dbus.UInt32(0),
+                     self.name, self.stype, self.domain, self.host,
+                     dbus.UInt16(self.port), self.text)
+
+        g.Commit()
+        self.group = g
+
+    def unpublish(self):
+        self.group.Reset()
 
 
 class NodeServer:
@@ -80,6 +120,10 @@ class NodeServer:
 
         # get information about the server
         self.determine_info()
+
+        service = ZeroconfService(name=platform.node(), port=self.port,
+            stype="_pydra._tcp")
+        service.publish()
 
         logger.info('Node - starting server on port %s' % self.port)
 

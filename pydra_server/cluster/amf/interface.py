@@ -203,6 +203,20 @@ class AMFInterface(pb.Root):
         """
         return self.master._queue
 
+    @authenticated
+    def list_known_nodes(self, _):
+        """
+        list know_nodes
+        """
+        # cast to list, doesn't seem to digest set
+        return list(self.master.known_nodes)
+
+    @authenticated
+    def connect(self, _):
+        """
+        allows the gui to make the master aware of the new node without restart
+        """
+        return self.master.connect()
 
     @authenticated
     def list_running(self, _):
@@ -211,6 +225,20 @@ class AMFInterface(pb.Root):
         """
         return self.master._running
 
+    @authenticated
+    def list_known_nodes(self, _):
+        """
+        list know_nodes
+        """
+        # cast to list, doesn't seem to digest set
+        return list(self.master.known_nodes)
+
+    @authenticated
+    def connect(self, _):
+        """
+        allows the gui to make the master aware of the new node without restart
+        """
+        return self.master.connect()
 
     @authenticated
     def run_task(self, _, task_key, args=None):
