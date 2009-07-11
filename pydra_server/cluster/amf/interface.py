@@ -276,11 +276,21 @@ class AMFInterface(pb.Root):
         """
         if values.has_key('id'):
             node = Node.objects.get(pk=values['id'])
+            connect = values['port'] == node.port
         else:
             node = Node()
+            connect = True
+
         for k,v in values.items():
             node.__dict__[k] = v
         node.save()
+
+        # call connect only for new nodes or if the port has changed.  The
+        # master should already be retrying to connect to the node with an
+        # incorrect port but the max timeout is 5 minutes.  Calling it here
+        # causes the change to fix things alot quicker
+        if connect:
+            self.master.connect()
 
 
     @authenticated
