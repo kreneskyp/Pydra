@@ -65,7 +65,7 @@ import settings
 import dbus, avahi
 from dbus.mainloop.glib import DBusGMainLoop
 
-from pydra_server.models import Node, TaskInstance
+from pydra_server.models import Node, TaskInstance, pydraSettings
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
@@ -151,7 +151,6 @@ class Master(object):
         self.connect()
 
         self.host = 'localhost'
-        self.port = 18800
         self.autodiscovery()
 
     def autodiscovery(self, callback=None):
@@ -160,8 +159,6 @@ class Master(object):
 
         based on http://avahi.org/wiki/PythonBrowseExample
         """
-        from pydra_server.models import pydraSettings
-
         def service_resolved(*args):
             # at this point we have all the info about the node we need
             if pydraSettings.multicast_all:
@@ -240,8 +237,8 @@ class Master(object):
             logger.critical('Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh')
             sys.exit()
 
-        controller_service = internet.SSLServer(18801, server.Site(root), contextFactory=context)
-        worker_service = internet.TCPServer(18800, pb.PBServerFactory(p))
+        controller_service = internet.SSLServer(pydraSettings.controller_port, server.Site(root), contextFactory=context)
+        worker_service = internet.TCPServer(pydraSettings.port, pb.PBServerFactory(p))
 
         return controller_service,  worker_service
 
@@ -272,7 +269,7 @@ class Master(object):
         with self._lock:
             self.connecting=True
 
-            # make sure the verious states are in sync
+            # make sure the various states are in sync
             for i in Node.objects.all():
                 if i.id not in self.nodes:
                     self.nodes[i.id] = i
@@ -286,7 +283,7 @@ class Master(object):
                 #only connect to nodes that aren't connected yet
                 if not node.ref:
                     factory = NodeClientFactory(node, self)
-                    reactor.connectTCP(node.host, 11890, factory)
+                    reactor.connectTCP(node.host, node.port, factory)
 
                     # SSH authentication is not currently supported with perspectiveBroker.
                     # For now we'll perform a key handshake within the info/init handshake that already
@@ -440,7 +437,7 @@ class Master(object):
 
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, self.port, node_key_str)
+        d = node.ref.callRemote('init', self.host, pydraSettings.port, node_key_str)
         d.addCallback(self.node_ready, node)
 
 
