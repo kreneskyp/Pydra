@@ -25,38 +25,42 @@ from pydra_server.models import TaskInstance
 import logging
 logger = logging.getLogger('root')
 
-""" TaskManager - Class that tracks and controls tasks
-"""
+
 class TaskManager():
+    """ 
+    TaskManager - Class that tracks and controls tasks available to run on the
+                  cluster.
+    """
 
     def __init__(self):
         self.registry = {}
 
 
-    """ Registers a task making it available through the manager
-
-    @param key: key for task
-    @param task: task instance
-    """
+    
     def register(self, key, task):
+        """ Registers a task making it available through the manager
+
+        @param key: key for task
+        @param task: task instance
+        """
         self.registry[key] = task
 
 
-    """ deregisters a task, stopping it and removing it from the manager
-
-    @param key: key for task
-    """
     def deregister(self, key):
+        """ deregisters a task, stopping it and removing it from the manager
+
+        @param key: key for task
+        """
         # remove the task from the registry
         del self.registry[key]
 
 
-    """ Iterates through a task and its children to build an array display information
-
-    @param task: Task to process
-    @param tasklist: Array to append data onto.  Uused for recursion.
-    """
     def processTask(self, task, tasklist=None, parent=False):
+        """ Iterates through a task and its children to build an array display information
+
+        @param task: Task to process
+        @param tasklist: Array to append data onto.  Uused for recursion.
+        """
         # initial call wont have an area yet
         if tasklist==None:
             tasklist = []
@@ -75,11 +79,12 @@ class TaskManager():
         return tasklist
 
 
-    """ Iterates through a task and its children to build an array of status information
-    @param task: Task to process
-    @param tasklist: Array to append data onto.  Uused for recursion.
-    """
+
     def processTaskProgress(self, task, tasklist=None):
+        """ Iterates through a task and its children to build an array of status information
+        @param task: Task to process
+        @param tasklist: Array to append data onto.  Uused for recursion.
+        """
         # initial call wont have an area yet
         if tasklist==None:
             tasklist = []
@@ -98,11 +103,11 @@ class TaskManager():
         return tasklist
 
 
-    """
-    listTasks - builds a list of tasks
-    @param keys: filters list to include only these tasks
-    """
     def list_tasks(self, toplevel=True, keys=None):
+        """
+        listTasks - builds a list of tasks
+        @param keys: filters list to include only these tasks
+        """
         message = {}
         # show all tasks by default
         if keys == None:
@@ -128,11 +133,12 @@ class TaskManager():
 
         return message
 
-    """
-    builds a dictionary of progresses for tasks
-    @param keys: filters list to include only these tasks
-    """
+    
     def progress(self, keys=None):
+        """
+        builds a dictionary of progresses for tasks
+        @param keys: filters list to include only these tasks
+        """
         message = {}
 
         # show all tasks by default
@@ -148,11 +154,11 @@ class TaskManager():
 
         return message
 
-
-    """
-    Auto-discover any tasks that are in the tasks directory
-    """
+ 
     def autodiscover(self):
+        """
+        Auto-discover any tasks that are in the tasks directory
+        """
         import imp, os, sys, inspect
         from pydra_server.models import *
 
@@ -165,7 +171,12 @@ class TaskManager():
         for filename in files:
             if filename <> '__init__.py' and filename[-3:] == '.py':
                 module = filename[:-3]
-                tasks = __import__(module, {}, {}, ['Task'])
+                
+                try:
+                    tasks = __import__(module, {}, {}, ['Task'])
+                except Exception, e:
+                    logger.warn('Failed to load tasks from: %s (%s) - %s' % (module, filename, e))
+                    continue
 
                 # iterate through the objects in  the module to find Tasks
                 # TODO replace this logic with code in Task that adds all tasks
@@ -188,6 +199,7 @@ class TaskManager():
 
                             self.register(task_key, task_class)
                             logger.info('Loaded task: %s' % key)
+
                         except:
                             logger.error('ERROR Loading task: %s' % key)
 
