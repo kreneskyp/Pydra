@@ -317,7 +317,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for node in nodes.object_list %}
+            {% for node in nodes %}
                 <tr id="node_{{node.id}}" class="node {% if not forloop.first%}notfirst{%endif%}"><td colspan="100%">
                 <table>
                     <tr>
@@ -330,7 +330,7 @@
                             {% endif %}
                         </td>
                         <td class="port">{{node.port}}</td>
-                        <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node|available_cores}}</span></td>
+                        <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node.cores}}</span></td>
                         <td></td>
                         <td></td>
                     </tr>

@@ -50,7 +50,7 @@ Models
 """
 class Node(models.Model):
     host            = models.CharField(max_length=255)
-    port            = models.IntegerField(default=11880)
+    port            = models.IntegerField(default=11890)
     cores_available = models.IntegerField(null=True)
     cores           = models.IntegerField(null=True)
 
