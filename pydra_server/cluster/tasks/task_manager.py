@@ -157,7 +157,6 @@ class TaskManager():
         from pydra_server.models import *
 
         # Step 1: get all python files in the tasks directory
-        print pydraSettings.tasks_dir
         files = os.listdir(pydraSettings.tasks_dir)
         sys.path.append(pydraSettings.tasks_dir)
 
