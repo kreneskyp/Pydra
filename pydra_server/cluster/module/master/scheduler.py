@@ -24,8 +24,8 @@ from pydra_server.models import TaskInstance
 from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
 
 # init logging
-from pydra_server.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_MASTER)
+import logging
+logger = logging.getLogger('root')
 
 
 class TaskScheduler(Module):

@@ -17,8 +17,8 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import settings
-
+import logging
+logger = logging.getLogger('root')
 
 class ModuleManager(object):
     """

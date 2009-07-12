@@ -29,9 +29,8 @@ from pydra_server.cluster.module import Module
 
 
 # init logging
-
-from pydra_server.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_MASTER)
+import logging
+logger = logging.getLogger('root')
 
 class WorkerConnectionManager(Module):
 

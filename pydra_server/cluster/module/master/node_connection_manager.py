@@ -24,9 +24,8 @@ from pydra_server.models import Node, pydraSettings
 from twisted.spread import pb
 from twisted.internet import reactor, defer
 
-# init logging
-from pydra_server.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_MASTER)
+import logging
+logger = logging.getLogger('root')
 
 class NodeClientFactory(pb.PBClientFactory):
     """
