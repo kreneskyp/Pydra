@@ -17,17 +17,17 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from rsa_auth import RSAAvatar
+from module_avatar import ModuleAvatar
 from Crypto.PublicKey import RSA
 
 import logging
 logger = logging.getLogger('root')
 
-class WorkerAvatar(RSAAvatar):
+class WorkerAvatar(ModuleAvatar):
     """
     Avatar used by Workers connecting to the Master.
     """
-    def __init__(self, name, server, node):
+    def __init__(self, name, server, node, module_manager):
         self.name = name
         self.server = server
 
@@ -35,7 +35,7 @@ class WorkerAvatar(RSAAvatar):
         node_key = node_key if node_key else None
         master_key = RSA.construct(server.pub_key) if server.pub_key else None
 
-        RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
+        ModuleAvatar.__init__(self, module_manager, master_key, None, node_key, server.worker_authenticated, True)
 
     def attached(self, mind):
         self.remote = mind

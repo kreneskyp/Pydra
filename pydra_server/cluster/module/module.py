@@ -52,6 +52,10 @@ class ModuleManager(object):
     # simple types it would be a copy rather than a reference.
     _shared = {}
     
+    
+    # list of services that have been registered with the manager.  This is a
+    # list of methods that each return a service object
+    _services = []
 
     def emit_signal(self, signal, *args, **kwargs):
         """
@@ -68,24 +72,6 @@ class ModuleManager(object):
                 function(*args, **kwargs)
 
 
-    def register_module(self, module_class):
-        self._modules.append(module_class(self))
-    
-
-    def register_signal(self, signal, module):
-        """
-        Register a signal that a module can send
-        """
-        try:
-            self._signals[signal].append(module)
-        except KeyError:
-            self._signals[signal] = [module]
-
-
-    def register_remote(self, remote, function):
-        pass
-
-
     def register_listener(self, signal, function):
         """
         Register a listener
@@ -97,6 +83,35 @@ class ModuleManager(object):
             self._listeners[signal].append(function)
         except KeyError:
             self._listeners[signal] = [function]
+
+
+    def register_module(self, module_class):
+        """
+        Register a module
+        """
+        self._modules.append(module_class(self))
+
+
+    def register_remote(self, remote, function):
+        pass
+
+
+    def register_service(self, service):
+        """
+        Register a service exposed by a module
+        """
+        self._services.append(service)
+
+
+    def register_signal(self, signal, module):
+        """
+        Register a signal that a module can send
+        """
+        try:
+            self._signals[signal].append(module)
+        except KeyError:
+            self._signals[signal] = [module]
+
 
 
     def get_shared(self, key):
@@ -116,6 +131,7 @@ class ModuleManager(object):
         Sets a shared property
         """
         self.__dict__[key] = value
+
 
 class Module(object):
     """
@@ -154,7 +170,8 @@ class Module(object):
 
     def __init__(self, manager):
         """
-        Initializes the 
+        Initializes the module.  All of the functionality provided by this
+        module is registered with the ModuleManager
         """
         self.manager = manager
 
@@ -167,6 +184,9 @@ class Module(object):
 
         for remote in self._remotes:
             manager.register_remote(*remote)
+
+        for service in self._services: 
+            manager.register_service(service)
     
 
     def __getattribute__(self, key):

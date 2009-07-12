@@ -17,10 +17,19 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 import settings
-from pydra_server.cluster.module import Module
+
+from twisted.application import internet
+from twisted.cred import checkers, portal
+from twisted.spread import pb
+
+from pydra_server.models import pydraSettings
+from pydra_server.cluster.auth.master_realm import MasterRealm
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
+from pydra_server.cluster.module import Module
+
 
 # init logging
+
 from pydra_server.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_MASTER)
 
@@ -32,8 +41,30 @@ class WorkerConnectionManager(Module):
     ]
 
     def __init__(self, manager):
+        self._services = [self.get_worker_service]
+
         #cluster management
         self.workers = {}
+
+        Module.__init__(self, manager)
+
+
+    def get_worker_service(self, master):
+        """
+        constructs a twisted service for Workers to connect to 
+        """
+        # setup cluster connections
+        realm = MasterRealm()
+        realm.server = master
+
+        # setup worker security - using this checker just because we need
+        # _something_ that returns an avatarID.  Its extremely vulnerable
+        # but thats ok because the real authentication takes place after
+        # the worker has connected
+        self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
+        p = portal.Portal(realm, [self.worker_checker])
+ 
+        return internet.TCPServer(pydraSettings.port, pb.PBServerFactory(p))
 
 
     def worker_authenticated(self, worker_avatar):

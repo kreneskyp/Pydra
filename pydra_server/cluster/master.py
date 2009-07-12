@@ -49,18 +49,17 @@ glib2reactor.install()
 
 from threading import Lock
 
-from twisted.cred import checkers
-from twisted.spread import pb
-from twisted.application import service, internet
+
+from twisted.application import service
 from twisted.internet.error import AlreadyCalled
-from twisted.web import server, resource
+
 from twisted.cred import credentials
 import settings
 
 from pydra_server.cluster.constants import *
-from pydra_server.cluster.amf.interface import AMFInterface
+
 from pydra_server.cluster.module.module import ModuleManager
-from pydra_server.cluster.module.master import NodeConnectionManager, WorkerConnectionManager, TaskScheduler, AutoDiscoveryModule
+from pydra_server.cluster.module.master import NodeConnectionManager, WorkerConnectionManager, TaskScheduler, AutoDiscoveryModule, AMFInterfaceModule
 from pydra_server.models import pydraSettings
 
 # init logging
@@ -68,14 +67,10 @@ from pydra_server.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_MASTER)
 
 
-# THESE WILL BE REMOVEABLE!!
-from twisted.cred import portal
-from pydra_server.cluster.auth.master_realm import MasterRealm
-
 class Master(object):
     """
     Master is the server that controls the cluster.  There must be one and only one master
-    per cluster.  It will direct and delegate work taking place on the Nodes and Workers
+    per cluster (for now).  It will direct and delegate work taking place on the Nodes and Workers
     """
 
     def __init__(self):
@@ -98,7 +93,7 @@ class Master(object):
             NodeConnectionManager,
             WorkerConnectionManager,
             TaskScheduler,
-            
+            AMFInterfaceModule
         ]
         map(self.module_manager.register_module, modules)
 
@@ -107,51 +102,11 @@ class Master(object):
 
     def get_services(self):
         """
-        Get the service objects used by twistd
+        Get the service objects used by twistd.  The services are exposed by
+        modules.  This method just calls all the mapped functions used for
+        creating the services
         """
-        # setup cluster connections
-        realm = MasterRealm()
-        realm.server = self
-
-        # setup worker security - using this checker just because we need
-        # _something_ that returns an avatarID.  Its extremely vulnerable
-        # but thats ok because the real authentication takes place after
-        # the worker has connected
-        self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-        p = portal.Portal(realm, [self.worker_checker])
-
-        #setup AMF gateway security
-        checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
-        checker.addUser("controller", "1234")
-
-        #setup controller connection via AMF gateway
-        # Place the namespace mapping into a TwistedGateway:
-        from pyamf.remoting.gateway.twisted import TwistedGateway
-        from pyamf.remoting import gateway
-        interface = AMFInterface(self, checker)
-        gw = TwistedGateway({ 
-                        "controller": interface,
-                        }, authenticator=interface.auth)
-        # Publish the PyAMF gateway at the root URL:
-        root = resource.Resource()
-        root.putChild("", gw)
-
-        #setup services
-        from twisted.internet.ssl import DefaultOpenSSLContextFactory
-        try:
-            context = DefaultOpenSSLContextFactory('ca-key.pem', 'ca-cert.pem')
-        except:
-            logger.critical('Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh')
-            sys.exit()
-
-        controller_service = internet.SSLServer(pydraSettings.controller_port, server.Site(root), contextFactory=context)
-        worker_service = internet.TCPServer(pydraSettings.port, pb.PBServerFactory(p))
-
-        return controller_service,  worker_service
-
-
-
-
+        return [service(self) for service in self.module_manager._services]
 
 
 #setup application used by twistd
@@ -159,6 +114,7 @@ master = Master()
 
 application = service.Application("Pydra Master")
 
-service1, service2 = master.get_services()
-service1.setServiceParent(application)
-service2.setServiceParent(application)
+for service in master.get_services():
+    print 'Starting service'
+    service.setServiceParent(application)
+
