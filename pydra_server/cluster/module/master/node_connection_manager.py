@@ -1,6 +1,54 @@
+"""
+    Copyright 2009 Oregon State University
 
+    This file is part of Pydra.
 
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+"""
+import settings
 from pydra_server.cluster.module import Module
+from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
+from pydra_server.models import Node, pydraSettings
+
+from twisted.spread import pb
+from twisted.internet import reactor, defer
+
+# init logging
+from pydra_server.logging.logger import init_logging
+logger = init_logging(settings.LOG_FILENAME_MASTER)
+
+class NodeClientFactory(pb.PBClientFactory):
+    """
+    Subclassing of PBClientFactory to add auto-reconnect via Master's reconnection code.
+    This factory is specific to the master acting as a client of a Node.
+    """
+
+    node = None
+
+    def __init__(self, node, master):
+        self.node = node
+        self.master = master
+        pb.PBClientFactory.__init__(self)
+
+    def clientConnectionLost(self, connector, reason):
+        #lock - ensures that this blocks any connection attempts
+        with self.master._lock:
+            self.node.ref = None
+
+        self.master.reconnect_nodes(True);
+        pb.PBClientFactory.clientConnectionLost(self, connector, reason)
+
 
 class NodeConnectionManager(Module):
 
@@ -11,6 +59,29 @@ class NodeConnectionManager(Module):
         'NODE_DISCONNECTED',
         'NODE_AUTHENTICATED'
     ]
+
+    def __init__(self, manager):
+
+        self._listeners = {
+            'MASTER_INIT':self.connect
+        }
+
+        #load rsa crypto
+        self.pub_key, self.priv_key = load_crypto('./master.key')
+        self.rsa_client = RSAClient(self.priv_key, self.pub_key, callback=self.init_node)
+
+        #cluster management
+        self.nodes = self.load_nodes()
+
+        #connection management
+        self.connecting = True
+        self.reconnect_count = 0
+        self.attempts = None
+        self.reconnect_call_ID = None
+
+        self.host = 'localhost'
+
+        Module.__init__(self, manager)
 
 
     def load_nodes(self):

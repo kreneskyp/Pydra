@@ -1,0 +1,50 @@
+"""
+    Copyright 2009 Oregon State University
+
+    This file is part of Pydra.
+
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+"""
+import settings
+from zope.interface import implements
+from twisted.cred import portal
+from pydra_server.models import Node
+from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
+
+# init logging
+from pydra_server.logging.logger import init_logging
+logger = init_logging(settings.LOG_FILENAME_MASTER)
+
+class MasterRealm:
+    """
+    Realm used by the Master server to assign avatars.
+    """
+    implements(portal.IRealm)
+    def requestAvatar(self, avatarID, mind, *interfaces):
+        assert pb.IPerspective in interfaces
+
+        if avatarID == 'controller':
+            avatar = ControllerAvatar(avatarID)
+            avatar.server = self.server
+            avatar.attached(mind)
+            logger.info('controller:%s - connected' % avatarID)
+
+        else:
+            key_split = avatarID.split(':')
+            node = Node.objects.get(host=key_split[0], port=key_split[1])
+            avatar = WorkerAvatar(avatarID, self.server, node)
+            avatar.attached(mind)
+            logger.info('worker:%s - connected' % avatarID)
+
+        return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
