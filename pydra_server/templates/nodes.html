@@ -143,7 +143,6 @@
             }
         </style>
 
-        <script type="text/javascript" src="{{MEDIA_URL}}/js/jquery-1.3.1.min.js"></script>
         <script type="text/javascript">
 
             var worker_count = -1;
@@ -279,7 +278,7 @@
 {% endblock %}
 
 {% block submenu %}
-    {% if nodes and perms.pydra_server.can_edit_nodes %}
+    {% if perms.pydra_server.can_edit_nodes %}
         <span class="menuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/edit">Create Node</a></span>
         <span class="menuitem lastmenuitem"><a class="menuitem" href="{{SITE_ROOT}}/nodes/discover/">Discover Nodes</a></span>
     {% endif %}
@@ -317,7 +316,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for node in nodes.object_list %}
+            {% for node in nodes %}
                 <tr id="node_{{node.id}}" class="node {% if not forloop.first%}notfirst{%endif%}"><td colspan="100%">
                 <table>
                     <tr>
@@ -330,7 +329,7 @@
                             {% endif %}
                         </td>
                         <td class="port">{{node.port}}</td>
-                        <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node|available_cores}}</span></td>
+                        <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node.cores}}</span></td>
                         <td></td>
                         <td></td>
                     </tr>

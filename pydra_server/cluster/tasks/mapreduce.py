@@ -1,3 +1,4 @@
+from __future__ import with_statement
 
 from tasks import Task, TaskNotFoundException, \
     STATUS_RUNNING, STATUS_COMPLETE

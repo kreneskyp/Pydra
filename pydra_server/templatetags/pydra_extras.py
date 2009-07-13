@@ -43,11 +43,11 @@ Filter that creates a range equal to the number of cores available on a node
 @register.filter(name='node_range')
 def node_range(node):
     if node.cores_available:
-        return range(0,node.cores_available)
+        return range(0,node['cores_available'])
 
     #default to all cores
     if node.cores:
-        return range(0,node.cores)
+        return range(0,node['cores'])
 
     #node hasn't been initialized, we don't know how many cores it has
     return None

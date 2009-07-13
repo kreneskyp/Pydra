@@ -27,7 +27,7 @@ from authenticator import AMFAuthenticator
 
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 
-from pydra_server.models import TaskInstance
+from pydra_server.models import TaskInstance, Node
 
 import logging
 logger = logging.getLogger('root')
@@ -225,20 +225,73 @@ class AMFInterface(pb.Root):
         """
         return self.master._running
 
-    @authenticated
-    def list_known_nodes(self, _):
-        """
-        list know_nodes
-        """
-        # cast to list, doesn't seem to digest set
-        return list(self.master.known_nodes)
 
     @authenticated
-    def connect(self, _):
+    def node_list(self, _, page=1):
         """
-        allows the gui to make the master aware of the new node without restart
+        Lists Nodes saved in the database
         """
-        return self.master.connect()
+        # get nodes
+        nodes = Node.objects.all()
+
+        # paginate
+        paginator = Paginator(nodes, 25) # Show 25 nodes per page
+
+        # Make sure page request is an int. If not, deliver first page.
+        try:
+            page = int(page)
+        except ValueError:
+            page = 1
+
+        # If page request (9999) is out of range, deliver last page of results.
+        try:
+            paginatedNodes = paginator.page(page)
+        except (EmptyPage, InvalidPage):
+            page = paginator.num_pages
+            paginatedNodes = paginator.page(page)
+
+        #generate a list of pages to display in the pagination bar
+        pages = ([i for i in range(1, 11 if page < 8 else 3)],
+                [i for i in range(page-5,page+5)] if page > 7 and page < paginator.num_pages-6 else None,
+                [i for i in range(paginator.num_pages-(1 if page < paginator.num_pages-6 else 9), paginator.num_pages+1)])
+    
+        return paginatedNodes.object_list, pages
+
+
+    @authenticated
+    def node_detail(self, _, id):
+        """
+        Returns details for a single node
+        """
+        node = Node.objects.get(id=id)
+        return node
+        
+
+    @authenticated
+    def node_edit(self, _, values):
+        """
+        Updates or Creates a node with the values passed in.  If an id field
+        is present it will be update the existing node.  Otherwise it will
+        create a new node
+        """
+        if values.has_key('id'):
+            node = Node.objects.get(pk=values['id'])
+            connect = values['port'] == node.port
+        else:
+            node = Node()
+            connect = True
+
+        for k,v in values.items():
+            node.__dict__[k] = v
+        node.save()
+
+        # call connect only for new nodes or if the port has changed.  The
+        # master should already be retrying to connect to the node with an
+        # incorrect port but the max timeout is 5 minutes.  Calling it here
+        # causes the change to fix things alot quicker
+        if connect:
+            self.master.connect()
+
 
     @authenticated
     def run_task(self, _, task_key, args=None):

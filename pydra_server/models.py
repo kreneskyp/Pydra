@@ -30,8 +30,9 @@ from _mysql_exceptions import ProgrammingError
 try:
     class PydraSettings(dbsettings.Group):
         host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect', default='localhost')
-        port        = dbsettings.IntegerValue('port','Port for this server', default=18800)
-        tasks_dir = dbsettings.StringValue('tasks_dir', 'tasks directory','Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
+        port        = dbsettings.IntegerValue('port','Port this server listens on for Workers to connect to', default=18800)
+        controller_port = dbsettings.IntegerValue('controller_port','Port this server listens on for Controllers', default=18801)
+        tasks_dir = dbsettings.StringValue('tasks_dir', 'Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
         multicast_all    = dbsettings.BooleanValue('multicast_all', 'Automatically use all the nodes found', default=False)
     pydraSettings = PydraSettings('Pydra')
 
@@ -50,7 +51,7 @@ Models
 """
 class Node(models.Model):
     host            = models.CharField(max_length=255)
-    port            = models.IntegerField(default=11880)
+    port            = models.IntegerField(default=11890)
     cores_available = models.IntegerField(null=True)
     cores           = models.IntegerField(null=True)
 
