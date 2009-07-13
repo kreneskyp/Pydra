@@ -16,13 +16,16 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import settings
+from __future__ import with_statement
+from threading import Lock
+
+from twisted.cred import credentials
+from twisted.internet import reactor, defer
+from twisted.spread import pb
+
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.models import Node, pydraSettings
-
-from twisted.spread import pb
-from twisted.internet import reactor, defer
 
 import logging
 logger = logging.getLogger('root')
@@ -35,17 +38,24 @@ class NodeClientFactory(pb.PBClientFactory):
 
     node = None
 
-    def __init__(self, node, master):
+    def __init__(self, node, manager):
+        """
+        @param node - node this factory is watching
+        @param manager - manager that is tracking this node
+        """
         self.node = node
-        self.master = master
+        self.connection_manager = manager
         pb.PBClientFactory.__init__(self)
 
     def clientConnectionLost(self, connector, reason):
+        """
+        Called when self.node disconnects
+        """
         #lock - ensures that this blocks any connection attempts
-        with self.master._lock:
+        with self.connection_manager._lock:
             self.node.ref = None
 
-        self.master.reconnect_nodes(True);
+        self.connection_manager.reconnect_nodes(True);
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
 
 
@@ -59,17 +69,30 @@ class NodeConnectionManager(Module):
         'NODE_AUTHENTICATED'
     ]
 
+    _shared = [
+        'nodes',
+        'known_nodes',
+        'worker_checker',
+    ]
+
+
     def __init__(self, manager):
+
+        #locks
+        self._lock = Lock() #general lock, use when multiple shared resources are touched
 
         self._listeners = {
             'MASTER_INIT':self.connect
         }
+
+        Module.__init__(self, manager)
 
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('./master.key')
         self.rsa_client = RSAClient(self.priv_key, self.pub_key, callback=self.init_node)
 
         #cluster management
+        print '&&&&&&&&&&&&&&&&&&&&&&&&&&&'
         self.nodes = self.load_nodes()
 
         #connection management
@@ -79,8 +102,6 @@ class NodeConnectionManager(Module):
         self.reconnect_call_ID = None
 
         self.host = 'localhost'
-
-        Module.__init__(self, manager)
 
 
     def load_nodes(self):
@@ -106,6 +127,7 @@ class NodeConnectionManager(Module):
         #  1) connect() cannot be called more than once at a time
         #  2) if a node fails while connecting the reconnect call will block till 
         #     connections are finished
+        print '!!!!!!!!!!!!!!!!!!!!!!!'
         with self._lock:
             self.connecting=True
 
@@ -116,7 +138,7 @@ class NodeConnectionManager(Module):
                 if (i.host, i.port) in self.known_nodes:
                     self.known_nodes.discard((i.host, i.port))
 
-            "Begin the connection process"
+            logger.info("Connecting to nodes")
             connections = []
             self.attempts = []
             for id, node in self.nodes.items():
@@ -179,6 +201,7 @@ class NodeConnectionManager(Module):
 
         else:
             self.reconnect_count = 0
+
 
     def check_node(self, key, node):
         # node.pub_key is set only for paired nodes, make sure we don't attempt

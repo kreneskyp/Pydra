@@ -16,6 +16,9 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from __future__ import with_statement
+from threading import Lock
+
 import settings
 
 from twisted.application import internet
@@ -24,13 +27,16 @@ from twisted.spread import pb
 
 from pydra_server.models import pydraSettings
 from pydra_server.cluster.auth.master_realm import MasterRealm
+from pydra_server.cluster.auth.rsa_auth import load_crypto
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
+from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
 
 
 # init logging
 import logging
 logger = logging.getLogger('root')
+
 
 class WorkerConnectionManager(Module):
 
@@ -39,13 +45,29 @@ class WorkerConnectionManager(Module):
         'WORKER_DISCONNECTED',
     ]
 
+    _shared = [
+        'worker_checker'
+    ]
+
     def __init__(self, manager):
         self._services = [self.get_worker_service]
+
+        Module.__init__(self, manager)
+
+        #locks
+        self._lock = Lock() #general lock, use when multiple shared resources are touched
+
+        #load rsa crypto
+        self.pub_key, self.priv_key = load_crypto('./master.key')
 
         #cluster management
         self.workers = {}
 
-        Module.__init__(self, manager)
+        # setup worker security - using this checker just because we need
+        # _something_ that returns an avatarID.  Its extremely vulnerable
+        # but thats ok because the real authentication takes place after
+        # the worker has connected
+        self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
 
 
     def get_worker_service(self, master):
@@ -54,13 +76,8 @@ class WorkerConnectionManager(Module):
         """
         # setup cluster connections
         realm = MasterRealm()
-        realm.server = master
+        realm.server = self
 
-        # setup worker security - using this checker just because we need
-        # _something_ that returns an avatarID.  Its extremely vulnerable
-        # but thats ok because the real authentication takes place after
-        # the worker has connected
-        self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
         p = portal.Portal(realm, [self.worker_checker])
  
         return internet.TCPServer(pydraSettings.port, pb.PBServerFactory(p))
@@ -70,48 +87,21 @@ class WorkerConnectionManager(Module):
         """
         Callback when a worker has been successfully authenticated
         """
+        self.emit('WORKER_CONNECTED')
         #request status to determine what this worker was doing
         deferred = worker_avatar.remote.callRemote('status')
         deferred.addCallback(self.add_worker, worker=worker_avatar, worker_key=worker_avatar.name)
 
 
-    def add_worker(self, result, worker, worker_key):
+    def worker_disconnected(self, worker):
         """
-        Add a worker avatar as worker available to the cluster.  There are two possible scenarios:
-        1) Only the worker was started/restarted, it is idle
-        2) Only master was restarted.  Workers previous status must be reestablished
-
-        The best way to determine the state of the worker is to ask it.  It will return its status
-        plus any relevent information for reestablishing it's status
+        Callback from worker_avatar when it is disconnected
         """
-        # worker is working and it was the master for its task
-        if result[0] == WORKER_STATUS_WORKING:
-            logger.info('worker:%s - is still working' % worker_key)
-            #record what the worker is working on
-            #self._workers_working[worker_key] = task_key
+        with self._lock:
+            del self.workers[worker.name]
 
-        # worker is finished with a task
-        elif result[0] == WORKER_STATUS_FINISHED:
-            logger.info('worker:%s - was finished, requesting results' % worker_key)
-            #record what the worker is working on
-            #self._workers_working[worker_key] = task_key
+        self.emit('WORKER_DISCONNECTED', worker)
+        
 
-            #check if the Worker acting as master for this task is ready
-            if (True):
-                #TODO
-                pass
-
-            #else not ready to send the results
-            else:
-                #TODO
-                pass
-
-        #otherwise its idle
-        else:
-            with self._lock:
-                self.workers[worker_key] = worker
-                # worker shouldn't already be in the idle queue but check anyway
-                if not worker_key in self._workers_idle:
-                    self._workers_idle.append(worker_key)
-                    logger.info('worker:%s - added to idle workers' % worker_key)
+    
 

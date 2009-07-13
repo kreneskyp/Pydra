@@ -57,6 +57,16 @@ class ModuleManager(object):
     # list of methods that each return a service object
     _services = []
 
+
+    def __init__(self, modules=[]):
+        """
+        Initialize the ModuleManager with the list of nodes
+
+        @param modules - list of modules to initially register
+        """
+        map(self.register_module, modules)
+
+
     def emit_signal(self, signal, *args, **kwargs):
         """
         Called when a module wants to emit a signal.  It notifies
@@ -70,6 +80,30 @@ class ModuleManager(object):
             signal_listeners = self._listeners[signal]
             for function in signal_listeners:
                 function(*args, **kwargs)
+
+
+    def get_services(self):
+        """
+        Get the service objects used by twistd.  The services are exposed by
+        modules.  This method just calls all the mapped functions used for
+        creating the services
+        
+        @return list of twisted service objects
+        """
+        return [service(self) for service in self._services]
+
+
+    def get_shared(self, key):
+        """
+        Returns a shared property
+
+        @param key to look up
+        @return Value if exists, None otherwise
+        """
+        try:
+            return self.__dict__[key]
+        except KeyError:
+            return None
 
 
     def register_listener(self, signal, function):
@@ -88,6 +122,9 @@ class ModuleManager(object):
     def register_module(self, module_class):
         """
         Register a module
+
+        @module_class - class of the module to register.  Module will be
+                        instantiated by the ModuleManager
         """
         self._modules.append(module_class(self))
 
@@ -111,19 +148,6 @@ class ModuleManager(object):
             self._signals[signal].append(module)
         except KeyError:
             self._signals[signal] = [module]
-
-
-
-    def get_shared(self, key):
-        """
-        Returns a shared property
-        @param key to look up
-        @return Value if exists, None otherwise
-        """
-        try:
-            return self.__dict__[key]
-        except KeyError:
-            return None
 
 
     def set_shared(self, key, value):
@@ -154,7 +178,7 @@ class Module(object):
 
     # mapping of signals and the functions this module will invoke upon 
     # receiving that signal
-    _listening = {}
+    _listeners = {}
 
     # list of functions this module adds to avatar classes 
     _remotes = []
@@ -178,7 +202,7 @@ class Module(object):
         for signal in self._signals:
             manager.register_signal(signal, self)
 
-        for signal, function in self._listening.items():
+        for signal, function in self._listeners.items():
             print signal, function
             manager.register_listener(signal, function)
 
@@ -194,17 +218,21 @@ class Module(object):
         Overridden to pass shared properties through to the manager
         """
         if key not in ('__dict__', '_shared') and key in self._shared:
-            return self.manager.get_shared(key)
+            val =  self.manager.get_shared(key)
+            print 'GETTING: ', key, val
+            return val
         return object.__getattribute__(self, key)
 
 
-    def __setattribute__(self, key, value):
+    def __setattr__(self, key, value):
         """
         Overridden to pass shared property lookups through to the manager
         """
-        
-        if key != '__dict__' and key in self.__dict__['_shared']:
+        #print '!!!!!!!!!!!!?????????', key, value
+        if key not in ('__dict__', '_shared') and key in self._shared:
+            print ' SETTING: ', key, value
             self.manager.set_shared(key, value)
+
         self.__dict__[key] = value
 
 

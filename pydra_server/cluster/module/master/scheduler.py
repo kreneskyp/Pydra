@@ -16,6 +16,9 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from __future__ import with_statement
+from threading import Lock
+
 import settings
 import datetime
 from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
@@ -30,6 +33,38 @@ logger = logging.getLogger('root')
 
 class TaskScheduler(Module):
 
+    """
+    Handles Scheduling tasks
+
+    Methods:
+
+        == worker availability ==
+        remove_worker - called on worker disconnect
+        #return_work_success
+        #return_work_failed
+        worker_connected
+        worker_status_returned
+        
+        == scheduling ==
+        queue_task - add task to queue
+        cancel_task
+        advance_queue - pick next task
+        run_task - sends task to worker
+        run_task_successful
+        select_worker
+
+        == task reporting ==
+        send_results
+        task_failed
+        worker_stopped
+        request_worker
+
+        == task status tracking ==
+        fetch_task_status
+        fetch_task_status_success
+        task_statuses        
+    """
+
     _signals = [
         'TASK_QUEUED',
         'TASK_STARTED',
@@ -39,15 +74,18 @@ class TaskScheduler(Module):
         'WORKUNIT_COMPLETED',
         'WORKUNIT_FAILED'
     ]
+ 
+    _shared = [
+        '_running_workers',
+    ]    
 
-    
     def __init__(self, manager):
 
-        self._listeners = [
-            ('WORKER_DISCONNECTED',self.remove_worker),
-            ('WORKER_CONNECTED', self.advance_queue),
-            ('CANCEL_TASK', self.cancel_task),
-        ]
+        self._listeners = {
+            'WORKER_DISCONNECTED':self.remove_worker,
+            'WORKER_CONNECTED': self.advance_queue,
+            'CANCEL_TASK': self.cancel_task,
+        }
 
         self._remotes = [
             (REMOTE_WORKER, self.request_worker),
@@ -59,6 +97,12 @@ class TaskScheduler(Module):
         self._interfaces = [
             self.task_statuses
         ]
+
+
+        Module.__init__(self, manager)
+
+        # locks
+        self._lock_queue = Lock()   #for access to _queue
 
         # load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -79,8 +123,6 @@ class TaskScheduler(Module):
         self.task_manager = TaskManager()
         self.task_manager.autodiscover()
         self.available_tasks = self.task_manager.registry
-
-        Module.__init__(self, manager)
 
 
     def remove_worker(self, worker_key):
@@ -409,6 +451,57 @@ class TaskScheduler(Module):
 
             else:
                 logger.debug('Worker:%s - request for worker failed, task is not running' % (workerAvatar.name))
+
+
+    def worker_connected(self, worker_avatar):
+        """
+        Callback when a worker has been successfully authenticated
+        """
+        #request status to determine what this worker was doing
+        deferred = worker_avatar.remote.callRemote('status')
+        deferred.addCallback(self.worker_status_returned, worker=worker_avatar, worker_key=worker_avatar.name)
+
+
+    def worker_status_returned(self, result, worker, worker_key):
+        """
+        Add a worker avatar as worker available to the cluster.  There are two possible scenarios:
+        1) Only the worker was started/restarted, it is idle
+        2) Only master was restarted.  Workers previous status must be reestablished
+
+        The best way to determine the state of the worker is to ask it.  It will return its status
+        plus any relevent information for reestablishing it's status
+        """
+        # worker is working and it was the master for its task
+        if result[0] == WORKER_STATUS_WORKING:
+            logger.info('worker:%s - is still working' % worker_key)
+            #record what the worker is working on
+            #self._workers_working[worker_key] = task_key
+
+        # worker is finished with a task
+        elif result[0] == WORKER_STATUS_FINISHED:
+            logger.info('worker:%s - was finished, requesting results' % worker_key)
+            #record what the worker is working on
+            #self._workers_working[worker_key] = task_key
+
+            #check if the Worker acting as master for this task is ready
+            if (True):
+                #TODO
+                pass
+
+            #else not ready to send the results
+            else:
+                #TODO
+                pass
+
+        #otherwise its idle
+        else:
+            with self._lock:
+                self.workers[worker_key] = worker
+                # worker shouldn't already be in the idle queue but check anyway
+                if not worker_key in self._workers_idle:
+                    self._workers_idle.append(worker_key)
+                    logger.info('worker:%s - added to idle workers' % worker_key)
+
 
 
     def fetch_task_status(self):

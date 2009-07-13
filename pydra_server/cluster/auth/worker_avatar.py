@@ -27,7 +27,7 @@ class WorkerAvatar(ModuleAvatar):
     """
     Avatar used by Workers connecting to the Master.
     """
-    def __init__(self, name, server, node, module_manager):
+    def __init__(self, name, server, node):
         self.name = name
         self.server = server
 
@@ -35,7 +35,7 @@ class WorkerAvatar(ModuleAvatar):
         node_key = node_key if node_key else None
         master_key = RSA.construct(server.pub_key) if server.pub_key else None
 
-        ModuleAvatar.__init__(self, module_manager, master_key, None, node_key, server.worker_authenticated, True)
+        ModuleAvatar.__init__(self, server, master_key, None, node_key, server.worker_authenticated, True)
 
     def attached(self, mind):
         self.remote = mind
@@ -43,10 +43,11 @@ class WorkerAvatar(ModuleAvatar):
     def detached(self, mind):
         logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
-            self.server.remove_worker(self.name)
+            self.server.worker_disconnected(self.name)
         self.remote = None
 
 
+    '''
     def perspective_failed(self, message, workunit_key):
         """
         Called by workers when they task they were running threw an exception
@@ -82,3 +83,4 @@ class WorkerAvatar(ModuleAvatar):
         returns the status (progress) of the task this worker is working on
         """
         return self.server.task_status(self)
+    '''

@@ -33,20 +33,18 @@ class AutoDiscoveryModule(Module):
         'NODE_ADDED',
     ]
 
-    _listeners = [
-    ]
-
-    _remotes = [
-    ]
-
-    _interface = [
+    _shared = [
+        'known_nodes'
     ]
 
 
     def __init__(self, manager):
+
+        Module.__init__(self, manager)
+
         self.known_nodes = set()
         self.autodiscovery()
-        Module.__init__(self, manager)
+
 
 
     def autodiscovery(self, callback=None):

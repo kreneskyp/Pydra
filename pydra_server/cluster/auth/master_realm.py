@@ -18,7 +18,10 @@
 """
 import settings
 from zope.interface import implements
+
 from twisted.cred import portal
+from twisted.spread import pb
+
 from pydra_server.models import Node
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 
@@ -34,17 +37,17 @@ class MasterRealm:
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
 
-        if avatarID == 'controller':
+        '''if avatarID == 'controller':
             avatar = ControllerAvatar(avatarID)
             avatar.server = self.server
             avatar.attached(mind)
             logger.info('controller:%s - connected' % avatarID)
 
-        else:
-            key_split = avatarID.split(':')
-            node = Node.objects.get(host=key_split[0], port=key_split[1])
-            avatar = WorkerAvatar(avatarID, self.server, node)
-            avatar.attached(mind)
-            logger.info('worker:%s - connected' % avatarID)
+        else:'''
+        key_split = avatarID.split(':')
+        node = Node.objects.get(host=key_split[0], port=key_split[1])
+        avatar = WorkerAvatar(avatarID, self.server, node)
+        avatar.attached(mind)
+        logger.info('worker:%s - connected' % avatarID)
 
         return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)
