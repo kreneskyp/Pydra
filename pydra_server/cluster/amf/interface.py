@@ -254,7 +254,7 @@ class AMFInterface(pb.Root):
         pages = ([i for i in range(1, 11 if page < 8 else 3)],
                 [i for i in range(page-5,page+5)] if page > 7 and page < paginator.num_pages-6 else None,
                 [i for i in range(paginator.num_pages-(1 if page < paginator.num_pages-6 else 9), paginator.num_pages+1)])
-    
+
         return paginatedNodes.object_list, pages
 
 
@@ -265,7 +265,7 @@ class AMFInterface(pb.Root):
         """
         node = Node.objects.get(id=id)
         return node
-        
+
 
     @authenticated
     def node_edit(self, _, values):
