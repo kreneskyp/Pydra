@@ -48,6 +48,7 @@ class ParallelTask(Task):
         if key == 'subtask':
             value.parent = self
 
+
     def work_unit_complete(self, workunit, results):
         """
         Method stub for method called to post process results.  This
@@ -57,26 +58,6 @@ class ParallelTask(Task):
         @param results - results sent by the completed subtask
         """
         pass
-
-
-    def work(self, args, callback=None, callback_args={}):
-        """
-        overridden to prevent early task cleanup.  ParallelTasl._work() returns immediately even though 
-        work is likely running in the background.  There appears to be no effective way to block without 
-        interupting twisted.Reactor.  The cleanup that normally happens in work() has been moved to
-        task_complete() which will be called when there is no more work remaining.
-
-        @param args - kwargs to be passed to _work
-        @param callback - callback that will be called when work is complete
-        @param callback_args - dictionary passed to callback as kwargs
-        """
-        self.__callback = callback
-        self._callback_args=callback_args
-
-        self._status = STATUS_RUNNING
-        results = self._work(**args)
-
-        return results
 
 
     def progress(self):
@@ -97,17 +78,6 @@ class ParallelTask(Task):
         self.subtask._stop()
 
 
-    def task_complete(self, results):
-        """
-        Should be called when all workunits have completed
-        """
-        self._status = STATUS_COMPLETE
-
-        #make a callback, if any
-        if self.__callback:
-            self.__callback(results)
-
-
     def _work(self, **kwargs):
         """
         Work function overridden to delegate workunits to other Workers.
@@ -116,7 +86,7 @@ class ParallelTask(Task):
         # save data, if any
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
-            logger.debug('Paralleltask - data was passed in!!!!')
+            logger.debug('Paralleltask - data was passed in!')
 
         self.subtask_key = self.subtask._generate_key()
 
@@ -208,7 +178,7 @@ class ParallelTask(Task):
 
         This method *MUST* lock while it is altering the lists of data
         """
-        logger.debug('Paralleltask - REMOTE Work unit completed')
+        logger.debug('Paralleltask - Work unit completed, local=%s' % local)
         with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
@@ -225,7 +195,7 @@ class ParallelTask(Task):
                 #all work is done, call the task specific function to combine the results 
                 logger.debug('Paralleltask - all workunits complete, calling task post process')
                 results = self.work_complete()
-                self.task_complete(results)
+                self._complete(results)
                 return
 
         # start another work unit.  its possible there is only 1 unit left and multiple

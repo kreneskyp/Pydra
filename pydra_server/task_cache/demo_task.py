@@ -49,7 +49,7 @@ class TestTask(Task):
     def __init__(self, msg='Demo Task'):
         Task.__init__(self, msg)
 
-    def _work(self, **kwargs):
+    def work(self, **kwargs):
         """
         Does some simple 'work'
         """

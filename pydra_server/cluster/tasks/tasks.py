@@ -96,12 +96,12 @@ class Task(object):
             split = subtask_key.split('.')
             subtask = self.get_subtask(split)
             logger.debug('Task - got subtask')
-            self.work_deferred = threads.deferToThread(subtask.work, args, callback, callback_args)
+            self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
 
         #else this is a normal task just execute it
         else:
             logger.debug('Task - starting task: %s' % args)
-            self.work_deferred = threads.deferToThread(self.work, args, callback, callback_args)
+            self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
         if errback:
             self.work_deferred.addErrback(errback)
@@ -123,28 +123,57 @@ class Task(object):
         self.STOP_FLAG=True
 
 
-    def work(self, args={}, callback=None, callback_args={}):
+    def _start(self, args={}, callback=None, callback_args={}):
         """
-        Does the work of the task.  This is can be called directly for synchronous work or via start which
-        causes a workunit thread to be spawned and call this function.  this method will set flags properly and
-        delegate implementation specific work to _work(args)
+        overridden to prevent early task cleanup.  ParallelTask._work() returns immediately even though 
+        work is likely running in the background.  There appears to be no effective way to block without 
+        interupting twisted.Reactor.  The cleanup that normally happens in work() has been moved to
+        task_complete() which will be called when there is no more work remaining.
+
+        @param args - kwargs to be passed to _work
+        @param callback - callback that will be called when work is complete
+        @param callback_args - dictionary passed to callback as kwargs
         """
-        logger.debug('%s - Task - in Task.work()'  % self.get_worker().worker_key)
+        logger.debug('************** parallelTask.work')
+        self.__callback = callback
+        self._callback_args=callback_args
+
         self._status = STATUS_RUNNING
         results = self._work(**args)
-        self._status = STATUS_COMPLETE
-        logger.debug('%s - Task - work complete' % self.get_worker().worker_key)
-
-        self.work_deferred = None
-
-        #make a callback, if any
-        if callback:
-            logger.debug('%s - Task - Making callback' % self)
-            callback(results, **callback_args)
-        else:
-            logger.warning('%s - Task - NO CALLBACK TO MAKE: %s' % (self, self.__callback))
 
         return results
+
+
+    def _work(self, **kwargs):
+        """
+        Calls the users work function and then calls the callback
+        signally completion of this task.  This is split out from 
+        do_work so that completion of work can be overridden to be
+        asynchronous.  By default it will be synchronous and return 
+        as soon as work() completes.  For any subclass that distributes
+        work the callback cannot be called until after all workunits
+        asynchronously return
+        """
+        results = self.work(**kwargs)
+        self._complete(results)
+
+
+    def work(self, **kwargs):
+        """
+        Function to be overrided by users to perform the real work
+        """
+        pass
+
+
+    def _complete(self, results):
+        self._status = STATUS_COMPLETE
+
+        if self.__callback:
+            logger.debug('%s - Task._work() -Making callback' % self)
+            self.__callback(results, **self._callback_args)
+        else:
+            logger.warning('%s - Task._work() - NO CALLBACK TO MAKE: %s' % (self, self.__callback))
+
 
 
     def status(self):
