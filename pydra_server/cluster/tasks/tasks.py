@@ -92,7 +92,7 @@ class Task(object):
 
         #if this was subtask find it and execute just that subtask
         if subtask_key:
-            logger.debug('Task - starting subtask %s - %s' % (subtask_key, args))
+            logger.debug('Task - starting subtask %s' % (subtask_key))
             split = subtask_key.split('.')
             subtask = self.get_subtask(split)
             logger.debug('Task - got subtask')
@@ -100,7 +100,7 @@ class Task(object):
 
         #else this is a normal task just execute it
         else:
-            logger.debug('Task - starting task: %s' % args)
+            logger.debug('Task - starting task: %s' % self)
             self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
         if errback:
@@ -134,7 +134,6 @@ class Task(object):
         @param callback - callback that will be called when work is complete
         @param callback_args - dictionary passed to callback as kwargs
         """
-        logger.debug('************** parallelTask.work')
         self.__callback = callback
         self._callback_args=callback_args
 

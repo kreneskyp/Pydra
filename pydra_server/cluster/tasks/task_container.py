@@ -135,7 +135,7 @@ class TaskContainer(Task):
 
         # start first subtask
         self._current_subtask = 0
-        self._start_subtask()
+        self._start_subtask(args=kwargs)
 
 
     def _start_subtask(self, args={}):
