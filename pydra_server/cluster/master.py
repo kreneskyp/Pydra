@@ -730,18 +730,20 @@ class Master(object):
                         # was already removed by cancel
                         pass
 
-
-            #check to make sure the task was still in the queue.  Its possible this call was made at the same
-            # time a task was being canceled.  Only worry about sending the reults back to the Task Head
-            # if the task is still running
-            task_instance = TaskInstance.objects.get(id=task_instance_id)
-            with self._lock_queue:
-                if task_instance in self._running:
-                    #if this was a subtask the main task needs the results and to be informed
-                    task_instance = TaskInstance.objects.get(id=task_instance_id)
-                    main_worker = self.workers[task_instance.worker]
-                    logger.debug('Worker:%s - informed that subtask completed' % 'FOO')
-                    main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
+            else:
+                #check to make sure the task was still in the queue.  Its possible this call was made at the same
+                # time a task was being canceled.  Only worry about sending the reults back to the Task Head
+                # if the task is still running
+                task_instance = TaskInstance.objects.get(id=task_instance_id)
+                with self._lock_queue:
+                    if task_instance in self._running:
+                        #if this was a subtask the main task needs the results and to be informed
+                        task_instance = TaskInstance.objects.get(id=task_instance_id)
+                        main_worker = self.workers[task_instance.worker]
+                        logger.debug('Worker:%s - informed that subtask completed' % task_instance.worker)
+                        main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
+                    else:
+                        logger.debug('Worker:%s - returned a subtask but the task is no longer running.  discarding value.' % worker_key)
 
         #attempt to advance the queue
         self.advance_queue()
