@@ -198,11 +198,11 @@ class MapReduceWrapper_Test(unittest.TestCase):
 
         self.worker = WorkerProxy()
 
-        self.maptask = MapWrapper(IdentityMapTask("IdentityMapTask"), self.im)
-        self.maptask.parent = self.worker
+        self.maptask = MapWrapper(IdentityMapTask("IdentityMapTask"), self.im, self.worker)
+        #self.maptask.parent = self.worker
 
-        self.reducetask = ReduceWrapper(IdentityReduceTask("IdentityReduceTask"), self.im)
-        self.reducetask.parent = self.worker
+        self.reducetask = ReduceWrapper(IdentityReduceTask("IdentityReduceTask"), self.im, self.worker)
+        #self.reducetask.parent = self.worker
 
 
     def test_work_mapwrapper(self):

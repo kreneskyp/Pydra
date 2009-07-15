@@ -172,11 +172,9 @@ class MapReduceTask(Task):
 
         self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
 
-        self.maptask = MapWrapper(self.map('MapTask'), self.im)
-        self.maptask.parent = self
+        self.maptask = MapWrapper(self.map('MapTask'), self.im, self)
 
-        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im)
-        self.reducetask.parent = self
+        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im, self)
 
 
     def map_callback(self, result, mapid=None, local=False):
@@ -412,21 +410,16 @@ class MapReduceWrapper():
     * get_subtask() to return self instead of subtask directly,
     * start() to run special self.work() instead of subtask's"""
 
-    def __init__(self, task, im):
+    def __init__(self, task, im, parent):
         self.task = task
-        self.task.parent = self
-
         self.im = im
+        self.parent = parent
+        self.task.parent = parent
 
 
     def _generate_key(self):
-        key = self.task._generate_key()
+        return self.task._generate_key()
 
-        if issubclass(self.parent.__class__, (MapReduceTask,)):
-            base = self.parent.get_key()
-            key = '%s.%s' % (base, key)
-
-        return key
 
     def get_key(self):
         return self._generate_key()
@@ -449,6 +442,7 @@ class MapReduceWrapper():
 
     def __repr__(self):
         return self.task.__repr__()
+
 
     def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
         """
@@ -476,7 +470,7 @@ class MapWrapper(MapReduceWrapper):
         dictionaries. And it is necessary to self.im.flush() intermediate results after
         self._work().
         """
-        logger.debug('%s - MapWrapper.work()'  % self.task.get_worker().worker_key)
+        logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
 
         output = AppendableDict()
         args['output'] = output
@@ -488,7 +482,7 @@ class MapWrapper(MapReduceWrapper):
 
         results = self.im.flush(output, id) # partitions are our results
 
-        logger.debug('%s - MapWrapper - work complete' % self.task.get_worker().worker_key)
+        logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
@@ -507,7 +501,7 @@ class ReduceWrapper(MapReduceWrapper):
         Overwrites Task.work() beacuse ReduceTask needs to provide special input
         dictionaries (from self.im).
         """
-        logger.debug('%s - ReduceWrapper.work()'  % self.task.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper.work()'  % self.get_worker().worker_key)
 
         args['input'] = self.im._partition_iter(args['partition'])
         output = args['output'] = {}
@@ -518,7 +512,7 @@ class ReduceWrapper(MapReduceWrapper):
         self.task.work(args) # ignoring results
         results = output
 
-        logger.debug('%s - ReduceWrapper - work complete' % self.task.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper - work complete' % self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
