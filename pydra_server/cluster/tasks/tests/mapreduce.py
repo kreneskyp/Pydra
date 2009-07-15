@@ -39,12 +39,14 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
         a = { 'a': 1, 'b': 1, }
 
         im1 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
-        p1 = im1.flush(a, 'map1')
+        pdict = im1.partition_output(a)
+        p1 = im1.flush(pdict, 'map1')
 
         b = { 'b': 1, 'c': 1, }
 
         im2 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
-        p2 = im2.flush(b, 'map2')
+        pdict = im2.partition_output(b)
+        p2 = im2.flush(pdict, 'map2')
 
         # getting results
         im = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
@@ -182,6 +184,10 @@ class IdentityReduceTask(Task):
 
 class NullIM():
     """dummy intermediate results class"""
+
+    def partition_output(self, output):
+        return output
+
 
     def flush(self, output, mapid):
         return output, mapid

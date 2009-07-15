@@ -75,12 +75,7 @@ class IntermediateResultsFiles():
         return hash(str(key)) % self.reducers
 
 
-    def flush(self, output, mapid):
-        """dumps a dictionary to a files.
-        returns corresponding partitions-dictionary"""
-
-        logger.debug("im: flushing %s" % str(output))
-
+    def partition_output(self, output):
         pdict = {}
 
         for k, vs in output.iteritems():
@@ -92,9 +87,18 @@ class IntermediateResultsFiles():
             else:
                 pdict[p] = [(k, vs)]
 
+        return pdict.iteritems()
+
+
+    def flush(self, partition, mapid):
+        """dumps a dictionary to a files.
+        returns corresponding partitions-dictionary"""
+
+        logger.debug("im: flushing %s" % str(partition))
+
         partitions = {}
 
-        for p, tuples in pdict.iteritems():
+        for p, tuples in partition:
 
             filename = self.pattern % (self.task_id, p, mapid)
             partitions[p] = filename
@@ -480,7 +484,8 @@ class MapWrapper(MapReduceWrapper):
 
         self.task._work(**args) # ignoring results
 
-        results = self.im.flush(output, id) # partitions are our results
+        pdict = self.im.partition_output(output)
+        results = self.im.flush(pdict, id) # partitions are our results
 
         logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
 
