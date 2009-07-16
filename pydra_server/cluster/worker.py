@@ -171,9 +171,10 @@ class Worker(pb.Referenceable):
 
         logger.info('Worker:%s - starting task: %s:%s  %s' % (self.worker_key, key,subtask_key, args))
         #create an instance of the requested task
-        self.__task_instance = object.__new__(self.available_tasks[key])
-        self.__task_instance.__init__()
-        self.__task_instance.parent = self
+        if not self.__task_instance or self.__task_instance.__class__.__name__ != key:
+            self.__task_instance = object.__new__(self.available_tasks[key])
+            self.__task_instance.__init__()
+            self.__task_instance.parent = self
 
         # process args to make sure they are no longer unicode
         clean_args = {}
