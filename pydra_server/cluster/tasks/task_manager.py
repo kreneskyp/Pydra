@@ -162,46 +162,48 @@ class TaskManager():
         import imp, os, sys, inspect
         from pydra_server.models import *
 
-        # Step 1: get all python files in the tasks directory
-        files = os.listdir(pydraSettings.tasks_dir)
-        sys.path.append(pydraSettings.tasks_dir)
+        for tasks_dir in pydraSettings.tasks_dir.split(','):
 
-        # Step 2: iterate through all the python files importing each one and 
-        #         and add it as an available Task
-        for filename in files:
-            if filename <> '__init__.py' and filename[-3:] == '.py':
-                module = filename[:-3]
-                
-                try:
-                    tasks = __import__(module, {}, {}, ['Task'])
-                except Exception, e:
-                    logger.warn('Failed to load tasks from: %s (%s) - %s' % (module, filename, e))
-                    continue
+            # Step 1: get all python files in the tasks directory
+            files = os.listdir(tasks_dir)
+            sys.path.append(tasks_dir)
 
-                # iterate through the objects in  the module to find Tasks
-                # TODO replace this logic with code in Task that adds all tasks
-                # to module.tasks when they are created.  This would be similar
-                # to how django does this in db/base.py.  It's extremely complicated
-                # and would take more time than is possible now.
+            # Step 2: iterate through all the python files importing each one and 
+            #         and add it as an available Task
+            for filename in files:
+                if filename <> '__init__.py' and filename[-3:] == '.py':
+                    module = filename[:-3]
+                    
+                    try:
+                        tasks = __import__(module, {}, {}, ['Task'])
+                    except Exception, e:
+                        logger.warn('Failed to load tasks from: %s (%s) - %s' % (module, filename, e))
+                        continue
 
-                #class exclusions.  do not include any of these class
-                class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
+                    # iterate through the objects in  the module to find Tasks
+                    # TODO replace this logic with code in Task that adds all tasks
+                    # to module.tasks when they are created.  This would be similar
+                    # to how django does this in db/base.py.  It's extremely complicated
+                    # and would take more time than is possible now.
 
-                for key, task_class in tasks.__dict__.items():
+                    #class exclusions.  do not include any of these class
+                    class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
 
-                    # Add any classes that a runnable task.
-                    # TODO: filter out subtasks not marked as standalone
-                    if inspect.isclass(task_class) and key not in class_exclusions and issubclass(task_class, (Task,)):
+                    for key, task_class in tasks.__dict__.items():
 
-                        try:
-                            #generate a unique key for this 
-                            task_key = key
+                        # Add any classes that a runnable task.
+                        # TODO: filter out subtasks not marked as standalone
+                        if inspect.isclass(task_class) and key not in class_exclusions and issubclass(task_class, (Task,)):
 
-                            self.register(task_key, task_class)
-                            logger.info('Loaded task: %s' % key)
+                            try:
+                                #generate a unique key for this 
+                                task_key = key
 
-                        except:
-                            logger.error('ERROR Loading task: %s' % key)
+                                self.register(task_key, task_class)
+                                logger.info('Loaded task: %s' % key)
+
+                            except:
+                                logger.error('ERROR Loading task: %s' % key)
 
 
 
