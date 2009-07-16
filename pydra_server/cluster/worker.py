@@ -64,12 +64,12 @@ class MasterClientFactory(pb.PBClientFactory):
         self.kwargs = kwargs
 
     def clientConnectionLost(self, connector, reason):
-        logger.warning('Lost connection to master.  Reason:', reason)
+        logger.warning('Lost connection to master.  Reason: %s' % reason)
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
         self.reconnect_func(*(self.args), **(self.kwargs))
 
     def clientConnectionFailed(self, connector, reason):
-        logger.warning('Connection to master failed. Reason:', reason)
+        logger.warning('Connection to master failed. Reason: %s' % reason)
         pb.PBClientFactory.clientConnectionFailed(self, connector, reason)
 
 
