@@ -247,6 +247,7 @@ class Worker(pb.Referenceable):
         with self.__lock_connection:
             if self.master:
                 deferred = self.master.callRemote("failed", results, self.__workunit_key)
+                logger.error('Worker - Task Failed: %s' % results)
                 #deferred.addErrback(self.send_failed_failed, results, self.__workunit_key)
 
             # master disapeared, hold failure until it comes back online and requests it
