@@ -83,7 +83,7 @@ class TaskScheduler(Module):
 
         self._listeners = {
             'WORKER_DISCONNECTED':self.remove_worker,
-            'WORKER_CONNECTED': self.advance_queue,
+            'WORKER_AUTHENTICATED': self.worker_connected,
             'CANCEL_TASK': self.cancel_task,
         }
 
