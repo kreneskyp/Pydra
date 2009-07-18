@@ -40,6 +40,8 @@ class AutoDiscoveryModule(Module):
 
     def __init__(self, manager):
 
+        self._interfaces = [self.list_known_nodes]
+
         Module.__init__(self, manager)
 
         self.known_nodes = set()
@@ -90,3 +92,13 @@ class AutoDiscoveryModule(Module):
                 avahi.DBUS_INTERFACE_SERVICE_BROWSER)
 
         sbrowser.connect_to_signal("ItemNew", node_found)
+
+
+    def list_known_nodes(self, _):
+        """
+        list know_nodes
+        """
+        # cast to list, doesn't seem to digest set
+        return list(self.master.known_nodes)
+
+

@@ -19,6 +19,7 @@
 
 from django.template import Context, loader
 
+from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks.tasks import *
 from pydra_server.models import TaskInstance
 
@@ -26,15 +27,37 @@ import logging
 logger = logging.getLogger('root')
 
 
-class TaskManager():
+class TaskManager(Module):
     """ 
     TaskManager - Class that tracks and controls tasks available to run on the
                   cluster.
     """
 
-    def __init__(self):
-        self.registry = {}
+    _signals = [
+        'TASK_ADDED',
+        'TASK_UPDATED',
+        'TASK_REMOVED',
+        'TASK_INVALID',
+    ]
 
+    _shared = [
+        'registry'
+    ]    
+
+    def __init__(self, manager):
+
+        self._interfaces = [
+            self.list_tasks,
+            self.task_history
+        ]
+
+        self._listeners = {
+            'MASTER_INIT':self.autodiscovery
+        }
+
+        Module.__init__(self, manager)
+
+        self.registry = {}
 
     
     def register(self, key, task):
@@ -204,4 +227,26 @@ class TaskManager():
                             logger.error('ERROR Loading task: %s' % key)
 
 
+    def task_history(self, _, key, page):
+
+        instances = TaskInstance.objects.filter(task_key=key).order_by('-completed').order_by('-started')
+        paginator = Paginator(instances, 10)
+
+         # If page request (9999) is out of range, deliver last page of results.
+        try:
+            paginated = paginator.page(page)
+
+        except (EmptyPage, InvalidPage):
+            page = paginator.num_pages
+            paginated = paginator.page(page)
+
+        return {
+                'prev':paginated.has_previous(),
+                'next':paginated.has_next(),
+                'page':page,
+                'instances':[instance for instance in paginated.object_list]
+               }
+
+
+    
 

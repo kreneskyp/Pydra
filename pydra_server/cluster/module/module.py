@@ -20,142 +20,6 @@
 import logging
 logger = logging.getLogger('root')
 
-class ModuleManager(object):
-    """
-    ModuleManager is used to coordinate module interactions.  It Loads them
-    and handles transporting signals between emitters and listerners
-
-    This allows modules to register for a signal that can be emitted by any 
-    other component.  This allows multiple components to emit the same signal
-    This system allows modules to be dependent on events rather than individual
-    modules.  It also removes the need for complicated dependency checking when
-    loading modules.
-
-    IE.  Both the manual registration and autodiscovery can emit NODE_ADDED.
-    """
-    
-    _modules = []
-
-    # map of signals to modules that emit them. This is only used for debugging
-    # purposes.  When initializing components this can be used to double check
-    # registered listeners actually have someone to talk to.
-    _signals = {}
-    
-    # map of signals to listeners.  Used for calling functions 
-    # when the signal is emitted
-    _listeners = {}
-
-    # list of proeprties that are shared with the manager.  This allows them
-    # to be accessed easier by other modules.  The other modules won't need
-    # to know which other module supplies the property, only that it exists
-    # this is a map of the property name to the class.  This is because for
-    # simple types it would be a copy rather than a reference.
-    _shared = {}
-    
-    
-    # list of services that have been registered with the manager.  This is a
-    # list of methods that each return a service object
-    _services = []
-
-
-    def __init__(self, modules=[]):
-        """
-        Initialize the ModuleManager with the list of nodes
-
-        @param modules - list of modules to initially register
-        """
-        map(self.register_module, modules)
-
-
-    def emit_signal(self, signal, *args, **kwargs):
-        """
-        Called when a module wants to emit a signal.  It notifies
-        all listeners by calling the registered
-
-        @param signal to emit
-        @param args - args list to be passed through to functions
-        @param kwargs - kwargs dict to be passed through to functions
-        """
-        if self._listeners.has_key(signal):
-            signal_listeners = self._listeners[signal]
-            for function in signal_listeners:
-                function(*args, **kwargs)
-
-
-    def get_services(self):
-        """
-        Get the service objects used by twistd.  The services are exposed by
-        modules.  This method just calls all the mapped functions used for
-        creating the services
-        
-        @return list of twisted service objects
-        """
-        return [service(self) for service in self._services]
-
-
-    def get_shared(self, key):
-        """
-        Returns a shared property
-
-        @param key to look up
-        @return Value if exists, None otherwise
-        """
-        try:
-            return self.__dict__[key]
-        except KeyError:
-            return None
-
-
-    def register_listener(self, signal, function):
-        """
-        Register a listener
-
-        @param signal signal to listen for
-        @param function function to call
-        """
-        try:
-            self._listeners[signal].append(function)
-        except KeyError:
-            self._listeners[signal] = [function]
-
-
-    def register_module(self, module_class):
-        """
-        Register a module
-
-        @module_class - class of the module to register.  Module will be
-                        instantiated by the ModuleManager
-        """
-        self._modules.append(module_class(self))
-
-
-    def register_remote(self, remote, function):
-        pass
-
-
-    def register_service(self, service):
-        """
-        Register a service exposed by a module
-        """
-        self._services.append(service)
-
-
-    def register_signal(self, signal, module):
-        """
-        Register a signal that a module can send
-        """
-        try:
-            self._signals[signal].append(module)
-        except KeyError:
-            self._signals[signal] = [module]
-
-
-    def set_shared(self, key, value):
-        """
-        Sets a shared property
-        """
-        self.__dict__[key] = value
-
 
 class Module(object):
     """
@@ -198,19 +62,6 @@ class Module(object):
         module is registered with the ModuleManager
         """
         self.manager = manager
-
-        for signal in self._signals:
-            manager.register_signal(signal, self)
-
-        for signal, function in self._listeners.items():
-            print signal, function
-            manager.register_listener(signal, function)
-
-        for remote in self._remotes:
-            manager.register_remote(*remote)
-
-        for service in self._services: 
-            manager.register_service(service)
     
 
     def __getattribute__(self, key):
@@ -219,7 +70,7 @@ class Module(object):
         """
         if key not in ('__dict__', '_shared') and key in self._shared:
             val =  self.manager.get_shared(key)
-            print 'GETTING: ', key, val
+            #print 'GETTING: ', key, val
             return val
         return object.__getattribute__(self, key)
 
@@ -228,9 +79,8 @@ class Module(object):
         """
         Overridden to pass shared property lookups through to the manager
         """
-        #print '!!!!!!!!!!!!?????????', key, value
         if key not in ('__dict__', '_shared') and key in self._shared:
-            print ' SETTING: ', key, value
+            #print ' SETTING: ', key, value
             self.manager.set_shared(key, value)
 
         self.__dict__[key] = value
@@ -240,5 +90,6 @@ class Module(object):
         """
         convenience function for emitting signals    
         """
+        print 'EMIT %s: %s %s' % (signal, args, kwargs)
         self.manager.emit_signal(signal, *args, **kwargs)
 

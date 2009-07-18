@@ -22,9 +22,10 @@ from threading import Lock
 import settings
 import datetime
 from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
-from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.models import TaskInstance
 from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
+#from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra_server.models import TaskInstance
+from pydra_server.util import deprecated
 
 # init logging
 import logging
@@ -77,6 +78,7 @@ class TaskScheduler(Module):
  
     _shared = [
         '_running_workers',
+        'registry'
     ]    
 
     def __init__(self, manager):
@@ -95,7 +97,10 @@ class TaskScheduler(Module):
         ]
 
         self._interfaces = [
-            self.task_statuses
+            self.task_statuses,
+            self.cancel_task,
+            '_queue',
+            '_running'
         ]
 
 
@@ -120,9 +125,9 @@ class TaskScheduler(Module):
         #load tasks that are cached locally
         #the master won't actually run the tasks unless there is also
         #a node running locally, but it will be used to inform the controller what is available
-        self.task_manager = TaskManager()
-        self.task_manager.autodiscover()
-        self.available_tasks = self.task_manager.registry
+        #self.task_manager = TaskManager()
+        #self.task_manager.autodiscover()
+        #self.available_tasks = self.task_manager.registry
 
 
     def remove_worker(self, worker_key):
@@ -214,6 +219,44 @@ class TaskScheduler(Module):
         self.advance_queue()
 
         return task_instance
+
+    @deprecated('Functionality will be moved to queue_task')
+    def interface_run_task(self, _, task_key, args=None):
+        """
+        Runs a task.  It it first placed in the queue and the queue manager
+        will run it when appropriate.
+
+        Args should be a dictionary of values.  It is acceptable for this to be
+        improperly typed data.  ie. Integer given as a String.  This function
+        will parse and clean the args using the form class for the Task
+        """
+
+        # args coming from the controller need to be parsed by the form. This
+        # will give proper typing to the data and allow validation.
+        if args:
+            task = self.master.available_tasks[task_key]
+            form_instance = task.form(args)
+            if form_instance.is_valid():
+                # repackage properly cleaned data
+                args = {}
+                for key, val in form_instance.cleaned_data.items():
+                    args[key] = val
+
+            else:
+                # not valid, report errors.
+                return {
+                    'task_key':task_key,
+                    'errors':form_instance.errors
+                }
+
+        task_instance =  self.master.queue_task(task_key, args=args)
+
+        return {
+                'task_key':task_key,
+                'instance_id':task_instance.id,
+                'time':time.mktime(task_instance.queued.timetuple())
+               }
+
 
 
     def cancel_task(self, task_id):
@@ -570,5 +613,3 @@ class TaskScheduler(Module):
             statuses[instance.id] = {'s':STATUS_RUNNING, 't':start, 'p':progress}
 
         return statuses
-
-

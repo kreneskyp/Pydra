@@ -24,8 +24,10 @@ from twisted.internet import reactor, defer
 from twisted.spread import pb
 
 from pydra_server.cluster.module import Module
+from pydra_server.cluster.amf.interface import authenticated
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.models import Node, pydraSettings
+
 
 import logging
 logger = logging.getLogger('root')
@@ -85,6 +87,10 @@ class NodeConnectionManager(Module):
             'MASTER_INIT':self.connect
         }
 
+        self._interfaces = [
+            authenticated(self.connect)
+        ]
+
         Module.__init__(self, manager)
 
         #load rsa crypto
@@ -92,7 +98,6 @@ class NodeConnectionManager(Module):
         self.rsa_client = RSAClient(self.priv_key, self.pub_key, callback=self.init_node)
 
         #cluster management
-        print '&&&&&&&&&&&&&&&&&&&&&&&&&&&'
         self.nodes = self.load_nodes()
 
         #connection management
@@ -127,7 +132,6 @@ class NodeConnectionManager(Module):
         #  1) connect() cannot be called more than once at a time
         #  2) if a node fails while connecting the reconnect call will block till 
         #     connections are finished
-        print '!!!!!!!!!!!!!!!!!!!!!!!'
         with self._lock:
             self.connecting=True
 

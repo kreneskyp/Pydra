@@ -47,8 +47,9 @@ glib2reactor.install()
 from twisted.application import service
 from twisted.internet.error import AlreadyCalled
 
-from pydra_server.cluster.module.module import ModuleManager
-from pydra_server.cluster.module.master import NodeConnectionManager, WorkerConnectionManager, TaskScheduler, AutoDiscoveryModule, AMFInterfaceModule
+from pydra_server.cluster.amf.interface import AMFInterface
+from pydra_server.cluster.module import ModuleManager
+from pydra_server.cluster.module.master import *
 from pydra_server.models import pydraSettings
 
 # init logging
@@ -65,16 +66,20 @@ class Master(ModuleManager):
 
     def __init__(self):
         logger.info('====== starting master ======')
-        
-        modules = [
+        """
+        List of modules to load.  They will be loaded sequentially
+        """
+        self.modules = [
             AutoDiscoveryModule,
             NodeConnectionManager,
             WorkerConnectionManager,
             TaskScheduler,
-            AMFInterfaceModule
+            AMFInterface,
+            NodeManager
         ]
 
-        ModuleManager.__init__(self, modules)
+        print self.modules
+        ModuleManager.__init__(self, self.modules)
 
         self.emit_signal('MASTER_INIT')
 
