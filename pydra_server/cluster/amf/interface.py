@@ -82,7 +82,10 @@ class AMFFunction():
                 # interface and could cause errors.
                 try:
                     ret = [self.function(*(args[:-1]))]
-                except Exception, e:
+                except Exception, e:                    
+                    import traceback, sys
+                    exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
+                    traceback.print_tb(exceptionTraceback, limit=10, file=sys.stdout)
                     logger.error('AMFFunction - exception in mapped function [%s] %s' % (self.function, e))
                     raise e
 
