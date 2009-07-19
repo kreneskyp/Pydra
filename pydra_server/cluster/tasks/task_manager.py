@@ -53,7 +53,7 @@ class TaskManager(Module):
         ]
 
         self._listeners = {
-            'MASTER_INIT':self.autodiscover
+            'MANAGER_INIT':self.autodiscover
         }
 
         Module.__init__(self, manager)

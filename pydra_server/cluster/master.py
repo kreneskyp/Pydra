@@ -80,10 +80,9 @@ class Master(ModuleManager):
             NodeManager
         ]
 
-        print self.modules
-        ModuleManager.__init__(self, self.modules)
+        ModuleManager.__init__(self)
 
-        self.emit_signal('MASTER_INIT')
+        self.emit_signal('MANAGER_INIT')
 
 
 #setup application used by twistd
