@@ -75,8 +75,12 @@ class ModuleManager(object):
         # list of methods that each return a service object
         self._services = []
 
+        
+        # append any user modules onto this one
+        self.modules + modules
+        
 
-        for module_class in modules:
+        for module_class in self.modules:
             logger.info('Loading Module: %s' % module_class)
 
             module = module_class(self)
