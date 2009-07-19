@@ -47,7 +47,8 @@ class WorkerConnectionManager(Module):
     ]
 
     _shared = [
-        'worker_checker'
+        'worker_checker',
+        '_workers'
     ]
 
     def __init__(self, manager):

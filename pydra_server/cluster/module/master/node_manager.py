@@ -17,12 +17,20 @@ class NodeManager(Module):
         'NODE_EDITED'
     ]
 
+    _shared = [
+        '_workers',
+        '_workers_idle',
+        '_workers_working',
+        'nodes'
+    ]
+
     def __init__(self, manager):
 
         self._interfaces = [
             self.node_list,
             self.node_detail,
-            self.node_edit
+            self.node_edit,
+            self.node_status
         ]
 
         Module.__init__(self, manager)
@@ -94,14 +102,14 @@ class NodeManager(Module):
         return paginatedNodes.object_list, pages
 
 
-    def node_status(self, _):
+    def node_status(self):
         """
         Returns status information about Nodes and Workers in the cluster
         """
         node_status = {}
-        worker_list = self.master.workers
+        worker_list = self._workers
         #iterate through all the nodes adding their status
-        for key, node in self.master.nodes.items():
+        for key, node in self.nodes.items():
             worker_status = {}
             if node.cores:
                 #iterate through all the workers adding their status as well
@@ -109,10 +117,10 @@ class NodeManager(Module):
                 for i in range(node.cores):
                     w_key = '%s:%s:%i' % (node.host, node.port, i)
                     html_key = '%s_%i' % (node.id, i)
-                    if w_key in self.master._workers_idle:
+                    if w_key in self._workers_idle:
                         worker_status[html_key] = (1,-1,-1)
-                    elif w_key in self.master._workers_working:
-                        task_instance_id, task_key, args, subtask_key, workunit_key = self.master._workers_working[w_key]
+                    elif w_key in self._workers_working:
+                        task_instance_id, task_key, args, subtask_key, workunit_key = self._workers_working[w_key]
                         worker_status[html_key] = (1,task_key,subtask_key if subtask_key else -1)
                     else:
                         worker_status[html_key] = -1

@@ -77,6 +77,8 @@ class TaskScheduler(Module):
     ]
  
     _shared = [
+        '_workers_idle',
+        '_workers_working',
         '_running_workers',
         'registry'
     ]    
