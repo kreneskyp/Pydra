@@ -77,6 +77,7 @@ class TaskScheduler(Module):
     ]
  
     _shared = [
+        '_workers',
         '_workers_idle',
         '_workers_working',
         '_running_workers',
@@ -150,7 +151,7 @@ class TaskScheduler(Module):
                 if removed_worker[3]:
                     logger.warning('%s failed during task, returning work unit' % worker_key)
                     task_instance = TaskInstance.objects.get(id=removed_worker[0])
-                    main_worker = self.workers[task_instance.worker]
+                    main_worker = self._workers[task_instance.worker]
                     if main_worker:
                         d = main_worker.remote.callRemote('return_work', removed_worker[3], removed_worker[4])
                         d.addCallback(self.return_work_success, worker_key)
@@ -195,7 +196,7 @@ class TaskScheduler(Module):
                 self._workers_working[worker_key] = (task_instance_id, task_key, args, subtask_key, workunit_key)
 
                 #return the worker object, not the key
-                return self.workers[worker_key]
+                return self._workers[worker_key]
             else:
                 return None
 
@@ -279,7 +280,7 @@ class TaskScheduler(Module):
                 #get all the workers to stop
                 for worker_key, worker_task in self._workers_working.items():
                     if worker_task[0] == task_id:
-                        worker = self.workers[worker_key]
+                        worker = self._workers[worker_key]
                         logger.debug('signalling worker to stop: %s' % worker_key)
                         worker.remote.callRemote('stop_task')
 
@@ -411,7 +412,7 @@ class TaskScheduler(Module):
                     if task_instance in self._running:
                         #if this was a subtask the main task needs the results and to be informed
                         task_instance = TaskInstance.objects.get(id=task_instance_id)
-                        main_worker = self.workers[task_instance.worker]
+                        main_worker = self._workers[task_instance.worker]
                         logger.debug('Worker:%s - informed that subtask completed' % 'FOO')
                         main_worker.remote.callRemote('receive_results', results, subtask_key, workunit_key)
                     else:
@@ -447,7 +448,7 @@ class TaskScheduler(Module):
 
                 for worker_key, worker_task in self._workers_working.items():
                     if worker_task[0] == task_instance_id:
-                        worker = self.workers[worker_key]
+                        worker = self._workers[worker_key]
                         logger.debug('signalling worker to stop: %s' % worker_key)
                         worker.remote.callRemote('stop_task')
 
@@ -545,7 +546,7 @@ class TaskScheduler(Module):
         #otherwise its idle
         else:
             with self._lock:
-                self.workers[worker_key] = worker
+                self._workers[worker_key] = worker
                 # worker shouldn't already be in the idle queue but check anyway
                 if not worker_key in self._workers_idle:
                     self._workers_idle.append(worker_key)
@@ -571,7 +572,7 @@ class TaskScheduler(Module):
         # limit updates so multiple controllers won't cause excessive updates
         now = datetime.datetime.now()
         if self._next_task_status_update < now:
-            workers = self.workers
+            workers = self._workers
             for key, data in self._workers_working.items():
                 if not data[3]:
                     worker = workers[key]
