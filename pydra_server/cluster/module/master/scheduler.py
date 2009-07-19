@@ -23,7 +23,8 @@ import settings
 import datetime, time
 import simplejson
 from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
-from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
+from pydra_server.cluster.tasks import *
+from pydra_server.cluster.constants import *
 #from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.models import TaskInstance
 from pydra_server.util import deprecated
@@ -89,7 +90,7 @@ class TaskScheduler(Module):
 
         self._listeners = {
             'WORKER_DISCONNECTED':self.remove_worker,
-            'WORKER_AUTHENTICATED': self.worker_connected,
+            'WORKER_CONNECTED':self.worker_connected,
             'CANCEL_TASK': self.cancel_task,
         }
 
@@ -140,7 +141,7 @@ class TaskScheduler(Module):
                 self._workers_idle.remove(worker_key)
 
             #worker was working on a task, need to clean it up
-            else:
+            elif worker_key in self._workers_working:
                 removed_worker = self._workers_working[worker_key]
 
                 #worker was working on a subtask, return unfinished work to main worker

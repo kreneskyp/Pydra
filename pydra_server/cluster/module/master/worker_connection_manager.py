@@ -42,7 +42,6 @@ class WorkerConnectionManager(Module):
 
     _signals = [
         'WORKER_CONNECTED',
-        'WORKER_AUTHENTICATED',
         'WORKER_DISCONNECTED',
     ]
 
@@ -89,10 +88,9 @@ class WorkerConnectionManager(Module):
         """
         Callback when a worker has been successfully authenticated
         """
+        with self._lock:
+            self.workers[worker_avatar.name] = worker_avatar
         self.emit('WORKER_CONNECTED', worker_avatar)
-        #request status to determine what this worker was doing
-        deferred = worker_avatar.remote.callRemote('status')
-        deferred.addCallback(self.emit, 'WORKER_AUTHENTICATED', worker_avatar)
 
 
     def worker_disconnected(self, worker):
@@ -100,7 +98,7 @@ class WorkerConnectionManager(Module):
         Callback from worker_avatar when it is disconnected
         """
         with self._lock:
-            del self.workers[worker.name]
+            del self.workers[worker]
 
         self.emit('WORKER_DISCONNECTED', worker)
         

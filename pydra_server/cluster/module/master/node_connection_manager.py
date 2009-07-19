@@ -21,6 +21,7 @@ from threading import Lock
 
 from twisted.cred import credentials
 from twisted.internet import reactor, defer
+from twisted.internet.error import AlreadyCalled
 from twisted.spread import pb
 
 from pydra_server.cluster.module import Module

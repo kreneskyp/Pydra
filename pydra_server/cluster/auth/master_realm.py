@@ -37,13 +37,6 @@ class MasterRealm:
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
 
-        '''if avatarID == 'controller':
-            avatar = ControllerAvatar(avatarID)
-            avatar.server = self.server
-            avatar.attached(mind)
-            logger.info('controller:%s - connected' % avatarID)
-
-        else:'''
         key_split = avatarID.split(':')
         node = Node.objects.get(host=key_split[0], port=key_split[1])
         avatar = WorkerAvatar(avatarID, self.server, node)

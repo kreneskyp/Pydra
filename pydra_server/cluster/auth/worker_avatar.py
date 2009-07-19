@@ -18,12 +18,13 @@
 """
 
 from module_avatar import ModuleAvatar
+from rsa_auth import RSAAvatar
 from Crypto.PublicKey import RSA
 
 import logging
 logger = logging.getLogger('root')
 
-class WorkerAvatar(ModuleAvatar):
+class WorkerAvatar(ModuleAvatar, RSAAvatar):
     """
     Avatar used by Workers connecting to the Master.
     """
@@ -36,6 +37,7 @@ class WorkerAvatar(ModuleAvatar):
         master_key = RSA.construct(server.pub_key) if server.pub_key else None
 
         ModuleAvatar.__init__(self, server, master_key, None, node_key, server.worker_authenticated, True)
+        RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
     def attached(self, mind):
         self.remote = mind

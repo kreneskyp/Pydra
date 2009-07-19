@@ -17,13 +17,13 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from rsa_auth import RSAAvatar
+from twisted.spread import pb
 
 import logging
 logger = logging.getLogger('root')
 
 
-class ModuleAvatar(RSAAvatar):
+class ModuleAvatar(pb.Avatar):
     """
     Avatar that aggregates methods exposed by Pydra Modules.  The methods will
     be stored in a dictionary mapping the method names back to the module that
@@ -34,7 +34,6 @@ class ModuleAvatar(RSAAvatar):
 
     def __init__(self, manager, *args, **kwargs):
         self._manager = manager
-        RSAAvatar.__init__(self, *args, **kwargs)
 
 
     def __getattribute__(self, key):

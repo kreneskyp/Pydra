@@ -45,7 +45,6 @@ glib2reactor.install()
 
 
 from twisted.application import service
-from twisted.internet.error import AlreadyCalled
 
 from pydra_server.cluster.amf.interface import AMFInterface
 from pydra_server.cluster.module import ModuleManager
