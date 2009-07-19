@@ -20,7 +20,8 @@ from __future__ import with_statement
 from threading import Lock
 
 import settings
-import datetime
+import datetime, time
+import simplejson
 from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
 from pydra_server.cluster.tasks import STATUS_STOPPED, STATUS_RUNNING, STATUS_COMPLETE, STATUS_CANCELLED, STATUS_FAILED
 #from pydra_server.cluster.tasks.task_manager import TaskManager
@@ -102,6 +103,7 @@ class TaskScheduler(Module):
         self._interfaces = [
             self.task_statuses,
             self.cancel_task,
+            self.queue_task,
             ('_queue','list_queue'),
             ('_running','list_running')
         ]
@@ -110,7 +112,8 @@ class TaskScheduler(Module):
         Module.__init__(self, manager)
 
         # locks
-        self._lock_queue = Lock()   #for access to _queue
+        self._lock = Lock()         # general lock
+        self._lock_queue = Lock()   # for access to _queue
 
         # load tasks queue
         self._running = list(TaskInstance.objects.running())
@@ -124,13 +127,6 @@ class TaskScheduler(Module):
         # workers
         self._workers_idle = []
         self._workers_working = {}
-
-        #load tasks that are cached locally
-        #the master won't actually run the tasks unless there is also
-        #a node running locally, but it will be used to inform the controller what is available
-        #self.task_manager = TaskManager()
-        #self.task_manager.autodiscover()
-        #self.available_tasks = self.task_manager.registry
 
 
     def remove_worker(self, worker_key):
@@ -203,44 +199,24 @@ class TaskScheduler(Module):
 
     def queue_task(self, task_key, args={}, subtask_key=None):
         """
-        Queue a task to be run.  All task requests come through this method.  It saves their
-        information in the database.  If the cluster has idle resources it will start the task
-        immediately, otherwise it will queue the task until it is ready.
+        Queue a task to be run.  All task requests come through this method.
+
+        Successfully queued tasks will be saved in the database.  If the cluster 
+        has idle resources it will start the task immediately, otherwise it will 
+        remain in the queue until a worker is available.
+        
+        @param args: should be a dictionary of values.  It is acceptable for
+        this to be improperly typed data.  ie. Integer given as a String. This
+        function will parse and clean the args using the form class for the Task
+
         """
-        logger.info('Task:%s:%s - Queued:  %s' % (task_key, subtask_key, args))
-
-        #create a TaskInstance instance and save it
-        task_instance = TaskInstance()
-        task_instance.task_key = task_key
-        task_instance.subtask_key = subtask_key
-        task_instance.args = simplejson.dumps(args)
-        task_instance.save()
-
-        #queue the task and signal attempt to start it
-        with self._lock_queue:
-            self._queue.append(task_instance)
-        self.advance_queue()
-
-        return task_instance
-
-    @deprecated('Functionality will be moved to queue_task')
-    def interface_run_task(self, _, task_key, args=None):
-        """
-        Runs a task.  It it first placed in the queue and the queue manager
-        will run it when appropriate.
-
-        Args should be a dictionary of values.  It is acceptable for this to be
-        improperly typed data.  ie. Integer given as a String.  This function
-        will parse and clean the args using the form class for the Task
-        """
-
         # args coming from the controller need to be parsed by the form. This
         # will give proper typing to the data and allow validation.
         if args:
-            task = self.master.available_tasks[task_key]
+            task = self.registry[task_key]
             form_instance = task.form(args)
             if form_instance.is_valid():
-                # repackage properly cleaned data
+                # repackage cleaned data
                 args = {}
                 for key, val in form_instance.cleaned_data.items():
                     args[key] = val
@@ -252,14 +228,27 @@ class TaskScheduler(Module):
                     'errors':form_instance.errors
                 }
 
-        task_instance =  self.master.queue_task(task_key, args=args)
+
+        #create a TaskInstance instance and save it
+        task_instance = TaskInstance()
+        task_instance.task_key = task_key
+        task_instance.subtask_key = subtask_key
+        task_instance.args = simplejson.dumps(args)
+        task_instance.save()
+
+        logger.info('Task:%s:%s - Queued:  %s' % (task_key, subtask_key, args))            
+
+        #queue the task and signal attempt to start it
+        with self._lock_queue:
+            self._queue.append(task_instance)
+
+        self.advance_queue()
 
         return {
                 'task_key':task_key,
                 'instance_id':task_instance.id,
                 'time':time.mktime(task_instance.queued.timetuple())
                }
-
 
 
     def cancel_task(self, task_id):
@@ -334,9 +323,9 @@ class TaskScheduler(Module):
         should be informed and it can readjust its count of available resources.  Any type of resource
         sharing logic should be handled within select_worker() to keep the logic organized.
         """
-
         # get a worker for this task
         worker = self.select_worker(task_instance_id, task_key, args, subtask_key, workunit_key)
+
         # determine how many workers are available for this task
         available_workers = len(self._workers_idle)+1
 
@@ -546,7 +535,6 @@ class TaskScheduler(Module):
         #otherwise its idle
         else:
             with self._lock:
-                self._workers[worker_key] = worker
                 # worker shouldn't already be in the idle queue but check anyway
                 if not worker_key in self._workers_idle:
                     self._workers_idle.append(worker_key)
