@@ -81,7 +81,7 @@ def nodes(request):
         response = e.code
         nodes = None
         pages = None
-    
+
     return render_to_response('nodes.html', {
         'nodes':nodes,
         'pages':pages,

@@ -39,7 +39,6 @@ class SubTaskWrapper():
         self.parent = parent
 
     def get_subtask(self, task_path):
-        print '^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
         return self.task.get_subtask(task_path)
 
     def get_key(self):
@@ -133,17 +132,33 @@ class TaskContainer(Task):
     def _work(self, **kwargs):
         # Starts the task running all subtasks
         result = kwargs
-        for subtask in self.subtasks:
-            logger.debug('   Starting Subtask: %s' % subtask)
-            if self.sequential:
-                #sequential task, run the task work directly (default)
-                result = subtask.task.work(args=result)
 
-            else:
-                #parallel task, run the subtask in its own thread
-                result = subtask.task.start(args=result)
+        # start first subtask
+        self._current_subtask = 0
+        self._start_subtask(args=kwargs)
 
-        return result
+
+    def _start_subtask(self, args={}):
+        """
+        Starts a subtask
+        """
+        subtask = self.subtasks[self._current_subtask]
+        logger.debug('TaskContainer - starting subtask: %s' % subtask)
+        subtask.task.start(args=args, callback=self._subtask_complete)
+        logger.debug('TaskContainer - STARTED! subtask: %s' % subtask)
+
+
+    def _subtask_complete(self, results):
+        """
+        Callback when a subtask is complete.  Will either move on
+        to the next subtask or call the callback
+        """
+        self._current_subtask += 1
+        if self._current_subtask < len (self.subtasks):
+            self._start_subtask(args=results)
+
+        else:
+            self._complete(results)
 
 
     def _stop(self):

@@ -67,6 +67,7 @@ class Master(ModuleManager):
 
     def __init__(self):
         logger.info('====== starting master ======')
+
         """
         List of modules to load.  They will be loaded sequentially
         """

@@ -64,12 +64,12 @@ class MasterClientFactory(pb.PBClientFactory):
         self.kwargs = kwargs
 
     def clientConnectionLost(self, connector, reason):
-        logger.warning('Lost connection to master.  Reason:', reason)
+        logger.warning('Lost connection to master.  Reason: %s' % reason)
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
         self.reconnect_func(*(self.args), **(self.kwargs))
 
     def clientConnectionFailed(self, connector, reason):
-        logger.warning('Connection to master failed. Reason:', reason)
+        logger.warning('Connection to master failed. Reason: %s' % reason)
         pb.PBClientFactory.clientConnectionFailed(self, connector, reason)
 
 
@@ -171,9 +171,10 @@ class Worker(pb.Referenceable):
 
         logger.info('Worker:%s - starting task: %s:%s  %s' % (self.worker_key, key,subtask_key, args))
         #create an instance of the requested task
-        self.__task_instance = object.__new__(self.available_tasks[key])
-        self.__task_instance.__init__()
-        self.__task_instance.parent = self
+        if not self.__task_instance or self.__task_instance.__class__.__name__ != key:
+            self.__task_instance = object.__new__(self.available_tasks[key])
+            self.__task_instance.__init__()
+            self.__task_instance.parent = self
 
         # process args to make sure they are no longer unicode
         clean_args = {}
@@ -246,6 +247,7 @@ class Worker(pb.Referenceable):
         with self.__lock_connection:
             if self.master:
                 deferred = self.master.callRemote("failed", results, self.__workunit_key)
+                logger.error('Worker - Task Failed: %s' % results)
                 #deferred.addErrback(self.send_failed_failed, results, self.__workunit_key)
 
             # master disapeared, hold failure until it comes back online and requests it
