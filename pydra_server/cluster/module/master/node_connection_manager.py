@@ -84,7 +84,9 @@ class NodeConnectionManager(Module):
         self._lock = Lock() #general lock, use when multiple shared resources are touched
 
         self._listeners = {
-            'MASTER_INIT':self.connect
+            'MASTER_INIT':self.connect,
+            'NODE_CREATED':self.connect,
+            'NODE_UPDATED':self.connect,
         }
 
         self._interfaces = [

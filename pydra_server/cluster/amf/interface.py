@@ -21,13 +21,12 @@ import datetime, time, hashlib
 from authenticator import AMFAuthenticator
 from twisted.application import internet
 from twisted.cred import checkers
-from twisted.internet import reactor, defer
+from twisted.internet import reactor
 from twisted.python.randbytes import secureRandom
-from twisted.spread import pb
 from twisted.web import server, resource
-from django.core.paginator import Paginator, InvalidPage, EmptyPage
 
-from pydra_server.models import TaskInstance, Node, pydraSettings
+
+from pydra_server.models import pydraSettings
 from pydra_server.cluster.auth.rsa_auth import load_crypto
 from pydra_server.cluster.module import InterfaceModule
 
@@ -67,14 +66,38 @@ def authenticated(fn):
     return new
 
 
-def AMFCall(fn):
+class AMFFunction():
     """
-    Decorator that wraps a function to remove the AMF specific arguments
+    Wrapper for registered functions.  This wrapper pulls out the AMF specific
+    property and then calls the mapped function
     """
-    def new(self, _, *args, **kwargs):
-        return fn(self, *args, **kwargs)
 
-    return new        
+    def __call__(self, _, *args):
+        user = args[-1]
+
+        try:
+            if self.interface.sessions[user]['auth']:
+                # user is authorized - execute original function
+                # strip authentication key from the args, its not needed by the
+                # interface and could cause errors.
+                try:
+                    ret = [self.function(*(args[:-1]))]
+                except Exception, e:
+                    logger.error('AMFFunction - exception in mapped function [%s] %s' % (function, e))
+                    raise e
+
+                return ret
+
+        except KeyError:
+            pass # no session yet user must go through authentication
+
+        # user requires authorization
+        return 0
+
+
+    def __init__(self, interface, function):
+        self.function = function
+        self.interface = interface
 
 
 class AMFInterface(InterfaceModule):
@@ -172,15 +195,6 @@ class AMFInterface(InterfaceModule):
         self.sessions[user]['challenge'] = None
 
         return self.sessions[user]['auth']
-
-
-    @authenticated
-    def is_alive(self, _):
-        """
-        Remote function just for determining that Master is responsive
-        """
-        logger.debug('is alive')
-        return 1
      
 
     def get_controller_service(self, master):
@@ -207,3 +221,16 @@ class AMFInterface(InterfaceModule):
             sys.exit()
 
         return internet.SSLServer(pydraSettings.controller_port, server.Site(root), contextFactory=context)
+
+
+    @authenticated
+    def is_alive(self, _):
+        """
+        Remote function just for determining that Master is responsive
+        """
+        logger.debug('is alive')
+        return 1
+
+
+    def wrap_interface(self, interface):
+        return AMFFunction(self, interface)

@@ -99,8 +99,8 @@ class TaskScheduler(Module):
         self._interfaces = [
             self.task_statuses,
             self.cancel_task,
-            '_queue',
-            '_running'
+            ('_queue','list_queue'),
+            ('_running','list_running')
         ]
 
 

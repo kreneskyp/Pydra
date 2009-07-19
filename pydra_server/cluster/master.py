@@ -50,6 +50,7 @@ from twisted.internet.error import AlreadyCalled
 from pydra_server.cluster.amf.interface import AMFInterface
 from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.module.master import *
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.models import pydraSettings
 
 # init logging
@@ -73,6 +74,7 @@ class Master(ModuleManager):
             AutoDiscoveryModule,
             NodeConnectionManager,
             WorkerConnectionManager,
+            TaskManager,
             TaskScheduler,
             AMFInterface,
             NodeManager

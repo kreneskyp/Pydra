@@ -1,6 +1,7 @@
+from django.core.paginator import Paginator, InvalidPage, EmptyPage
+
 from pydra_server.cluster.module import Module
 from pydra_server.models import Node, pydraSettings
-
 
 import logging
 logger = logging.getLogger('root')
@@ -27,7 +28,7 @@ class NodeManager(Module):
         Module.__init__(self, manager)
 
 
-    def node_detail(self, _, id):
+    def node_detail(self, id):
         """
         Returns details for a single node
         """
@@ -35,7 +36,7 @@ class NodeManager(Module):
         return node
         
 
-    def node_edit(self, _, values):
+    def node_edit(self, values):
         """
         Updates or Creates a node with the values passed in.  If an id field
         is present it will be update the existing node.  Otherwise it will
@@ -43,24 +44,25 @@ class NodeManager(Module):
         """
         if values.has_key('id'):
             node = Node.objects.get(pk=values['id'])
-            connect = values['port'] == node.port
+            updated = values['port'] == node.port
         else:
             node = Node()
-            connect = True
+            new = True
 
         for k,v in values.items():
             node.__dict__[k] = v
         node.save()
 
-        # call connect only for new nodes or if the port has changed.  The
-        # master should already be retrying to connect to the node with an
-        # incorrect port but the max timeout is 5 minutes.  Calling it here
-        # causes the change to fix things alot quicker
-        if connect:
-            self.master.connect()
+
+        #emit signals
+        if new:
+            self.emit('NODE_CREATED', node)
+
+        else:            
+            self.emit('NODE_UPDATED', node)
 
 
-    def node_list(self, _, page=1):
+    def node_list(self, page=1):
         """
         Lists Nodes saved in the database
         """

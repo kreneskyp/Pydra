@@ -86,20 +86,20 @@ class ModuleManager(object):
                 self.register_signal(signal, module)
 
             for signal, function in module._listeners.items():
-                print signal, function
                 self.register_listener(signal, function)
 
             for remote in module._remotes:
                 self.register_remote(*remote)
 
             for interface in module._interfaces:
-                self.register_interface(interface)
+                self.register_interface(module, interface)
 
             for service in module._services: 
                 self.register_service(service)
 
             if isinstance(module,(InterfaceModule,)):
-                self.register_interface_module(module)              
+                'INTEFACE', module
+                self.register_interface_module(module)          
 
 
     def emit_signal(self, signal, *args, **kwargs):
@@ -141,30 +141,30 @@ class ModuleManager(object):
             return None
 
     
-    def register_interface(self, function):
+    def register_interface(self, module, interface):
         """
         Registers an exposed function.  If there are already interfaces
         registered with this ModuleManager then they will be informed
 
-        @param function: exposed function
+        @param interface: exposed function or attribute
         """
-        self._interfaces.append(function)
+        self._interfaces.append((module, interface))
 
-        for module in self._interface_modules:
-            module.register_interface(function)
+        for interface_module in self._interface_modules:
+            interface_module.register_interface(module, interface)
 
 
-    def register_interface_module(self, module):
+    def register_interface_module(self, interface_module):
         """
         Register a module that provides an interface for controllers.  Register
         any exposed functions already registed with this ModuleManager
 
         @param module: module to register
         """
-        self._interface_modules.append(module)
+        self._interface_modules.append(interface_module)
         
-        for interface in self._interfaces:
-            module.register_interface(interface)
+        for module, interface in self._interfaces:
+            interface_module.register_interface(module, interface)
 
 
     def register_listener(self, signal, function):
