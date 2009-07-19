@@ -17,6 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.template import Context, loader
 
 from pydra_server.cluster.module import Module
@@ -227,7 +228,7 @@ class TaskManager(Module):
                             logger.error('ERROR Loading task: %s' % key)
 
 
-    def task_history(self, _, key, page):
+    def task_history(self, key, page):
 
         instances = TaskInstance.objects.filter(task_key=key).order_by('-completed').order_by('-started')
         paginator = Paginator(instances, 10)
