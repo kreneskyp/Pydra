@@ -85,8 +85,8 @@ class NodeConnectionManager(Module):
 
         self._listeners = {
             'MASTER_INIT':self.connect,
-            'NODE_CREATED':self.connect,
-            'NODE_UPDATED':self.connect,
+            'NODE_CREATED':self.connect_node,
+            'NODE_UPDATED':self.connect_node,
         }
 
         self._interfaces = [
@@ -122,6 +122,14 @@ class NodeConnectionManager(Module):
             node_dict[node.id] = node
         logger.info('%i nodes loaded' % len(nodes))
         return node_dict
+
+    
+    def connect_node(self, node):
+        """
+        Callback for node creation and updates.  Connect() cannot be called
+        directly because those signals include a parameter
+        """
+        self.connect()
 
 
     def connect(self):

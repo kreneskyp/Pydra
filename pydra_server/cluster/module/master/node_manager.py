@@ -45,6 +45,7 @@ class NodeManager(Module):
         if values.has_key('id'):
             node = Node.objects.get(pk=values['id'])
             updated = values['port'] == node.port
+            new = False
         else:
             node = Node()
             new = True

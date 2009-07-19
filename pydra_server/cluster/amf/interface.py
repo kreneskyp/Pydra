@@ -83,7 +83,7 @@ class AMFFunction():
                 try:
                     ret = [self.function(*(args[:-1]))]
                 except Exception, e:
-                    logger.error('AMFFunction - exception in mapped function [%s] %s' % (function, e))
+                    logger.error('AMFFunction - exception in mapped function [%s] %s' % (self.function, e))
                     raise e
 
                 return ret
