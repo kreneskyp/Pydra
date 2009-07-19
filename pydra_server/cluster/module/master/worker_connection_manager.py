@@ -62,7 +62,7 @@ class WorkerConnectionManager(Module):
         self.pub_key, self.priv_key = load_crypto('./master.key')
 
         #cluster management
-        self.workers = {}
+        self._workers = {}
 
         # setup worker security - using this checker just because we need
         # _something_ that returns an avatarID.  Its extremely vulnerable
@@ -89,7 +89,7 @@ class WorkerConnectionManager(Module):
         Callback when a worker has been successfully authenticated
         """
         with self._lock:
-            self.workers[worker_avatar.name] = worker_avatar
+            self._workers[worker_avatar.name] = worker_avatar
         self.emit('WORKER_CONNECTED', worker_avatar)
 
 
@@ -98,7 +98,7 @@ class WorkerConnectionManager(Module):
         Callback from worker_avatar when it is disconnected
         """
         with self._lock:
-            del self.workers[worker]
+            del self._workers[worker]
 
         self.emit('WORKER_DISCONNECTED', worker)
         
