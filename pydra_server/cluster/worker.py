@@ -43,6 +43,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from threading import Lock
 
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
+from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from constants import *
 
@@ -75,13 +76,20 @@ class MasterClientFactory(pb.PBClientFactory):
 
 
 
-class Worker(pb.Referenceable):
+class Worker(pb.Referenceable, ModuleManager):
     """
     Worker - The Worker is the workhorse of the cluster.  It sits and waits for Tasks and SubTasks to be executed
             Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
             the first worker will make requests for work to be distributed to other Nodes
     """
     def __init__(self, master_host, master_port, node_key, worker_key):
+
+        self.modules = [
+            TaskManager
+        ]
+        
+        ModuleManager.__init__(self)
+
         self.id = id
         self.__task = None
         self.__task_instance = None
@@ -103,9 +111,8 @@ class Worker(pb.Referenceable):
         self.rsa_client = RSAClient(self.priv_key)
 
         #load tasks that are cached locally
-        self.task_manager = TaskManager()
-        self.task_manager.autodiscover()
-        self.available_tasks = self.task_manager.registry
+        self.emit_signal('MANAGER_INIT')
+        self.available_tasks = self.registry
 
         logger.info('Started Worker: %s' % worker_key)
         self.connect()
