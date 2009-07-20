@@ -48,7 +48,7 @@ from twisted.application import service
 
 from pydra_server.cluster.amf.interface import AMFInterface
 from pydra_server.cluster.module import ModuleManager
-from pydra_server.cluster.module.master import *
+from pydra_server.cluster.master import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.models import pydraSettings
 
