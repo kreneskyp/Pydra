@@ -39,50 +39,19 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
         ModuleAvatar.__init__(self, server.manager._remotes['REMOTE_WORKER'], master_key, None, node_key, server.worker_authenticated, True)
         RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
+
     def attached(self, mind):
+        """
+        callback when avatar is connected
+        """
         self.remote = mind
 
+
     def detached(self, mind):
+        """
+        callback when avatar is disconnected
+        """
         logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
             self.server.worker_disconnected(self.name)
         self.remote = None
-
-
-    '''
-    def perspective_failed(self, message, workunit_key):
-        """
-        Called by workers when they task they were running threw an exception
-        """
-        return self.server.task_failed(self.name, message, workunit_key)
-
-
-    def perspective_send_results(self, results, workunit_key):
-        """
-        Called by workers when they have completed their task and need to report the results.
-        * Tasks runtime and log should be saved in the database
-        """
-        return self.server.send_results(self.name, results, workunit_key)
-
-    def perspective_stopped(self):
-        """
-        Called by workers when they have stopped themselves because of a stop_task call
-        This response may be delayed because there is no guaruntee that the Task will
-        respect the STOP_FLAG.  Until this callback is made the Worker is still working
-        """
-        return self.server.worker_stopped(self.name)
-
-    def perspective_request_worker(self, subtask_key, args, workunit_key):
-        """
-        Called by workers running a Parallel task.  This is a request
-        for a worker in the cluster to process the args sent
-        """
-        return self.server.request_worker(self, subtask_key, args, workunit_key)
-
-
-    def perspective_task_status(self):
-        """
-        returns the status (progress) of the task this worker is working on
-        """
-        return self.server.task_status(self)
-    '''
