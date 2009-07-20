@@ -90,6 +90,5 @@ class Module(object):
         """
         convenience function for emitting signals    
         """
-        print 'EMIT %s: %s %s' % (signal, args, kwargs)
         self.manager.emit_signal(signal, *args, **kwargs)
 
