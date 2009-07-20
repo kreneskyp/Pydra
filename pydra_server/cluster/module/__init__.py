@@ -6,8 +6,3 @@ from pydra_server.cluster.module.module_manager import ModuleManager as ModuleMa
 InterfaceModule = InterfaceModule_import
 Module = Module_import
 ModuleManager = ModuleManager_import
-
-
-# Remote Options - IDs used to specify which remote to add functins to
-REMOTE_NODE = 0
-REMOTE_WORKER = 1

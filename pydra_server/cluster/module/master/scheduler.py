@@ -22,7 +22,7 @@ from threading import Lock
 import settings
 import datetime, time
 import simplejson
-from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
+from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import *
 from pydra_server.cluster.constants import *
 #from pydra_server.cluster.tasks.task_manager import TaskManager
@@ -95,10 +95,10 @@ class TaskScheduler(Module):
         }
 
         self._remotes = [
-            (REMOTE_WORKER, self.request_worker),
-            (REMOTE_WORKER, self.send_results),
-            (REMOTE_WORKER, self.worker_stopped),
-            (REMOTE_WORKER, self.task_failed)
+            ('REMOTE_WORKER', self.request_worker),
+            ('REMOTE_WORKER', self.send_results),
+            ('REMOTE_WORKER', self.worker_stopped),
+            ('REMOTE_WORKER', self.task_failed)
         ]
 
         self._interfaces = [
@@ -470,7 +470,7 @@ class TaskScheduler(Module):
         self.advance_queue()
 
 
-    def request_worker(self, workerAvatar, subtask_key, args, workunit_key):
+    def request_worker(self, worker_key, subtask_key, args, workunit_key):
         """
         Called by workers running a Parallel task.  This is a request
         for a worker in the cluster to process a workunit from a task
@@ -479,9 +479,9 @@ class TaskScheduler(Module):
         #get the task key and run the task.  The key is looked up
         #here so that a worker can only request a worker for the 
         #their current task.
-        worker = self._workers_working[workerAvatar.name]
+        worker = self._workers_working[worker_key]
         task_instance = TaskInstance.objects.get(id=worker[0])
-        logger.debug('Worker:%s - request for worker: %s:%s' % (workerAvatar.name, subtask_key, args))
+        logger.debug('Worker:%s - request for worker: %s:%s' % (worker_key, subtask_key, args))
 
         # lock queue and check status of task to ensure no lost workers
         # due to a canceled task
@@ -490,7 +490,7 @@ class TaskScheduler(Module):
                 self.run_task(worker[0], worker[1], args, subtask_key, workunit_key)
 
             else:
-                logger.debug('Worker:%s - request for worker failed, task is not running' % (workerAvatar.name))
+                logger.debug('Worker:%s - request for worker failed, task is not running' % (worker_key))
 
 
     def worker_connected(self, worker_avatar):

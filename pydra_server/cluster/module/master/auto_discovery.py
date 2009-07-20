@@ -20,7 +20,7 @@ import settings
 from dbus.mainloop.glib import DBusGMainLoop
 import dbus, avahi
 
-from pydra_server.cluster.module import Module, REMOTE_WORKER, REMOTE_NODE
+from pydra_server.cluster.module import Module
 from pydra_server.models import pydraSettings
 
 # init logging

@@ -23,6 +23,22 @@ import logging
 logger = logging.getLogger('root')
 
 
+class RemoteWrapper():
+    """
+    Wrapper for remote methods to add the Avatar to the method call
+    """
+
+    def __init__(self, avatar, function):
+        self.avatar = avatar
+        self.function = function
+
+    def __call__(self, *args, **kwargs):
+        """
+        Calls original function, adding the avatar to the beginning of the args
+        """
+        self.function(self.avatar.name, *args, **kwargs)
+
+
 class ModuleAvatar(pb.Avatar):
     """
     Avatar that aggregates methods exposed by Pydra Modules.  The methods will
@@ -32,21 +48,21 @@ class ModuleAvatar(pb.Avatar):
 
     _manager = None
 
-    def __init__(self, manager, *args, **kwargs):
-        self._manager = manager
+    def __init__(self, remotes, *args, **kwargs):
+        self._remotes = remotes
 
 
-    def __getattribute__(self, key):
+    def __getattr__(self, key):
         """
         Overridden to lookup remoted methods from modules
         """
-        if 'perspective_' == key[:12]:
-            try:
-                module = self._manager.__dict__[key[:12]]
-                return module.__dict__[key[:12]]
-            except KeyError:
-                # key not found
-                pass
 
-        # default to attributes of this class
-        return object.getattribute(key)
+        # proxy perspective methods through the _remotes.
+        if 'perspective_' == key[:12]:
+            
+            # remotes must be packaged in wrapper so that there is a link
+            # back to the worker that called it.  Remotes cannot be wrapped
+            # in the list because the wrapper is implementation specific
+            return RemoteWrapper(self, self._remotes[key[12:]])
+
+        return pb.Avatar.__getattr__(key)

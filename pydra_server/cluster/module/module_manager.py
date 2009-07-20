@@ -63,6 +63,11 @@ class ModuleManager(object):
         # functions that can be called via the user interface
         self._interfaces = []
 
+        # dictionary of remotes which are a dictionary of methods that are exposed 
+        # as remote methods.  Each remote is a separate interface that may be given
+        # out depending no the type of remote user
+        self._remotes = {}
+
         # list of proeprties that are shared with the manager.  This allows them
         # to be accessed easier by other modules.  The other modules won't need
         # to know which other module supplies the property, only that it exists
@@ -195,7 +200,14 @@ class ModuleManager(object):
 
 
     def register_remote(self, remote, function):
-        pass
+
+        try:
+            _remote = self._remotes[remote]
+        except KeyError:
+            _remote = {}
+            self._remotes[remote] = _remote
+    
+        _remote[function.__name__] = function
 
 
     def register_service(self, service):
