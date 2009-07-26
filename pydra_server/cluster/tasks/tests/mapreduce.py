@@ -209,7 +209,7 @@ class MapReduceWrapper_Test(unittest.TestCase):
         a = { 'a': 1, 'b': 1, }
         id = 'identity_map'
 
-        flush_results = self.maptask.work(args={'input': a.iteritems(), 'id': id})
+        flush_results = self.maptask._start(args={'input': a.iteritems(), 'id': id})
         output, mapid = flush_results
 
         self.assertEqual(mapid, id, "mapid differs from id")
@@ -221,7 +221,7 @@ class MapReduceWrapper_Test(unittest.TestCase):
     def test_work_reducewrapper(self):
         a = { 'a': 1, 'b': 1, }
 
-        results = self.reducetask.work(args={'partition': a})
+        results = self.reducetask._start(args={'partition': a})
 
         for k, v in a.iteritems():
             self.assert_(v == results[k])

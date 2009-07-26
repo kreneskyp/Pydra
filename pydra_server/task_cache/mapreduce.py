@@ -8,7 +8,7 @@ logger = logging.getLogger('root')
 
 class MapWords(Task):
 
-    def _work(self, input, output, **kwargs):
+    def work(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
 
         for word in input:
@@ -18,7 +18,7 @@ class MapWords(Task):
 
 class ReduceWords(Task):
 
-    def _work(self, input, output, **kwargs):
+    def work(self, input, output, **kwargs):
         """sum occurances of each word"""
 
         d = {}
