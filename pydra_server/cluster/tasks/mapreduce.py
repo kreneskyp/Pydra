@@ -33,6 +33,33 @@ class AppendableDict(dict):
         super(AppendableDict, self).__getitem__(key).append(value)
 
 
+class DatasourceDict(object):
+
+    def __init__(self, dict):
+        self.store = dict
+
+
+    def load(self, key):
+        return self.store[key]
+
+
+    def __iter__(self):
+        return self.store.iterkeys()
+
+
+class SequenceSlicer(object):
+
+    def __init__(self):
+        self.input = None
+
+    def load(self, key):
+        parent = key[:-1]
+
+        return self.input.load(parent).key[-1]
+
+    def __iter__(self):
+        pass
+
 class IntermediateResults(object):
     """Datahandler for not direct input/output handling.
 
@@ -300,7 +327,7 @@ class MapReduceTask(Task):
         logger.debug('   starting maptask: %s' % mapid)
         map_args = {
                     'id': mapid,
-                    'input': i,
+                    'partition': i,
                    }
 
         if self.sequential:
@@ -501,6 +528,9 @@ class MapWrapper(MapReduceWrapper):
         self.work().
         """
         logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
+
+        if args.has_key('partition') and hasattr(self.parent, 'input'):
+            args['input'] = self.parent.input.load(args['partition'])
 
         output = AppendableDict()
         args['output'] = output

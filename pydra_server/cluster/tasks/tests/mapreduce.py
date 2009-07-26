@@ -25,6 +25,32 @@ class AppendableDict_Test(unittest.TestCase):
         self.assert_(3 not in a['key'])
 
 
+class Datastore_Test(unittest.TestCase):
+
+    def setUp(self):
+        self.in_dict = { 
+                    "1": ['one', 'two', 'four', 'two', 'four', 'seven'],
+                    "2": ['seven', 'four', 'seven', 'seven'],
+                    "3": ['seven', 'four', 'seven', 'seven'],
+                       }
+
+
+    def test_datasourcedict(self):
+
+        input = DatasourceDict(self.in_dict)
+
+        for key in input:
+            self.assertEqual(self.in_dict[key], input.load(key))
+
+
+    def test_sequenceslicer(self):
+
+        source = DatasourceDict(self.in_dict)
+
+        slicer = SequenceSlicer()
+        slicer.input = source
+
+
 class IntermediateResultsFiles_Test(unittest.TestCase):
 
     def setUp(self):
