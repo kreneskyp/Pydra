@@ -38,10 +38,10 @@ class IntermediateResultsFiles():
 
     map stage:
     * map task output is a dictionary (which must be pick-able);
-    * when map.work() is completed output dictionary is flushed;
-    * flush() partitions items depending on a partition() function
-      and dumps them into a unique file, returns partition-dictionary;
-    * every map task flush partition-dictionary is collected and provided
+    * when map.work() is completed output dict is partitioned and dumped;
+    * partition_output() partitions items depending on a partition() function;
+    * dump() dumps them into a unique file, returns partition-dictionary;
+    * every map task's dump partition-dictionary is collected and provided
       to update_partitions() function for future iterator generation.
 
     partition:
@@ -51,8 +51,8 @@ class IntermediateResultsFiles():
 
     reduce stage:
     * next() method returns list of all files within one partition;
-    * list of files is provided to _partition_iter() for every reduce task;
-    * _partition_iter() returns iterator which is used as a input iterator
+    * list of files is provided to load() for every reduce task;
+    * load() returns iterator which is used as a input iterator
       for a reduce task;
     * iterator loads from (key, values) tuples from a files.
     """
@@ -76,6 +76,10 @@ class IntermediateResultsFiles():
 
 
     def partition_output(self, output):
+        """iterates through an output dictionary and partitions it,
+        returns a dictionary where key is a partition number and value - items
+        of output dict belonging to this partition"""
+
         pdict = {}
 
         for k, vs in output.iteritems():
@@ -90,15 +94,15 @@ class IntermediateResultsFiles():
         return pdict.iteritems()
 
 
-    def flush(self, partition, mapid):
+    def dump(self, pdict, mapid):
         """dumps a dictionary to a files.
         returns corresponding partitions-dictionary"""
 
-        logger.debug("im: flushing %s" % str(partition))
+        logger.debug("im: dumping %s" % str(pdict))
 
         partitions = {}
 
-        for p, tuples in partition:
+        for p, tuples in pdict:
 
             filename = self.pattern % (self.task_id, p, mapid)
             partitions[p] = filename
@@ -112,6 +116,7 @@ class IntermediateResultsFiles():
 
 
     def update_partitions(self, partitions):
+        """updates partition-dictionary for future iterator generation."""
 
         with self._lock:
             for p, filename in partitions.items():
@@ -125,7 +130,18 @@ class IntermediateResultsFiles():
         return self
 
 
-    def _partition_iter(self, files):
+    def next(self):
+        """return next partition's files list"""
+        try:
+            with self._lock:
+                p, fs = self._partitions.popitem()
+        except KeyError:
+            raise StopIteration
+
+        return fs
+
+
+    def load(self, files):
         """returns an iterator for a reduce task input"""
 
         for filename in files:
@@ -139,16 +155,6 @@ class IntermediateResultsFiles():
                     logger.debug("im: loading from %s done" % filename)
                     pass
 
-
-    def next(self):
-        """return next partition's files list"""
-        try:
-            with self._lock:
-                p, fs = self._partitions.popitem()
-        except KeyError:
-            raise StopIteration
-
-        return fs
 
 
 class MapReduceTask(Task):
@@ -471,8 +477,8 @@ class MapWrapper(MapReduceWrapper):
     def _start(self, args={}, callback=None, callback_args={}):
         """
         Overwrites Task._start() because MapTask needs to provide special input and output
-        dictionaries. And it is necessary to self.im.flush() intermediate results after
-        self._start().
+        dictionaries. And it is necessary to self.im.dump() intermediate results after
+        self.work().
         """
         logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
 
@@ -485,7 +491,7 @@ class MapWrapper(MapReduceWrapper):
         self.task._work(**args) # ignoring results
 
         pdict = self.im.partition_output(output)
-        results = self.im.flush(pdict, id) # partitions are our results
+        results = self.im.dump(pdict, id) # partitions are our results
 
         logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
 
@@ -508,7 +514,7 @@ class ReduceWrapper(MapReduceWrapper):
         """
         logger.debug('%s - ReduceWrapper.work()'  % self.get_worker().worker_key)
 
-        args['input'] = self.im._partition_iter(args['partition'])
+        args['input'] = self.im.load(args['partition'])
         output = args['output'] = {}
 
         #id = args['id']

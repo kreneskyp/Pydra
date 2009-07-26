@@ -40,13 +40,13 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
 
         im1 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
         pdict = im1.partition_output(a)
-        p1 = im1.flush(pdict, 'map1')
+        p1 = im1.dump(pdict, 'map1')
 
         b = { 'b': 1, 'c': 1, }
 
         im2 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
         pdict = im2.partition_output(b)
-        p2 = im2.flush(pdict, 'map2')
+        p2 = im2.dump(pdict, 'map2')
 
         # getting results
         im = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
@@ -56,7 +56,7 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
         # reduce
         c = { 'a': 0, 'b': 0, 'c': 0 }
         for p in im:
-            for k, v in im._partition_iter(p):
+            for k, v in im.load(p):
                 c[k] += 1
 
         self.assertEqual(c['a'], 1)
@@ -189,11 +189,11 @@ class NullIM():
         return output
 
 
-    def flush(self, output, mapid):
+    def dump(self, output, mapid):
         return output, mapid
 
 
-    def _partition_iter(self, fs):
+    def load(self, fs):
         return fs.iteritems()
 
 
@@ -215,8 +215,8 @@ class MapReduceWrapper_Test(unittest.TestCase):
         a = { 'a': 1, 'b': 1, }
         id = 'identity_map'
 
-        flush_results = self.maptask._start(args={'input': a.iteritems(), 'id': id})
-        output, mapid = flush_results
+        dump_results = self.maptask._work(args={'input': a.iteritems(), 'id': id})
+        output, mapid = dump_results
 
         self.assertEqual(mapid, id, "mapid differs from id")
 
