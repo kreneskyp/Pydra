@@ -215,7 +215,7 @@ class MapReduceWrapper_Test(unittest.TestCase):
         a = { 'a': 1, 'b': 1, }
         id = 'identity_map'
 
-        dump_results = self.maptask._work(args={'input': a.iteritems(), 'id': id})
+        dump_results = self.maptask._start(args={'input': a.iteritems(), 'id': id})
         output, mapid = dump_results
 
         self.assertEqual(mapid, id, "mapid differs from id")

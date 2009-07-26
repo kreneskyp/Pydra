@@ -29,42 +29,21 @@ class AppendableDict(dict):
     def __setitem__(self, key, value):
         if not self.has_key(key):
             super(AppendableDict, self).__setitem__(key, [])
-        
+
         super(AppendableDict, self).__getitem__(key).append(value)
 
 
-class IntermediateResultsFiles():
-    """Storing intermediate results in flat files.
+class IntermediateResults(object):
+    """Datahandler for not direct input/output handling.
 
-    map stage:
-    * map task output is a dictionary (which must be pick-able);
-    * when map.work() is completed output dict is partitioned and dumped;
-    * partition_output() partitions items depending on a partition() function;
-    * dump() dumps them into a unique file, returns partition-dictionary;
-    * every map task's dump partition-dictionary is collected and provided
-      to update_partitions() function for future iterator generation.
+    Implements partitioning part. Backend writing/reading needs
+    to be implemented in subclass.
 
-    partition:
-    * number of partitions equals number of reducers;
-    * partition must assure that a specific key will be processed by
-      one and only one reduce task.
+    For details please refer IntermediateResultsFiles docstring"""
 
-    reduce stage:
-    * next() method returns list of all files within one partition;
-    * list of files is provided to load() for every reduce task;
-    * load() returns iterator which is used as a input iterator
-      for a reduce task;
-    * iterator loads from (key, values) tuples from a files.
-    """
-
-    # mapreduce-i9t-(taks_id)-(partition)
-    pattern = "mapreduce-i9t-%s-%d-%s"
-
-
-    def __init__(self, task_id, reducers, dir=None):
+    def __init__(self, task_id, reducers):
         self.task_id = task_id
         self.reducers = reducers
-        self.dir = dir
 
         self._lock = Lock()
         self._partitions = {}
@@ -94,6 +73,74 @@ class IntermediateResultsFiles():
         return pdict.iteritems()
 
 
+    def update_partitions(self, partitions):
+        """updates partition-dictionary for future iterator generation."""
+
+        with self._lock:
+            for p, filename in partitions.items():
+                if p in self._partitions:
+                    self._partitions[p].append(filename)
+                else:
+                    self._partitions[p] = [filename]
+
+
+    def __iter__(self):
+        return self
+
+
+    def next(self):
+        """return next partition's files list (workunit)"""
+        try:
+            with self._lock:
+                p, fs = self._partitions.popitem()
+        except KeyError:
+            raise StopIteration
+
+        return fs
+
+
+    # backend
+    def dump(self, pdict, id):
+        raise NotImplementedError
+
+
+    def load(self, partitions):
+        raise NotImplementedError
+
+
+class IntermediateResultsFiles(IntermediateResults):
+    """Storing intermediate results in flat files.
+
+    map stage:
+    * map task output is a dictionary (which must be pick-able);
+    * when map._work() is completed output dict is partitioned and dumped;
+    * partition_output() partitions items depending on a partition() function;
+    * dump() dumps them into a unique file, returns partition-dictionary;
+    * every map task's dump partition-dictionary is collected and provided
+      to update_partitions() function for future iterator generation.
+
+    partition:
+    * number of partitions equals number of reducers;
+    * partition must assure that a specific key will be processed by
+      one and only one reduce task.
+
+    reduce stage:
+    * next() method returns list of all files within one partition;
+    * list of files is provided to load() for every reduce task;
+    * load() returns iterator which is used as a input iterator
+      for a reduce task;
+    * iterator loads (key, values) tuples from a files.
+    """
+
+    # mapreduce-i9t-(taks_id)-(partition)
+    pattern = "mapreduce-i9t-%s-%d-%s"
+
+
+    def __init__(self, task_id, reducers, dir):
+        super(IntermediateResultsFiles, self).__init__(task_id, reducers)
+        self.dir = dir
+
+
     def dump(self, pdict, mapid):
         """dumps a dictionary to a files.
         returns corresponding partitions-dictionary"""
@@ -115,32 +162,6 @@ class IntermediateResultsFiles():
         return partitions
 
 
-    def update_partitions(self, partitions):
-        """updates partition-dictionary for future iterator generation."""
-
-        with self._lock:
-            for p, filename in partitions.items():
-                if p in self._partitions:
-                    self._partitions[p].append(filename)
-                else:
-                    self._partitions[p] = [filename]
-
-
-    def __iter__(self):
-        return self
-
-
-    def next(self):
-        """return next partition's files list"""
-        try:
-            with self._lock:
-                p, fs = self._partitions.popitem()
-        except KeyError:
-            raise StopIteration
-
-        return fs
-
-
     def load(self, files):
         """returns an iterator for a reduce task input"""
 
@@ -154,7 +175,6 @@ class IntermediateResultsFiles():
                 except EOFError:
                     logger.debug("im: loading from %s done" % filename)
                     pass
-
 
 
 class MapReduceTask(Task):
@@ -413,7 +433,7 @@ class MapReduceTask(Task):
 class MapReduceWrapper():
     """map-reduce wrapper base class.
 
-    It expects to work() to do some speciall stuff before and after subtask (self.task) real wrok() method.
+    It expects to work() to do some special stuff before and after subtask (self.task) real work() method.
 
     It stores intermediate results helper (self.im) and overrides:
     * _generate_key() to assure proper subtask identification,
@@ -516,9 +536,6 @@ class ReduceWrapper(MapReduceWrapper):
 
         args['input'] = self.im.load(args['partition'])
         output = args['output'] = {}
-
-        #id = args['id']
-        #logger.debug("%s._work()" % id)
 
         self.task._work(**args) # ignoring results
         results = output
