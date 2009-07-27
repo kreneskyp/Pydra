@@ -166,7 +166,7 @@ class ModuleManager(object):
     def register_interface_module(self, interface_module):
         """
         Register a module that provides an interface for controllers.  Register
-        any exposed functions already registed with this ModuleManager
+        any exposed functions already registered with this ModuleManager
 
         @param module: module to register
         """
