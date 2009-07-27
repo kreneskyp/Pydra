@@ -46,10 +46,11 @@ except ProgrammingError:
 Models
 ================================ """
 
-"""
- Represents a node in the cluster
-"""
+
 class Node(models.Model):
+    """
+    Represents a node in the cluster
+    """
     host            = models.CharField(max_length=255)
     port            = models.IntegerField(default=11890)
     cores_available = models.IntegerField(null=True)
@@ -105,10 +106,11 @@ class Node(models.Model):
 
             return  pub_key_obj
 
-"""
-Custom manager overridden to supply pre-made queryset for queued and running tasks
-"""
+
 class TaskInstanceManager(models.Manager):
+    """
+    Custom manager overridden to supply pre-made queryset for queued and running tasks
+    """
     def queued(self):
         return self.filter(completion_type=None, started=None)
 
@@ -116,11 +118,12 @@ class TaskInstanceManager(models.Manager):
         return self.filter(completion_type=None).exclude(started=None)
 
 
-"""
-Represents and instance of a Task.  This is used to track when a Task was run
-and whether it completed.
-"""
+
 class TaskInstance(models.Model):
+    """
+    Represents and instance of a Task.  This is used to track when a Task was run
+    and whether it completed.
+    """
     task_key        = models.CharField(max_length=255)
     subtask_key     = models.CharField(max_length=255, null=True)
     args            = models.TextField(null=True)
