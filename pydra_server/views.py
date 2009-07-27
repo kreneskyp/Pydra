@@ -244,7 +244,7 @@ def run_task(request):
     }, [pydra_processor])
 
     try:
-        response = simplejson.dumps(pydra_controller.remote_run_task(key, args))
+        response = simplejson.dumps(pydra_controller.remote_queue_task(key, args))
     except ControllerException, e:
         response = e.code
 
