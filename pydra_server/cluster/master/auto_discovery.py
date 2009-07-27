@@ -21,7 +21,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 import dbus, avahi
 
 from pydra_server.cluster.module import Module
-from pydra_server.models import pydraSettings
+from pydra_server.models import pydraSettings, Node
 
 # init logging
 import logging
@@ -30,7 +30,7 @@ logger = logging.getLogger('root')
 class AutoDiscoveryModule(Module):
 
     _signals = [
-        'NODE_ADDED',
+        'NODE_CREATED',
     ]
 
     _shared = [
@@ -48,7 +48,6 @@ class AutoDiscoveryModule(Module):
         self.autodiscovery()
 
 
-
     def autodiscovery(self, callback=None):
         """
         set up the dbus loop, and add the callbacks for adding nodes on the fly
@@ -60,8 +59,9 @@ class AutoDiscoveryModule(Module):
             if pydraSettings.multicast_all:
 
                 # add the node (without the restart)
-                Node.objects.create(host=args[7], port=args[8])
-                self.connect()
+                node = Node.objects.create(host=args[7], port=args[8])
+                self.emit('NODE_CREATED', node)
+
             else:
                 self.known_nodes.add((args[7], args[8]))
 
@@ -94,11 +94,11 @@ class AutoDiscoveryModule(Module):
         sbrowser.connect_to_signal("ItemNew", node_found)
 
 
-    def list_known_nodes(self, _):
+    def list_known_nodes(self):
         """
         list know_nodes
         """
         # cast to list, doesn't seem to digest set
-        return list(self.master.known_nodes)
+        return list(self.known_nodes)
 
 
