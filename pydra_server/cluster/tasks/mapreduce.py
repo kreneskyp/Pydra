@@ -40,11 +40,15 @@ class DatasourceDict(object):
 
 
     def load(self, key):
-        return self.store[key]
+        """data reading"""
+        # we are the source len(key) == 1: key[0] == key[-1]
+        return self.store[key[-1]]
 
 
     def __iter__(self):
-        return self.store.iterkeys()
+        """key generation"""
+        for key in self.store.iterkeys():
+            yield key,
 
 
 class SequenceSlicer(object):
@@ -52,13 +56,21 @@ class SequenceSlicer(object):
     def __init__(self):
         self.input = None
 
-    def load(self, key):
-        parent = key[:-1]
 
-        return self.input.load(parent).key[-1]
+    def load(self, key):
+        """data reading"""
+        parent, index = key[:-1], key[-1]
+        sequence = self.input.load(parent)
+        return sequence[index]
+
 
     def __iter__(self):
-        pass
+        """key generation"""
+        for input_key in self.input:
+            seq_len = len(self.input.load(input_key))
+            for sequence_key in xrange(seq_len):
+                yield input_key + (sequence_key, )
+
 
 class IntermediateResults(object):
     """Datahandler for not direct input/output handling.
@@ -327,7 +339,7 @@ class MapReduceTask(Task):
         logger.debug('   starting maptask: %s' % mapid)
         map_args = {
                     'id': mapid,
-                    'partition': i,
+                    'input_key': i,
                    }
 
         if self.sequential:
@@ -529,8 +541,8 @@ class MapWrapper(MapReduceWrapper):
         """
         logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
 
-        if args.has_key('partition') and hasattr(self.parent, 'input'):
-            args['input'] = self.parent.input.load(args['partition'])
+        if args.has_key('input_key') and hasattr(self.parent, 'input'):
+            args['input'] = self.parent.input.load(args['input_key'])
 
         output = AppendableDict()
         args['output'] = output

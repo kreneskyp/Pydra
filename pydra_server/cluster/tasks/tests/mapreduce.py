@@ -29,9 +29,9 @@ class Datastore_Test(unittest.TestCase):
 
     def setUp(self):
         self.in_dict = { 
-                    "1": ['one', 'two', 'four', 'two', 'four', 'seven'],
-                    "2": ['seven', 'four', 'seven', 'seven'],
-                    "3": ['seven', 'four', 'seven', 'seven'],
+                    "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
+                    "k2": ['seven', 'four', 'seven', 'seven'],
+                    "k3": ['seven', 'four', 'seven', 'seven'],
                        }
 
 
@@ -40,15 +40,26 @@ class Datastore_Test(unittest.TestCase):
         input = DatasourceDict(self.in_dict)
 
         for key in input:
-            self.assertEqual(self.in_dict[key], input.load(key))
+            dkey = key[-1]
+            self.assertEqual(self.in_dict[dkey], input.load(key))
 
 
     def test_sequenceslicer(self):
 
         source = DatasourceDict(self.in_dict)
 
+        expected_seq = []
+
+        for xs in self.in_dict.itervalues():
+            for x in xs:
+                expected_seq.append(x)
+
         slicer = SequenceSlicer()
         slicer.input = source
+
+        for key in slicer:
+            self.assertEqual(len(key), 2)
+            self.assertEqual(slicer.load(key), expected_seq.pop(0))
 
 
 class IntermediateResultsFiles_Test(unittest.TestCase):
