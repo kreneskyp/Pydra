@@ -38,7 +38,7 @@ class IntermediateResultsFiles():
 
     map stage:
     * map task output is a dictionary (which must be pick-able);
-    * when map._work() is completed output dictionary is flushed;
+    * when map.work() is completed output dictionary is flushed;
     * flush() partitions items depending on a partition() function
       and dumps them into a unique file, returns partition-dictionary;
     * every map task flush partition-dictionary is collected and provided
@@ -172,11 +172,9 @@ class MapReduceTask(Task):
 
         self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
 
-        self.maptask = MapWrapper(self.map('MapTask'), self.im)
-        self.maptask.parent = self
+        self.maptask = MapWrapper(self.map('MapTask'), self.im, self)
 
-        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im)
-        self.reducetask.parent = self
+        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im, self)
 
 
     def map_callback(self, result, mapid=None, local=False):
@@ -209,12 +207,12 @@ class MapReduceTask(Task):
         self.reduce_next(local)
 
 
-    def work(self, args, callback, callback_args={}):
+    def _start(self, args, callback, callback_args={}):
         """overridden to prevent early cleanup.
         
-        MapReduceTask does not implement _work() and don't expect user to provide its own. Instead it requires user to provide map and reduce attributes which should be classes derived from MapTask and ReduceTask respectively.
+        MapReduceTask does not implement work() and don't expect user to provide its own. Instead it requires user to provide map and reduce attributes which should be classes derived from MapTask and ReduceTask respectively.
 
-        Cleanup is moved to task_complete() which will be called when there is no more work remaining.
+        Cleanup is in _complete() which will be called when there is no more work remaining.
         map:
         * work(): initialization and calling map_next() for every worker available;
         * map_next(): checking if any data to process and starting a map task,
@@ -224,10 +222,10 @@ class MapReduceTask(Task):
         reduce:
         * reduce_stage: calling reduce_next() for every worker available;
         * reduce_next(): checking if any data to process and starting a reduce task,
-          if no more data available, call task_complete();
+          if no more data available, call _complete();
         * reduce_callback(): updating results (output) and calling reduce_next() for more work.
 
-        task_complete:
+        _complete:
         * cleanup and callbacks.
         """
 
@@ -276,7 +274,7 @@ class MapReduceTask(Task):
                    }
 
         if self.sequential:
-            self.maptask.work(args=map_args, callback=self.map_callback,
+            self.maptask._start(args=map_args, callback=self.map_callback,
                                             callback_args={'mapid': mapid})
         else:
             if local: # XXX orginal worker is to run computations as well, or schedule only?
@@ -318,7 +316,7 @@ class MapReduceTask(Task):
             # call task complete (final stage)
             if not self._complete_called:
                 self._complete_called = True
-                self.task_complete()
+                self._complete()
 
             return
 
@@ -332,7 +330,7 @@ class MapReduceTask(Task):
                       }
 
         if self.sequential:
-            self.reducetask.work(args=reduce_args, callback=self.reduce_callback,
+            self.reducetask._start(args=reduce_args, callback=self.reduce_callback,
                                 callback_args={'reduceid': reduceid})
         else:
             if local: # XXX orginal worker is to run computations as well, or schedule only?
@@ -358,14 +356,14 @@ class MapReduceTask(Task):
             self.reduce_callback(result, id, local=False)
 
 
-    def task_complete(self):
+    def _complete(self):
         """
         Should be called when all map and reduce task have completed
         """
 
         if self.reduce_tasks:
             logger.debug('mapreduce: waiting for reduce stage to finish')
-            reactor.callLater(1, self.task_complete)
+            reactor.callLater(1, self._complete)
             return
 
         logger.debug('mapreduce: finished')
@@ -412,21 +410,16 @@ class MapReduceWrapper():
     * get_subtask() to return self instead of subtask directly,
     * start() to run special self.work() instead of subtask's"""
 
-    def __init__(self, task, im):
+    def __init__(self, task, im, parent):
         self.task = task
-        self.task.parent = self
-
         self.im = im
+        self.parent = parent
+        self.task.parent = parent
 
 
     def _generate_key(self):
-        key = self.task._generate_key()
+        return self.task._generate_key()
 
-        if issubclass(self.parent.__class__, (MapReduceTask,)):
-            base = self.parent.get_key()
-            key = '%s.%s' % (base, key)
-
-        return key
 
     def get_key(self):
         return self._generate_key()
@@ -450,6 +443,7 @@ class MapReduceWrapper():
     def __repr__(self):
         return self.task.__repr__()
 
+
     def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
         """
         starts the task.  This will spawn the work in a workunit thread.
@@ -460,7 +454,7 @@ class MapReduceWrapper():
             return
 
         logger.debug('MapReduceWrapper - starting task: %s' % args)
-        self.work_deferred = threads.deferToThread(self.work, args, callback, callback_args)
+        self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
         if errback:
             self.work_deferred.addErrback(errback)
@@ -470,13 +464,13 @@ class MapReduceWrapper():
 
 class MapWrapper(MapReduceWrapper):
 
-    def work(self, args={}, callback=None, callback_args={}):
+    def _start(self, args={}, callback=None, callback_args={}):
         """
-        Overwrites Task.work() because MapTask needs to provide special input and output
+        Overwrites Task._start() because MapTask needs to provide special input and output
         dictionaries. And it is necessary to self.im.flush() intermediate results after
-        self._work().
+        self._start().
         """
-        logger.debug('%s - MapWrapper.work()'  % self.task.get_worker().worker_key)
+        logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
 
         output = AppendableDict()
         args['output'] = output
@@ -484,11 +478,11 @@ class MapWrapper(MapReduceWrapper):
         id = args['id']
         logger.debug("%s._work()" % id)
 
-        self.task.work(args) # ignoring results
+        self.task._work(**args) # ignoring results
 
         results = self.im.flush(output, id) # partitions are our results
 
-        logger.debug('%s - MapWrapper - work complete' % self.task.get_worker().worker_key)
+        logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
@@ -502,12 +496,12 @@ class MapWrapper(MapReduceWrapper):
 
 class ReduceWrapper(MapReduceWrapper):
 
-    def work(self, args={}, callback=None, callback_args={}):
+    def _start(self, args={}, callback=None, callback_args={}):
         """
-        Overwrites Task.work() beacuse ReduceTask needs to provide special input
+        Overwrites Task._start() beacuse ReduceTask needs to provide special input
         dictionaries (from self.im).
         """
-        logger.debug('%s - ReduceWrapper.work()'  % self.task.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper.work()'  % self.get_worker().worker_key)
 
         args['input'] = self.im._partition_iter(args['partition'])
         output = args['output'] = {}
@@ -515,10 +509,10 @@ class ReduceWrapper(MapReduceWrapper):
         #id = args['id']
         #logger.debug("%s._work()" % id)
 
-        self.task.work(args) # ignoring results
+        self.task._work(**args) # ignoring results
         results = output
 
-        logger.debug('%s - ReduceWrapper - work complete' % self.task.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper - work complete' % self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
