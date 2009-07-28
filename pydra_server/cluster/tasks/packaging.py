@@ -103,7 +103,9 @@ def archive_package(pkg_folder, out_file):
     """
     Archives a task package in a tar.gz file so that it can be transferred.
     """
-    pass
+    tar = tarfile.open(out_file, 'w:bz2')
+    tar.add(pkg_folder)
+    tar.close()
 
 
 def get_python_path(task_folder):

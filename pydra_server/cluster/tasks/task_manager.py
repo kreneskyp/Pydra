@@ -22,6 +22,8 @@ from django.template import Context, loader
 from pydra_server.cluster.tasks.tasks import *
 from pydra_server.models import TaskInstance
 
+from twisted.internet import reactor
+
 import logging
 logger = logging.getLogger('root')
 
@@ -32,8 +34,9 @@ class TaskManager():
                   cluster.
     """
 
-    def __init__(self):
+    def __init__(self, scan_interval=10):
         self.registry = {}
+        self.scan_interval = scan_interval
 
 
     
@@ -154,6 +157,13 @@ class TaskManager():
 
         return message
 
+
+    def discover(self):
+        """
+        A new discover method to periodically scan the task_cache folder.
+        """
+        # 
+        reactor.callLater(self.scan_interval, self.discover)
  
     def autodiscover(self):
         """
