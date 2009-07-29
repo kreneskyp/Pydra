@@ -18,6 +18,7 @@
 """
 
 from pydra_server.cluster.module.interface_module import InterfaceModule
+from pydra_server.cluster.module.attribute_wrapper import AttributeWrapper
 
 import logging
 logger = logging.getLogger('root')
@@ -98,7 +99,7 @@ class ModuleManager(object):
                 self.register_listener(signal, function)
 
             for remote in module._remotes:
-                self.register_remote(*remote)
+                self.register_remote(module, *remote)
 
             for interface in module._interfaces:
                 self.register_interface(module, interface)
@@ -107,7 +108,6 @@ class ModuleManager(object):
                 self.register_service(service)
 
             if isinstance(module,(InterfaceModule,)):
-                'INTEFACE', module
                 self.register_interface_module(module)          
 
 
@@ -193,21 +193,62 @@ class ModuleManager(object):
         """
         Register a module
 
-        @module_class - class of the module to register.  Module will be
+        @param module_class - class of the module to register.  Module will be
                         instantiated by the ModuleManager
         """
         self._modules.append(module_class(self))
 
 
-    def register_remote(self, remote, function):
+    def register_remote(self, module, remote, function):
+        """
+        Register a remote - a remote is a function or attribute available to
+                            internal RPC interfaces within the cluster
 
+        @param module: module registering this remote
+        @param remote: group of mapped functions this remote belongs to.
+                       remotes are grouped to allow multiple interfaces with
+                       distinct functions exposed to it.
+        @param function: function to map.  This may be a function, or method
+               name.  Optionally it may be contained in a tuple with other
+               options.
+
+               Available Options:
+                  * secure (boolean): mark field as requiring authentication.
+                                      default value is true. 
+        """
+
+
+
+        # get the _remote list, initialize if it
+        # does not yet exist
         try:
             _remote = self._remotes[remote]
         except KeyError:
             _remote = {}
             self._remotes[remote] = _remote
     
-        _remote[function.__name__] = function
+        if isinstance(function,(list,tuple)): 
+            if isinstance(function[0],(str,)):
+                # attribute exposed as method with options, repackage with
+                # wrapper around the attribute name
+                attribute = function[0]
+                wrapper = AttributeWrapper(module, attribute)
+                function = list(function[1:])
+                function.insert(0, wrapper)
+                _remote[attribute] = function
+
+            else:
+                # function with other options.  Add as is extracting the
+                # name from the mapped function
+                _remote[function[0].__name__] = function
+
+        elif isinstance(function,(str,)):
+            # attribute exposed as a method with no other options
+            _remote[function] = AttributeWrapper(module, function)
+
+        else:
+            # function with no options
+            _remote[function.__name__] = function
 
 
     def register_service(self, service):

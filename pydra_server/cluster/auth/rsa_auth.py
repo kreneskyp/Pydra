@@ -149,6 +149,7 @@ class RSAAvatar(pb.Avatar):
 
         return key_chunks
         
+
     def chunks(self):
         json_key = simplejson.dumps(self.server_pub_key)
         key_chunks = []
@@ -156,6 +157,13 @@ class RSAAvatar(pb.Avatar):
         for i in range(int(math.ceil(len(json_key)/(chunk*1.0)))):
             key_chunks.append(json_key[i*chunk:i*chunk+chunk])
         return key_chunks
+
+
+    def perspective_get_key(self):
+        """
+        Return the public key to the remote user
+        """
+        return self.chunks()
 
 
 class RSAClient(object):

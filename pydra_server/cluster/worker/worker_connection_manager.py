@@ -134,7 +134,4 @@ class WorkerConnectionManager(Module):
         Callback called when conenction to master fails
         """
         self.reconnect()
-        
-
-    
 
