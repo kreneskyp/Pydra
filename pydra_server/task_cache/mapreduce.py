@@ -1,6 +1,7 @@
 from pydra_server.cluster.tasks.tasks import Task
 from pydra_server.cluster.tasks.mapreduce import MapReduceTask, \
-        IntermediateResultsFiles, DatasourceDict
+        IntermediateResultsFiles
+from pydra_server.cluster.tasks.datasource import DatasourceDict
 
 import logging
 logger = logging.getLogger('root')
