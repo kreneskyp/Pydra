@@ -15,19 +15,60 @@
 # You should have received a copy of the GNU General Public License
 # along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 
-class Graph:
+class DirectedGraph:
 
     def __init__(self):
-        pass
+        self.adjacency_lists = {} # vertex: adj_list
 
 
-    def add_node(self, node):
-        pass
+    def add_vertex(self, vertex):
+        if vertex not in self.adjacency_lists:
+            self.adjacency_lists[vertex] = []
 
 
-    def add_edge(self, from_node, to_node):
-        pass
+    def add_vertices(self, vertices):
+        for vertex in vertices:
+            self.add_vertex(vertex)
 
 
-    def dfs(self):
-        pass
+    def add_edge(self, from_vertex, to_vertex):
+        try:
+            if to_vertex not in self.adjacency_lists[from_vertex]:
+                self.adjacency_lists[from_vertex].append(to_vertex)
+        except KeyError:
+            pass
+
+
+def dfs(graph, root=None):
+    """
+    Returns a tuple of:
+    1) the generated spanning tree after dfs
+    2) if this graph has cycles
+    """
+    def dfs_visit(vertex):
+        color[vertex] = 1 # mark it as visited
+        for next_vertex in graph.adjacency_lists[vertex]:
+            if color[next_vertex] == 0:
+                spanning_tree[next_vertex] = vertex
+                dfs_visit(next_vertex)
+            elif color[next_vertex] == 1:
+                # a cycle
+                dfs.has_cycle = True
+            else:
+                # reaching another spanning tree
+                pass
+        color[vertex] = 2 # finished exploring this vertex
+
+    color = {}
+    spanning_tree = {} # node: parent
+    dfs.has_cycle = False
+    for vertex in graph.adjacency_lists.iterkeys():
+        color[vertex] = 0
+        spanning_tree[vertex] = None
+
+    for vertex in graph.adjacency_lists.iterkeys():
+        if color[vertex] == 0:
+            dfs_visit(vertex)
+
+    return spanning_tree, dfs.has_cycle
+
