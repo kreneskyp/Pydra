@@ -36,7 +36,7 @@ if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
 # ==========================================================
 # Done setting up django environment
 # ==========================================================
-import os, sys, time
+import time
 
 # should be executed before any other reactor stuff to prevent from using non
 # glib2 event loop which we need for dbus
@@ -91,6 +91,6 @@ master = Master()
 application = service.Application("Pydra Master")
 
 for service in master.get_services():
-    print 'Starting service'
+    logger.info('Starting service: %s' % service)
     service.setServiceParent(application)
 
