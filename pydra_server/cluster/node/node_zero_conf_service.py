@@ -17,21 +17,31 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-STATUS_CANCELLED = -2;
-STATUS_FAILED = -1;
-STATUS_STOPPED = 0;
-STATUS_RUNNING = 1;
-STATUS_PAUSED = 2;
-STATUS_COMPLETE = 3;
+import platform
+from pydra_server.cluster.module import Module
+from pydra_server.util.zero_conf_service import ZeroConfService
 
-class TaskNotFoundException(Exception):
-    def __init__(self, value):
-        self.parameter = value
+class NodeZeroConfService(Module):
+    """
+    Module that publishes the node port using ZeroConfService (avahi)
+    """
 
-    def __str__(self):
-        return repr(self.parameter)
+    _shared = [
+        'port',
+        'host'
+    ]
+
+    def __init__(self, manager):
+
+        self._listeners = {
+            '':self.start_service
+        }
+
+        Module.__init__(self, manager)
 
 
-from tasks import Task
-from parallel_task import ParallelTask
-from task_container import TaskContainer
+    def start_service(self):
+        
+        self.service = ZeroconfService(name=platform.node(), port=self.port,
+            stype="_pydra._tcp")
+        self.service.publish()

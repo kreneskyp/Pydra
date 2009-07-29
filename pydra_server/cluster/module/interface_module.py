@@ -19,24 +19,10 @@
 
 
 from pydra_server.cluster.module.module import Module
+from pydra_server.cluster.module.attribute_wrapper import AttributeWrapper
 
 import logging
 logger = logging.getLogger('root')
-
-
-class AttributeWrapper():
-    """
-    Wrapper for attributes that are exposed to the interface.  The wrapper
-    is a callable that turns the attribute into a function that returns
-    the attribute
-    """    
-
-    def __call__(self):
-        return self.module.__dict__[self.attribute]
-
-    def __init__(self, module, attribute):
-       self.module = module
-       self.attribute = attribute  
 
 
 class InterfaceModule(Module):
