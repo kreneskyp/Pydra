@@ -19,6 +19,7 @@ class DatasourceDict(object):
         for key in self.store.iterkeys():
             yield key, # tuple
 
+
     def load(self, key):
         """data reading"""
         # we are the source len(key) == 1: key[0] == key[-1]
@@ -30,8 +31,9 @@ class DatasourceDir(object):
     def __init__(self, dir):
         self.dir = dir
 
+
     def __iter__(self):
-        """generate key to files"""
+        """generate key for input files"""
         files = os.walk(self.dir).__iter__().next()[2]
 
         for filename in files:
@@ -39,6 +41,7 @@ class DatasourceDir(object):
 
 
     def load(self, key):
+        """open particular input file"""
         filename = key[-1]
         path = os.path.join(self.dir, filename)
         return open(path)
@@ -52,11 +55,15 @@ class Slicer(object):
 
 
     def __iter__(self):
+        """iterator generating keys"""
         # implement this
         raise NotImplementedError
 
 
     def load(self, key):
+        """loading data corresponding with particular key"""
+
+        #if self.send_as_input then the key is the input
         if self.send_as_input:
             return key
 
@@ -64,6 +71,7 @@ class Slicer(object):
 
 
     def _load(self, key):
+        """loading data corresponding with particular key"""
         # implement this
         raise NotImplementedError
 
@@ -92,6 +100,7 @@ class SequenceSlicer(Slicer):
 class LineFileSlicer(Slicer):
 
     def __iter__(self):
+        """generates a key == parent_key + (offset, ), where offset is a line position in file"""
         for input_key in self.input:
             with self.input.load(input_key) as f:
                 #must use readline:
@@ -111,6 +120,7 @@ class LineFileSlicer(Slicer):
 
 
     def _load(self, key):
+        """reads particular line in file"""
         parent, offset = key[:-1], key[-1]
         with self.input.load(parent) as f:
             f.seek(offset)

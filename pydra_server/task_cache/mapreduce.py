@@ -1,7 +1,8 @@
 from pydra_server.cluster.tasks.tasks import Task
 from pydra_server.cluster.tasks.mapreduce import MapReduceTask, \
         IntermediateResultsFiles
-from pydra_server.cluster.tasks.datasource import DatasourceDict
+from pydra_server.cluster.tasks.datasource import DatasourceDict, \
+        DatasourceDir
 
 import logging
 logger = logging.getLogger('root')
@@ -37,10 +38,12 @@ class CountWords(MapReduceTask):
 
     input = DatasourceDict(
                 { 
-                    "1": ['one', 'two', 'four', 'two', 'four', 'seven'],
-                    "2": ['seven', 'four', 'seven', 'seven'],
-                    "3": ['seven', 'four', 'seven', 'seven'],
+                    "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
+                    "k2": ['seven', 'four', 'seven', 'seven'],
+                    "k3": ['seven', 'four', 'seven', 'seven'],
                 })
+
+    #input = DatasourceDir(dir='/mnt/shared/in')
 
     output = {}
 
