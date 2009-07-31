@@ -184,7 +184,7 @@ class TaskManager(Module):
         Auto-discover any tasks that are in the tasks directory
         """
         import imp, os, sys, inspect
-        from pydra_server.models import *
+        from pydra_server.models import pydraSettings
 
         for tasks_dir in pydraSettings.tasks_dir.split(','):
 

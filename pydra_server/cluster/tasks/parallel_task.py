@@ -32,7 +32,7 @@ class ParallelTask(Task):
     ParallelTask - is a task that can be broken into discrete work units
     """
     _lock = None                # general lock
-    _available_workers = 1      # number of workers available to this task
+    #_available_workers = 1      # number of workers available to this task
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
@@ -88,26 +88,16 @@ class ParallelTask(Task):
             self._data = kwargs['data']
             logger.debug('Paralleltask - data was passed in!')
 
-        self.subtask_key = self.subtask._generate_key()
 
-        logger.debug('Paralleltask - getting count of available workers')
-        self._available_workers = self.get_worker().available_workers
-        logger.debug('Paralleltask - starting, workers available: %i' % self._available_workers)
-
-
-        # if theres more than one worker assign values
-        # this check is required for cases where this is run
-        # on a single core machine.  in that case this worker
-        # is the only worker that exists
-        if self._available_workers > 1:
-            #assign initial set of work to other workers
-            for i in range(1, self._available_workers):
-                logger.debug('Paralleltask - trying to assign worker %i' % i)
-                self._assign_work()
-
-        #start a work_unit locally
-        #reactor.callLater(1, self._assign_work_local)
-        self._assign_work(True)
+        # expand all the work units eagerly. the master will handles these
+        # worker requests. other task implementations (like MapReduceTask) may
+        # employ a more sophisticated mechanism that allows dependence between
+        # work units.
+        data, index = self.get_work_unit()
+        while data is not None:
+            logger.debug('Paralleltask - assigning remote work')
+            self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
+            data, index = self.get_work_unit()
 
         logger.debug('Paralleltask - initial work assigned')
 
