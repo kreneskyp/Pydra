@@ -48,6 +48,13 @@ class ParallelTask(Task):
         if key == 'subtask':
             value.parent = self
 
+    def work_complete(self):
+        """
+        Method stub for method called to post process completion of task.  This
+        must be overridden by users for their task specific work
+        """
+        pass
+
 
     def work_unit_complete(self, workunit, results):
         """
@@ -147,7 +154,7 @@ class ParallelTask(Task):
         with self._lock:
 
             #grab from the beginning of the list
-            if len(self._data):
+            if len(self._data) != 0:
                 data = self._data.pop(0)
             else:
                 return None, None

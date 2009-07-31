@@ -121,7 +121,7 @@ class NodeManager(Module):
                         worker_status[html_key] = (1,-1,-1)
                     elif w_key in self._active_workers:
                         task_instance_id, task_key, args, subtask_key, workunit_key = self._active_workers[w_key]
-                        worker_status[html_key] = (1,task_key,subtask_key if subtask_key else -1)
+                        worker_status[html_key] = (1,task_key,subtask_key,workunit_key if subtask_key else -1)
                     else:
                         worker_status[html_key] = -1
 

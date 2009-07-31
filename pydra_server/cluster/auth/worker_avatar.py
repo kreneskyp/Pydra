@@ -36,7 +36,7 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
         node_key = node_key if node_key else None
         master_key = RSA.construct(server.pub_key) if server.pub_key else None
 
-        ModuleAvatar.__init__(self, server.manager._remotes['REMOTE_WORKER'], master_key, None, node_key, server.worker_authenticated, True)
+        ModuleAvatar.__init__(self, server.manager._remotes['REMOTE_WORKER'])
         RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
 

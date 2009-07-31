@@ -17,21 +17,16 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-STATUS_CANCELLED = -2;
-STATUS_FAILED = -1;
-STATUS_STOPPED = 0;
-STATUS_RUNNING = 1;
-STATUS_PAUSED = 2;
-STATUS_COMPLETE = 3;
+class AttributeWrapper():
+    """
+    Wrapper for attributes that are exposed to the interface.  The wrapper
+    is a callable that turns the attribute into a function that returns
+    the attribute
+    """    
 
-class TaskNotFoundException(Exception):
-    def __init__(self, value):
-        self.parameter = value
+    def __call__(self, *args, **kwargs):
+        return self.module.__dict__[self.attribute]
 
-    def __str__(self):
-        return repr(self.parameter)
-
-
-from tasks import Task
-from parallel_task import ParallelTask
-from task_container import TaskContainer
+    def __init__(self, module, attribute):
+       self.module = module
+       self.attribute = attribute 

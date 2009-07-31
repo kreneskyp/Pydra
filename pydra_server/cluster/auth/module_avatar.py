@@ -28,15 +28,27 @@ class RemoteWrapper():
     Wrapper for remote methods to add the Avatar to the method call
     """
 
-    def __init__(self, avatar, function):
+    def __init__(self, avatar, remote):
         self.avatar = avatar
-        self.function = function
+
+        # process remote - it may be just a function or a tuple
+        # containing a function and additional options
+        if isinstance(remote, (list,tuple)):
+            self.function, self.secure = remote
+        else:
+            self.function = remote
+            self.secure = True
+
 
     def __call__(self, *args, **kwargs):
         """
         Calls original function, adding the avatar to the beginning of the args
         """
-        self.function(self.avatar.name, *args, **kwargs)
+        if self.secure and not self.avatar.authenticated:
+            logger.error('Attempted access to secured method before authentication: %s - %s', (self.avatar.name, self.function))
+            return
+
+        return self.function(self.avatar.name, *args, **kwargs)
 
 
 class ModuleAvatar(pb.Avatar):

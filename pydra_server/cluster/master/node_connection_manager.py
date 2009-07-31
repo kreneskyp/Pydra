@@ -298,7 +298,6 @@ class NodeConnectionManager(Module):
         Process Node information.  Most will just be stored for later use.  Info will include
         a list of workers.  The master will then connect to all Workers.
         """
-
         # save node's information in the database
         node.cores = info['cores']
         node.cpu_speed = info['cpu']
@@ -315,7 +314,7 @@ class NodeConnectionManager(Module):
 
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init', self.host, pydraSettings.port, node_key_str)
+        d = node.ref.callRemote('init_node', self.host, pydraSettings.port, node_key_str)
         d.addCallback(self.node_ready, node)
 
 
