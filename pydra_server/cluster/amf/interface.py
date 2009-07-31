@@ -16,7 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import datetime, time, hashlib
+import sys, datetime, time, hashlib
 
 from authenticator import AMFAuthenticator
 from twisted.application import internet
@@ -83,7 +83,7 @@ class AMFFunction():
                 try:
                     ret = [self.function(*(args[:-1]))]
                 except Exception, e:                    
-                    import traceback, sys
+                    import traceback
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
                     traceback.print_tb(exceptionTraceback, limit=10, file=sys.stdout)
                     logger.error('AMFFunction - exception in mapped function [%s] %s' % (self.function, e))
