@@ -184,7 +184,7 @@ class TaskScheduler(Module):
         task_instance.args = simplejson.dumps(args)
         task_instance.priority = priority
         task_instance.subtask_key = None
-        task_instance.queued_time = datetime.now()
+        task_instance.queued = datetime.now()
         task_instance.status = STATUS_STOPPED
         task_instance.save()
 
@@ -239,7 +239,7 @@ class TaskScheduler(Module):
                 if found:
                     task_instance = self._active_tasks.pop(root_task_id)
                     task_instance.status = STATUS_CANCELLED
-                    task_instance.completed_time = datetime.now()
+                    task_instance.completed = datetime.now()
                     task_instance.save()
                 return True
         except ValueError:
@@ -282,22 +282,20 @@ class TaskScheduler(Module):
                         del self._worker_mappings[worker_key]
                     status = STATUS_COMPLETE if task_status is None else task_status
                     task_instance.status = status
-                    task_instance.completed_time = datetime.now()
+                    task_instance.completed = datetime.now()
                     task_instance.save()
 
                     with self._queue_lock:
                         if status in (STATUS_CANCELLED, STATUS_COMPLETE, STATUS_FAILED):
                             # safe to remove the task
                             length = len(self._short_term_queue)
-                            print self._short_term_queue
                             for i in range(0, length):
-                                #TODO: exception here, index error wtf?
-                                print i, self._short_term_queue, self._short_term_queue[i]
                                 if self._short_term_queue[i][1] == job.root_task_id:
                                     del self._short_term_queue[i]
                                     logger.info(
                                             'Task %d: %s is removed from the short-term queue' % \
                                             (job.root_task_id, job.task_key))
+                                    break
                             heapify(self._short_term_queue)
             else:
                 # not a main worker
@@ -364,7 +362,7 @@ class TaskScheduler(Module):
 
 
 
-    def request_worker(self, requester_key, args, subtask_key, workunit_key):
+    def request_worker(self, requester_key, subtask_key, args, workunit_key):
         """
         Requests a worker for a workunit on behalf of a (main) worker.
 
@@ -381,6 +379,8 @@ class TaskScheduler(Module):
             task_instance = self._active_tasks[job.root_task_id]
             task_instance.queue_worker_request( (requester_key, args,
                         subtask_key, workunit_key) )
+
+            logger.debug('Work Request %s:  sub=%s  args=%s  w=%s ' % (requester_key, subtask_key, args, workunit_key))
 
             self._schedule()
         else:
@@ -458,7 +458,6 @@ class TaskScheduler(Module):
                         # move the task from the ltq to the stq
                         worker_key = self._idle_workers.pop()
                         root_task_id = heappop(self._long_term_queue)[1]
-                        print 'ROOT ID', root_task_id
                         task_instance = self._active_tasks[root_task_id]
                         task_instance.last_succ_time = datetime.now()
                         task_key = task_instance.task_key
@@ -468,7 +467,7 @@ class TaskScheduler(Module):
                                 [task_instance.compute_score(), root_task_id])
                         task_instance.main_worker = worker_key
                         task_instance.status = STATUS_RUNNING
-                        task_instance.started_time = datetime.now()
+                        task_instance.started = datetime.now()
                         task_instance.save()
 
                         self._main_workers.add(worker_key)
@@ -478,7 +477,6 @@ class TaskScheduler(Module):
                 task_instance, worker_request = None, None
                 for task in self._short_term_queue:
                     root_task_id = task[1]
-                    print 'ROOT ID!!!!', root_task_id
                     task_instance = self._active_tasks[root_task_id]
                     worker_request = task_instance.poll_worker_request()
                     if worker_request:
@@ -529,6 +527,7 @@ class TaskScheduler(Module):
             worker = self.workers[worker_key]
             d = worker.remote.callRemote('run_task', task_key, args,
                  subtask_key, workunit_key)
+            d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 
             return worker_key, root_task_id
@@ -770,8 +769,7 @@ class TaskScheduler(Module):
             return None'''
 
 
-    def run_task_successful(self, results, worker, task_instance_id, subtask_key=None):
-
+    def run_task_successful(self, results, worker_key, subtask_key=None):
         #save the history of what workers work on what task/subtask
         #its needed for tracking finished work in ParallelTasks and will aide in Fault recovery
         #it might also be useful for analysis purposes if one node is faulty
@@ -780,9 +778,11 @@ class TaskScheduler(Module):
             pass
 
         else:
-            task_instance = TaskInstance.objects.get(id=task_instance_id)
-            task_instance.worker = worker.name
-            task_instance.save()
+            job = self._worker_mappings.get(worker_key, None)
+            if job:
+                task_instance = self._active_tasks[job.root_task_id]
+                task_instance.worker = worker_key
+                task_instance.save()
 
 
     def send_results(self, worker_key, results, workunit_key):
@@ -833,7 +833,6 @@ class TaskScheduler(Module):
             # cancel the task and send notice to all other workers to stop
             # working on this task.  This may be partially recoverable but that
             # is not included for now.
-            print 'WTF???', self.get_workers_on_task(job.root_task_id)
             for other_worker_key in self.get_workers_on_task(job.root_task_id):
                 if other_worker_key != worker_key:
                     worker = self.workers[other_worker_key]
@@ -972,7 +971,7 @@ class TaskScheduler(Module):
             statuses[instance.id] = {'s':STATUS_STOPPED}
 
         for instance in self.get_running_tasks():
-            start = time.mktime(instance.started_time.timetuple())
+            start = time.mktime(instance.started.timetuple())
 
             # call worker to get status update
             try:

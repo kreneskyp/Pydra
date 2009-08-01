@@ -112,10 +112,10 @@ class TaskInstanceManager(models.Manager):
     Custom manager overridden to supply pre-made queryset for queued and running tasks
     """
     def queued(self):
-        return self.filter(completion_type=None, started=None)
+        return self.filter(status=None, started=None)
 
     def running(self):
-        return self.filter(completion_type=None).exclude(started=None)
+        return self.filter(status=None).exclude(started=None)
 
 
 
@@ -131,7 +131,6 @@ class TaskInstance(models.Model):
     started         = models.DateTimeField(null=True)
     completed       = models.DateTimeField(null=True)
     worker          = models.CharField(max_length=255, null=True)
-    completion_type = models.IntegerField(null=True)
     status          = models.IntegerField(null=True)
 
     objects = TaskInstanceManager()

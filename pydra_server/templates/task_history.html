@@ -132,7 +132,7 @@
 
             {% for instance in history.instances %}
                 <tr id="instance_{{instance.id}}" class="{% cycle '' 'stripe' %}">
-                    <td class="task_status">{{instance.completion_type|task_status}}</td>
+                    <td class="task_status">{{instance.status|task_status}}</td>
                     <td class="task_id">{{instance.id}}</td>
                     <td class="description"></td>
                     <td class="queue_time">{{instance.queued|default:"--"}}</td>
