@@ -22,7 +22,8 @@ from django.template import Context, loader
 
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks.tasks import *
-from pydra_server.models import TaskInstance
+from pydra_server.models import *
+from pydra_server.util import graph
 
 from twisted.internet import reactor
 
@@ -60,7 +61,7 @@ class TaskManager(Module):
 
         Module.__init__(self, manager)
 
-        self.registry = {}
+        self.registry = graph.DirectedGraph()
 
         self.scan_interval = scan_interval
 
@@ -187,15 +188,19 @@ class TaskManager(Module):
         """
         A new discover method to periodically scan the task_cache folder.
         """
-        # 
+        for task_dir in pydraSettings.tasks_dir.split(','):
+            files = os.listdir(task_dir)
+            for filename in files:
+                if os.isdir(filename):
+                    self.registry.add_vertex(filename)
         reactor.callLater(self.scan_interval, self.discover)
+
  
     def autodiscover(self):
         """
         Auto-discover any tasks that are in the tasks directory
         """
         import imp, os, sys, inspect
-        from pydra_server.models import *
 
         for tasks_dir in pydraSettings.tasks_dir.split(','):
 
@@ -261,6 +266,9 @@ class TaskManager(Module):
                 'instances':[instance for instance in paginated.object_list]
                }
 
+
+    def _read_package(self):
+        pass
 
     
 

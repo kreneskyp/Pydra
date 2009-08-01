@@ -62,12 +62,18 @@ def dfs(graph, root=None):
     color = {}
     spanning_tree = {} # node: parent
     dfs.has_cycle = False
+
     for vertex in graph.adjacency_lists.iterkeys():
         color[vertex] = 0
-        spanning_tree[vertex] = None
+
+    if root is not None:
+        spanning_tree[root] = None
+        dfs(root)
+        return spanning_tree, dfs.has_cycle
 
     for vertex in graph.adjacency_lists.iterkeys():
         if color[vertex] == 0:
+            spanning_tree[vertex] = None
             dfs_visit(vertex)
 
     return spanning_tree, dfs.has_cycle
