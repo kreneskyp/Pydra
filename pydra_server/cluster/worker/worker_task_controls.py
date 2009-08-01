@@ -110,7 +110,7 @@ class WorkerTaskControls(Module):
             task_instance.__init__()
             task_instance.parent = self
             return task_instance.start(clean_args, subtask_key,
-                    self._local_work_completed, errback=self._local_work_failed)
+                    self.work_complete, callback_args={'workunit_key':self.__local_workunit_key}, errback=self.work_failed)
 
         else:
             #create an instance of the requested task
@@ -118,7 +118,7 @@ class WorkerTaskControls(Module):
             self.__task_instance.__init__()
             self.__task_instance.parent = self
             return self.__task_instance.start(clean_args, subtask_key, self.work_complete,
-                    errback=self.work_failed)
+                    callback_args={'workunit_key':self.__workunit_key}, errback=self.work_failed)
 
 
     def stop_task(self):
@@ -145,7 +145,7 @@ class WorkerTaskControls(Module):
         return (WORKER_STATUS_IDLE,)
 
 
-    def work_complete(self, results):
+    def work_complete(self, results, workunit_key):
         """
         Callback that is called when a job is run in non_blocking mode.
         """
@@ -166,8 +166,8 @@ class WorkerTaskControls(Module):
             # if the master is still there send the results
             with self._lock_connection:
                 if self.master:
-                    deferred = self.master.callRemote("send_results", results, self.__workunit_key)
-                    deferred.addErrback(self.send_results_failed, results, self.__workunit_key)
+                    deferred = self.master.callRemote("send_results", results, workunit_key)
+                    deferred.addErrback(self.send_results_failed, results, workunit_key)
 
                 # master disapeared, hold results until it requests them
                 else:
