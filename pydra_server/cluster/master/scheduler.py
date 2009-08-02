@@ -531,8 +531,8 @@ class TaskScheduler(Module):
             
 
         if worker_key:
-            self._worker_mappings[worker_key] = WorkerJob(root_task_id,
-                    task_key, args, subtask_key, workunit_key, on_main_worker)
+            job = WorkerJob(root_task_id, task_key, args, subtask_key, workunit_key, on_main_worker)
+            self._worker_mappings[worker_key] = job
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
@@ -829,9 +829,10 @@ class TaskScheduler(Module):
                 if job.on_main_worker:
                     job.on_main_worker = False
                     job.workunit_key = None
+                    job.subtask_key = None
 
-                # Hold this worker until the master receives
-                # an explicit release message from the main worker
+                # Hold this worker for the next workunit or mainworker 
+                # releases it.
                 self.hold_worker(worker_key)
 
                 # advance the scheduler if there is already a request waiting 
