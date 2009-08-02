@@ -127,6 +127,7 @@ class ParallelTask(Task):
         """
         assign a unit of work to a Worker by requesting a worker from the compute cluster
         """
+        logger.critical('FIX ME, i should send any new work requests or release worker')
         data, index = self.get_work_unit()
         if not data == None:
             if local:

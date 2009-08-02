@@ -59,6 +59,7 @@ class WorkerTaskControls(Module):
         self.__subtask = None
         self.__workunit_key = None
         self.__local_workunit_key = None
+        self.__local_task_instance = None
         
 
     def run_task(self, key, args={}, subtask_key=None, workunit_key=None):
@@ -68,26 +69,32 @@ class WorkerTaskControls(Module):
         logger.debug('Calling run_task with key=%s, sub=%s, w=%s, arg=%s' % (key,
                     subtask_key, workunit_key, args))
 
+
         #Check to ensure this worker is not already busy.
         # The Master should catch this but lets be defensive.
-        run_local = False
         with self._lock:
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
-            if self.__task and (not isinstance(self.__task_instance,
-                        ParallelTask) or self.__local_workunit_key or \
-                    self.__task <> key):
-                # an ugly hack:
-                # we explicitly test if the loaded task is a parallel task.
-                # And if it is, we allow this worker to run an additional
-                # subtask.
-                logger.warn('This worker is already running a task')
+            # is this task being run locally for the mainworker?
+            run_local = self.__task_instance and self.__task == key and subtask_key and workunit_key
+
+            # Busy Check
+            if run_local:
+                busy =  not isinstance(self.__task_instance, ParallelTask) \
+                        or self.__local_workunit_key \
+
+            else:
+                busy = (self.__task and self.__task <> key) or self.__workunit_key
+                
+            if busy:
+                logger.warn('Worker:%s - worker busy:  task=%s, instance=%s, local=%s:%s' % (self.worker_key, self.__task, self.__task_instance, run_local, self.__local_workunit_key))
                 return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
+
 
             self.__task = key
             self.__subtask = subtask_key
-            if self.__task == key and subtask_key and workunit_key:
+            if run_local:
                 # the master wants this worker to exec a workunit locally
                 logger.info('The master wants to exec a local work')
                 self.__local_workunit_key = workunit_key
@@ -106,11 +113,11 @@ class WorkerTaskControls(Module):
                 clean_args[arg_key.__str__()] = arg_value
 
         if run_local:
-            task_instance = object.__new__(self.registry[key])
-            task_instance.__init__()
-            task_instance.parent = self
-            return task_instance.start(clean_args, subtask_key,
-                    self.work_complete, callback_args={'workunit_key':self.__local_workunit_key}, errback=self.work_failed)
+            self.__local_task_instance = object.__new__(self.registry[key])
+            self.__local_task_instance.__init__()
+            self.__local_task_instance.parent = self
+            return self.__local_task_instance.start(clean_args, subtask_key,
+                    self.work_complete, callback_args={'local':True}, errback=self.work_failed)
 
         else:
             #create an instance of the requested task
@@ -118,7 +125,7 @@ class WorkerTaskControls(Module):
             self.__task_instance.__init__()
             self.__task_instance.parent = self
             return self.__task_instance.start(clean_args, subtask_key, self.work_complete,
-                    callback_args={'workunit_key':self.__workunit_key}, errback=self.work_failed)
+                    errback=self.work_failed)
 
 
     def stop_task(self):
@@ -145,14 +152,21 @@ class WorkerTaskControls(Module):
         return (WORKER_STATUS_IDLE,)
 
 
-    def work_complete(self, results, workunit_key):
+    def work_complete(self, results, local=False):
         """
         Callback that is called when a job is run in non_blocking mode.
         """
-        stop_flag = self.__task_instance.STOP_FLAG
-        self.__task = None
 
-        if stop_flag:
+        if local:    
+            workunit_key = self.__local_workunit_key
+            task_instance = self.__local_task_instance
+            self.__local_workunit_key = None
+        else:            
+            workunit_key = self.__workunit_key
+            task_instance = self.__task_instance
+            self.__workunit_key = None
+
+        if task_instance.STOP_FLAG:
             #stop flag, this task was canceled.
             with self._lock_connection:
                 if self.master:
