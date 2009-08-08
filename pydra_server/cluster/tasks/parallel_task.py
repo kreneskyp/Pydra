@@ -36,6 +36,8 @@ class ParallelTask(Task):
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
+    _workunit_total = 0
+    _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
     subtask = None              # subtask that is parallelized
     subtask_key = None          # cached key from subtask
 
@@ -74,7 +76,10 @@ class ParallelTask(Task):
         A parallel task's progress is a derivitive of its workunits:
            COMPLETE_WORKUNITS / TOTAL_WORKUNITS
         """
-        return -1
+        total = self._workunit_completed + len(self._data) + \
+            len(self._data_in_progress)
+
+        return 100 * self._workunit_completed  / total
 
 
     def _stop(self):
@@ -93,6 +98,7 @@ class ParallelTask(Task):
         # save data, if any
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
+            self._workunit_total = len(data)
             logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
 
         # request initial workers
@@ -166,7 +172,7 @@ class ParallelTask(Task):
         This method *MUST* lock while it is altering the lists of data
         """
         logger.debug('[%s] Paralleltask - Work unit completed' % self.get_worker().worker_key)
-        with self._lock:        
+        with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
 
@@ -185,6 +191,8 @@ class ParallelTask(Task):
             # the scheduler.  Releasing it must be explicit though.
             if not self._data_in_progress:
                 self.get_worker().release_worker()
+
+            self._workunit_completed += 1
 
             #check for more work
             if not (self._data_in_progress or self._data):
