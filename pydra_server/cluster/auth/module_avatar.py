@@ -75,6 +75,10 @@ class ModuleAvatar(pb.Avatar):
             # remotes must be packaged in wrapper so that there is a link
             # back to the worker that called it.  Remotes cannot be wrapped
             # in the list because the wrapper is implementation specific
-            return RemoteWrapper(self, self._remotes[key[12:]])
+            try:
+                return RemoteWrapper(self, self._remotes[key[12:]])
+            except KeyError:
+                logger.error('Avatar [%s] tried to call non-existant function: %s' % (self.name, key[12:]))
+                raise Exception('Avatar [%s] tried to call non-existant function: %s' % (self.name, key[12:]))
 
         return pb.Avatar.__getattr__(key)
