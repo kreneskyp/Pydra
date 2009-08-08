@@ -32,6 +32,8 @@ class DirectedGraph:
 
 
     def add_edge(self, from_vertex, to_vertex):
+        self.add_vertex(from_vertex)
+        self.add_vertex(to_vertex)
         try:
             if to_vertex not in self.adjacency_lists[from_vertex]:
                 self.adjacency_lists[from_vertex].append(to_vertex)
@@ -68,7 +70,7 @@ def dfs(graph, root=None):
 
     if root is not None:
         spanning_tree[root] = None
-        dfs(root)
+        dfs_visit(root)
         return spanning_tree, dfs.has_cycle
 
     for vertex in graph.adjacency_lists.iterkeys():
