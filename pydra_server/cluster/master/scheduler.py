@@ -588,43 +588,6 @@ class TaskScheduler(Module):
 
             reactor.callLater(self.update_interval, self._update_queue)
 
-    '''
-    def remove_worker(self, worker_key):
-        """
-        Called when a worker disconnects
-        """
-        with self._lock:
-            # if idle, just remove it.  no need to do anything else
-            if worker_key in self._workers_idle:
-                logger.info('worker:%s - removing worker from idle pool' % worker_key)
-                self._workers_idle.remove(worker_key)
-
-            #worker was working on a task, need to clean it up
-            elif worker_key in self._workers_working:
-                removed_worker = self._workers_working[worker_key]
-
-                #worker was working on a subtask, return unfinished work to main worker
-                if removed_worker[3]:
-                    logger.warning('%s failed during task, returning work unit' % worker_key)
-                    task_instance = TaskInstance.objects.get(id=removed_worker[0])
-                    main_worker = self._workers[task_instance.worker]
-                    if main_worker:
-                        d = main_worker.remote.callRemote('return_work', removed_worker[3], removed_worker[4])
-                        d.addCallback(self.return_work_success, worker_key)
-                        d.addErrback(self.return_work_failed, worker_key)
-
-                    else:
-                        #if we don't have a main worker listed it probably already was disconnected
-                        #just call successful to clean up the worker
-                        self.return_work_success(None, worker_key)
-
-                #worker was main worker for a task.  cancel the task and tell any
-                #workers working on subtasks to stop.  Cannot recover from the 
-                #main worker going down
-                else:
-                    #TODO
-                    pass
-    '''
 
     def return_work_success(self, results, worker_key):
         """
@@ -638,26 +601,8 @@ class TaskScheduler(Module):
         """
         A worker disconnected and the method call to return the work failed
         """
+        #TODO this should add work request
         pass
-
-
-    '''
-    def select_worker(self, task_instance_id, task_key, args={}, subtask_key=None, workunit_key=None):
-        """
-        Select a worker to use for running a task or subtask
-        """
-        #lock, selecting workers must be threadsafe
-        with self._lock:
-            if len(self._workers_idle):
-                #move the first worker to the working state storing the task its working on
-                worker_key = self._workers_idle.pop(0)
-                self._workers_working[worker_key] = (task_instance_id, task_key, args, subtask_key, workunit_key)
-
-                #return the worker object, not the key
-                return self._workers[worker_key]
-            else:
-                return None
-    '''
 
     
     def queue_task(self, task_key, args={}):
@@ -723,70 +668,9 @@ class TaskScheduler(Module):
         return 1
 
 
-    '''
-    def advance_queue(self):
-        """
-        Advances the queue.  If there is a task waiting it will be started, otherwise the cluster will idle.
-        This should be called whenever a resource becomes available or a new task is queued
-        """
-        logger.debug('advancing queue: %s' % self._queue)
-        with self._lock_queue:
-            try:
-                task_instance = self._queue[0]
-
-            except IndexError:
-                #if there was nothing in the queue then fail silently
-                logger.debug('No tasks in queue, idling')
-                return False
-
-            if self.run_task(task_instance.id, task_instance.task_key, simplejson.loads(task_instance.args), task_instance.subtask_key):
-                #task started, update its info and remove it from the queue
-                logger.info('Task:%s:%s - starting' % (task_instance.task_key, task_instance.subtask_key))
-                task_instance.started = datetime.now()
-                task_instance.completion_type = STATUS_RUNNING
-                task_instance.save()
-
-                del self._queue[0]
-                self._running.append(task_instance)
-
-            else:
-                # cluster does not have idle resources.
-                # task will stay in the queue
-                logger.debug('Task:%s:%s - no resources available, remaining in queue' % (task_instance.task_key, task_instance.subtask_key))
-                return False
-    '''
-
-
     def run_task_failed(self, results, worker_key):
         # return the worker to the pool
         self.add_worker(worker_key)
-
-
-    '''def run_task(self, task_instance_id, task_key, args={}, subtask_key=None, workunit_key=None):
-        """
-        Run the task specified by the task_key.  This shouldn't be called directly.  Tasks should
-        be queued with queue_task().  If the cluster has idle resources it will be run automatically
-
-        This function is used internally by the cluster for parallel processing work requests.  Work
-        requests are never queued.  If there is no resource available the main worker for the task
-        should be informed and it can readjust its count of available resources.  Any type of resource
-        sharing logic should be handled within select_worker() to keep the logic organized.
-        """
-        # get a worker for this task
-        worker = self.select_worker(task_instance_id, task_key, args, subtask_key, workunit_key)
-
-        if worker:
-            logger.debug('Worker:%s - Assigned to task: %s:%s %s' % (worker.name, task_key, subtask_key, args))
-            d = worker.remote.callRemote('run_task', task_key, args, subtask_key, workunit_key)
-            d.addCallback(self.run_task_successful, worker, task_instance_id, subtask_key)
-            return worker
-
-        # no worker was available
-        # just return 0 (false), the calling function will decided what to do,
-        # depending what called run_task, different error handling will apply
-        else:
-            logger.warning('No worker available')
-            return None'''
 
 
     def run_task_successful(self, results, worker_key, subtask_key=None):
@@ -886,31 +770,6 @@ class TaskScheduler(Module):
         """
         logger.info(' Worker:%s - stopped' % worker_key)
         self.add_worker(worker_key, STATUS_CANCELLED)
-
-
-    '''
-    def request_worker(self, worker_key, subtask_key, args, workunit_key):
-        """
-        Called by workers running a Parallel task.  This is a request
-        for a worker in the cluster to process a workunit from a task
-        """
-
-        #get the task key and run the task.  The key is looked up
-        #here so that a worker can only request a worker for the 
-        #their current task.
-        worker = self._workers_working[worker_key]
-        task_instance = TaskInstance.objects.get(id=worker[0])
-        logger.debug('Worker:%s - request for worker: %s:%s' % (worker_key, subtask_key, args))
-
-        # lock queue and check status of task to ensure no lost workers
-        # due to a canceled task
-        with self._lock_queue:
-            if task_instance in self._running:
-                self.run_task(worker[0], worker[1], args, subtask_key, workunit_key)
-
-            else:
-                logger.debug('Worker:%s - request for worker failed, task is not running' % (worker_key))
-    '''
 
 
     def release_worker(self, worker_key):
