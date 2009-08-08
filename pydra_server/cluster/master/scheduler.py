@@ -860,6 +860,8 @@ class TaskScheduler(Module):
             for key, worker in self.workers.items():
                 if self.get_worker_status(key) == 1:
                     data = self.get_worker_job(key)
+                    if data.subtask_key and not data.on_main_worker:
+                        continue
                     task_instance_id = data.root_task_id
                     deferred = worker.remote.callRemote('task_status')
                     deferred.addCallback(self.fetch_task_status_success, task_instance_id)
