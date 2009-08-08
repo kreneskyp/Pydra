@@ -62,48 +62,46 @@ class WorkerTaskControls(Module):
         self.__local_task_instance = None
         
 
-    def run_task(self, key, args={}, subtask_key=None, workunit_key=None):
+    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, main_worker=None):
         """
         Runs a task on this worker
         """
-        logger.debug('Calling run_task with key=%s, sub=%s, w=%s, arg=%s' % (key,
-                    subtask_key, workunit_key, args))
+        logger.info('[%s] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
+            % (self.worker_key, key, args, subtask_key, workunit_key, \
+            main_worker))
 
-
-        #Check to ensure this worker is not already busy.
-        # The Master should catch this but lets be defensive.
+        # Register task with worker
         with self._lock:
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
             # is this task being run locally for the mainworker?
-            run_local = self.__task_instance and self.__task == key and subtask_key and workunit_key
+            run_local = subtask_key and self.worker_key == main_worker
 
-            # Busy Check
+            # Check to ensure this worker is not already busy.
+            # The Master should catch this but lets be defensive.
             if run_local:
                 busy =  not isinstance(self.__task_instance, ParallelTask) \
-                        or self.__local_workunit_key \
+                        or self.__local_workunit_key
 
             else:
                 busy = (self.__task and self.__task <> key) or self.__workunit_key
                 
             if busy:
-                logger.warn('Worker:%s - worker busy:  task=%s, instance=%s, local=%s:%s' % (self.worker_key, self.__task, self.__task_instance, run_local, self.__local_workunit_key))
+                logger.warn('Worker:%s - worker busy:  task=%s, instance=%s, local=%s:%s' \
+                    % (self.worker_key, self.__task, self.__task_instance, \
+                    run_local, self.__local_workunit_key))
                 return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
 
 
+            # not busy.  set variables that mark this worker as busy.
             self.__task = key
             self.__subtask = subtask_key
             if run_local:
-                # the master wants this worker to exec a workunit locally
-                logger.info('The master wants to exec a local work')
+                logger.debug('[%s] RunTask: The master wants to exec a local work' % self.worker_key)
                 self.__local_workunit_key = workunit_key
-                run_local = True
             else:
                 self.__workunit_key = workunit_key
-
-
-        logger.info('Worker:%s - starting task: %s:%s  %s' % (self.worker_key, key,subtask_key, args))
 
 
         # process args to make sure they are no longer unicode
@@ -112,12 +110,13 @@ class WorkerTaskControls(Module):
             for arg_key, arg_value in args.items():
                 clean_args[arg_key.__str__()] = arg_value
 
+        # Create task instance and start it
         if run_local:
             self.__local_task_instance = object.__new__(self.registry[key])
             self.__local_task_instance.__init__()
             self.__local_task_instance.parent = self
             return self.__local_task_instance.start(clean_args, subtask_key,
-                    self.work_complete, callback_args={'local':True}, errback=self.work_failed)
+                    self.work_complete, {'local':True}, errback=self.work_failed)
 
         else:
             #create an instance of the requested task
@@ -156,7 +155,6 @@ class WorkerTaskControls(Module):
         """
         Callback that is called when a job is run in non_blocking mode.
         """
-
         if local:    
             workunit_key = self.__local_workunit_key
             task_instance = self.__local_task_instance
@@ -264,10 +262,16 @@ class WorkerTaskControls(Module):
         """
         logger.info('Worker:%s - received REMOTE results for: %s' % (self.worker_key, subtask_key))
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
-        release_worker = subtask.parent._work_unit_complete(results, workunit_key)
-        if release_worker:
-            # notify the master to let it release the worker
-            self.master.callRemote('release_worker', worker_key)
+        subtask.parent._work_unit_complete(results, workunit_key)
+        
+
+    def release_worker(self):
+        """
+        Function called by Main Workers to release a worker.  This does not
+        specify which worker to release because the main worker does not know
+        which worker is optimal to release if there is a choice.
+        """
+        self.master.callRemote('release_worker')
 
 
     def request_worker(self, subtask_key, args, workunit_key):

@@ -116,7 +116,8 @@ class TaskScheduler(Module):
             ('REMOTE_WORKER', self.request_worker),
             ('REMOTE_WORKER', self.send_results),
             ('REMOTE_WORKER', self.worker_stopped),
-            ('REMOTE_WORKER', self.task_failed)
+            ('REMOTE_WORKER', self.task_failed),
+            ('REMOTE_WORKER', self.release_worker)
         ]
 
         self._interfaces = [
@@ -349,6 +350,13 @@ class TaskScheduler(Module):
 
 
     def hold_worker(self, worker_key):
+        """
+        Hold a worker for a task so that it may not be scheduled for other
+        jobs.  This allows a Task to maintain control over the same workers,
+        reducing costly initialization time.
+
+        @param worker_key: worker to hold
+        """
         with self._worker_lock:
             if worker_key not in self._main_workers:
                 # we don't need to retain a main worker
@@ -489,8 +497,8 @@ class TaskScheduler(Module):
                         elif subtask_key and not self._worker_mappings[requester].workunit_key:
                             # the main worker can do a local execution
                             task_instance.pop_worker_request()
-                            logger.info('Main worker:%s assigned to task %s' %
-                                    (requester, task_instance.task_key))
+                            logger.info('Main worker:%s assigned to task %s:%s' %
+                                    (requester, subtask_key, workunit_key))
                             worker_key = requester
                             on_main_worker = True
 
@@ -499,8 +507,9 @@ class TaskScheduler(Module):
                             task_instance.pop_worker_request()
                             worker_key = self._idle_workers.pop()
                             task_instance.running_workers.append(worker_key)
-                            logger.info('Worker:%s assigned to task %s' %
-                                    (requester, task_instance.task_key))
+                            logger.info('Worker:%s assigned to task=%s, subtask=%s:%s' %
+                                    (worker_key, task_instance.task_key, subtask_key, workunit_key))
+
 
                 else:
                     logger.debug('NO REQUESTS IN QUEUE')
@@ -537,7 +546,7 @@ class TaskScheduler(Module):
             # notify remote worker to start     
             worker = self.workers[worker_key]
             d = worker.remote.callRemote('run_task', task_key, args,
-                 subtask_key, workunit_key)
+                 subtask_key, workunit_key, task_instance.main_worker)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 
@@ -802,7 +811,7 @@ class TaskScheduler(Module):
 
             Tasks runtime and log should be saved in the database
         """
-        logger.debug('Worker:%s - sent results: %s' % (worker_key, results))
+        logger.debug('Worker:%s - sent results: w=%s results=%s' % (worker_key, workunit_key, results))
         # TODO: this lock does not appear to be sufficient because all of the
         # other functions use specific locks, might need to obtain both locks
         with self._lock:
@@ -831,9 +840,10 @@ class TaskScheduler(Module):
                     job.workunit_key = None
                     job.subtask_key = None
 
-                # Hold this worker for the next workunit or mainworker 
-                # releases it.
-                self.hold_worker(worker_key)
+                else:
+                    # Hold this worker for the next workunit or mainworker
+                    # releases it.
+                    self.hold_worker(worker_key)
 
                 # advance the scheduler if there is already a request waiting 
                 # for this task, otherwise there will be nothing to advance.
@@ -904,7 +914,26 @@ class TaskScheduler(Module):
 
 
     def release_worker(self, worker_key):
-        self.add_worker(worker_key)
+        """
+        Release a worker held by the worker calling this function.
+
+        @param worker_key: worker signally that it does not have additional
+                           workunits but is holding a worker.
+        """
+
+        # select the best worker to release.  For now just release the first
+        # worker in the waiting worker list
+
+        released_worker = None
+        job = self._worker_mappings.get(worker_key, None)
+        if job:
+            task_instance = self._active_tasks.get(job.root_task_id, None)
+            if task_instance:
+                released_worker = task_instance.waiting_workers.pop()
+
+        if released_worker:
+            logger.debug('Task %s - releasing worker: %s' % (worker_key, released_worker))
+            self.add_worker(released_worker)
 
 
     def worker_connected(self, worker_avatar):

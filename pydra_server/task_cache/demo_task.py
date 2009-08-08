@@ -66,16 +66,15 @@ class TestTask(Task):
             except KeyError:
                 pass
         except Exception, e:
-            logger.error('wtf?')
-            logger.error(e)
+            logger.error('[%s] test task exception' %(self.get_worker().worker_key, e))
 
-        logger.info('counting from %s to %s' % (value, value+self.stop))
+        logger.info('[%s] counting from %s to %s' % (self.get_worker().worker_key, value, value+self.stop))
 
         while self.count < self.stop and not self.STOP_FLAG:
             time.sleep(3)
             self.count += 1
             value += 1
-            logger.info('value: %d   progress: %d%%' % (value , self.progress()))
+            logger.info('[%s] value: %d   progress: %d%%' % (self.get_worker().worker_key, value , self.progress()))
 
         return {'start':value}
 
@@ -132,9 +131,9 @@ class TestParallelTask(ParallelTask):
         self._finished = []
 
     def work_unit_complete(self, data, results):
-        logger.info('   Adding results:%s' % results)
+        logger.info('[%s]   Adding results:%s' % (self.get_worker().worker_key, results))
         self._finished.append(results)
 
     def work_complete(self):
-        logger.info('tabulating results!')
+        logger.info('[%s] tabulating results!' % (self.get_worker().worker_key))
         logger.info(self._finished)
