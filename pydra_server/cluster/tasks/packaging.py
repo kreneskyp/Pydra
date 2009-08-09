@@ -82,21 +82,23 @@ class TaskPackage:
         This synchronization process may take one or more times of
         communication with the remote side. The 'phase' parameter, starting
         from 1, specifies the phase that the invocation of this method is in.
+        The final step typically manipulates the local file system and makes
+        the package content consistent with the remote package.
 
         Subclass implementators should guarantee that active_sync() and
         passive_sync() match.
 
         @param phase: the phase in which invocation of this method is made
         @param received: the data received from the remote side
-        @return the request as a string, or None if this package does not
-                expect a remote response any more
+        @return a pair of values consisting of the request as a string, and
+                a flag indicating whether it expect a remote response any more.
         """
         def on_remove_error(func, path, execinfo):
             logger.error('Error %s occurred while trying to remove %s' %
                     (execinfo, path))
 
         if phase == 1:
-            return self.version
+            return self.version, True
         elif phase == 2:
             if received:
                 buf = zlib.decompress(received)
@@ -115,7 +117,7 @@ class TaskPackage:
                 tar.close()
                 in_file.close()
                 self._init(self.folder)
-            return None
+            return '', False
 
 
     def passive_sync(self, received, phase=1):
@@ -133,8 +135,8 @@ class TaskPackage:
 
         @param phase: the phase in which invocation of this method is made
         @param received: the data received from the remote side
-        @return the response as a string, or None if this package does not
-                expect a remote response any more
+        @return a pair of values consisting of the response as a string, and
+                a flag indicating whether it expect a remote response any more.
         """
         if self.version <> snapshot:
             out_file = cStringIO.StringIO()
@@ -145,8 +147,8 @@ class TaskPackage:
             diff = out_file.getvalue()
             diff = zlib.compress(diff)
             out_file.close()
-            return diff
-        return '' # Should NOT return a None
+            return diff, False
+        return '', False
 
 
     def _init(self, pkg_folder):
