@@ -29,7 +29,7 @@ from twisted.internet import reactor, threads
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import *
 from pydra_server.cluster.constants import *
-from pydra_server.models import TaskInstance
+from pydra_server.models import TaskInstance, WorkUnit
 from pydra_server.util import deprecated
 
 # init logging
@@ -50,7 +50,6 @@ class WorkerJob:
         self.subtask_key = subtask_key
         self.workunit_key = workunit_key
         self.on_main_worker = on_main_worker
-
 
 class TaskScheduler(Module):
 
@@ -272,8 +271,13 @@ class TaskScheduler(Module):
                 if job.subtask_key:
                     # this main worker was working on a workunit
                     logger.info('Main worker:%s ready for work again' % worker_key)
+                    work_unit = job.model
+                    work_unit.completed = datetime.now()
+                    work_unit.status = task_status
+                    work_unit.save()
                     job.subtask_key = None
                     job.workunit_key = None
+
                 else:
                     logger.info('Main worker:%s finishes the root task' %
                             worker_key)
@@ -676,17 +680,33 @@ class TaskScheduler(Module):
 
 
     def run_task_successful(self, results, worker_key, subtask_key=None):
-        #save the history of what workers work on what task/subtask
-        #its needed for tracking finished work in ParallelTasks and will aide in Fault recovery
-        #it might also be useful for analysis purposes if one node is faulty
-        if subtask_key:
-            #TODO, update model and record what workers worked on what subtasks
-            pass
+        # save the history of what workers work on what task/subtask
+        # its needed for tracking finished work in ParallelTasks and will aide
+        # in Fault recovery it might also be useful for analysis purposes 
+        # if one node is faulty
 
-        else:
-            job = self._worker_mappings.get(worker_key, None)
-            if job:
-                task_instance = self._active_tasks[job.root_task_id]
+        job = self.get_worker_job(worker_key)
+        task_instance = self._active_tasks[job.root_task_id]
+
+        if job and task_instance:
+            if subtask_key:
+                print 'WORK_UNIT!'
+                try:
+                    work_unit = WorkUnit()
+                    work_unit.task_instance = task_instance
+                    work_unit.subtask_key = subtask_key
+                    work_unit.workunit_key = job.workunit_key
+                    work_unit.args = simplejson.dumps(job.args)
+                    work_unit.started = datetime.now()
+                    work_unit.worker = worker_key
+                    work_unit.status = STATUS_RUNNING
+                    work_unit.save()
+                    print 'SAVED!!'
+                except Exception, e:
+                    print e
+                job.model = work_unit
+
+            else:
                 task_instance.worker = worker_key
                 task_instance.save()
 
@@ -697,29 +717,32 @@ class TaskScheduler(Module):
 
             Tasks runtime and log should be saved in the database
         """
-        logger.debug('Worker:%s - sent results: w=%s results=%s' % (worker_key, workunit_key, results))
+        logger.debug('Worker:%s - sent results: w=%s results=%s' % \
+            (worker_key, workunit_key, results))
         # TODO: this lock does not appear to be sufficient because all of the
         # other functions use specific locks, might need to obtain both locks
         with self._lock:
             job = self.get_worker_job(worker_key)
             logger.info('Worker:%s - completed: %s:%s (%s)' %  \
-                    (worker_key, job.task_key, job.subtask_key, job.workunit_key))
+                (worker_key, job.task_key, job.subtask_key, job.workunit_key))
 
-            # check to make sure the task was still in the queue.  Its possible this call was made at the same
-            # time a task was being canceled.  Only worry about sending the reults back to the Task Head
+            # check to make sure the task was still in the queue.  Its possible
+            # this call was made at the same time a task was being canceled.  
+            # Only worry about sending the results back to the Task Head 
             # if the task is still running
             if job.subtask_key:
 
                 task_instance = self.get_task_instance(job.root_task_id)
 
-                #if this was a subtask the main task needs the results and to be informed
+                # if this was a subtask the main task needs the results and to 
+                # be informed
                 main_worker = self.workers[task_instance.main_worker]
                 logger.debug('Worker:%s - informed that subtask completed' %
                         main_worker.name)
                 main_worker.remote.callRemote('receive_results', worker_key,
                         results, job.subtask_key, job.workunit_key)
 
-                # Clear attributes if mainworker.  these will cause bugs later on
+                # Clear attributes if mainworker. This prevents bugs later on
                 # with scheduling and task completion if not cleared
                 if job.on_main_worker:
                     job.on_main_worker = False
@@ -734,7 +757,13 @@ class TaskScheduler(Module):
                 # advance the scheduler if there is already a request waiting 
                 # for this task, otherwise there will be nothing to advance.
                 if len(task_instance._worker_requests) != 0:
-                    threads.deferToThread(self._schedule)                    
+                    threads.deferToThread(self._schedule)
+
+                # save information about this workunit to the database
+                work_unit = job.model
+                work_unit.completed = datetime.now()
+                work_unit.status = STATUS_COMPLETE
+                work_unit.save()
 
             else:
                 # this is the root task, so we can return the worker to the
@@ -793,7 +822,8 @@ class TaskScheduler(Module):
                 released_worker = task_instance.waiting_workers.pop()
 
         if released_worker:
-            logger.debug('Task %s - releasing worker: %s' % (worker_key, released_worker))
+            logger.debug('Task %s - releasing worker: %s' % \
+                    (worker_key, released_worker))
             self.add_worker(released_worker)
 
 
