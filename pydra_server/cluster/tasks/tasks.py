@@ -95,6 +95,7 @@ class Task(object):
             logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
             split = subtask_key.split('.')
             subtask = self.get_subtask(split)
+            subtask.logger = self.logger
             logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
             self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
 
