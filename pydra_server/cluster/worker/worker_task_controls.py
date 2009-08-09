@@ -19,10 +19,10 @@
 from __future__ import with_statement
 from threading import Lock
 
-
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import ParallelTask
+from pydra_server.logging import get_task_logger
 
 # init logging
 import logging
@@ -62,7 +62,8 @@ class WorkerTaskControls(Module):
         self.__local_task_instance = None
         
 
-    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, main_worker=None):
+    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, \
+        main_worker=None, task_id=None):
         """
         Runs a task on this worker
         """
@@ -115,16 +116,20 @@ class WorkerTaskControls(Module):
             self.__local_task_instance = object.__new__(self.registry[key])
             self.__local_task_instance.__init__()
             self.__local_task_instance.parent = self
-            return self.__local_task_instance.start(clean_args, subtask_key,
-                    self.work_complete, {'local':True}, errback=self.work_failed)
+            self.__local_task_instance.logger = get_task_logger( \
+                self.worker_key, task_id, subtask_key, workunit_key)
+            return self.__local_task_instance.start(clean_args, subtask_key, \
+                self.work_complete, {'local':True}, errback=self.work_failed)
 
         else:
             #create an instance of the requested task
             self.__task_instance = object.__new__(self.registry[key])
             self.__task_instance.__init__()
             self.__task_instance.parent = self
-            return self.__task_instance.start(clean_args, subtask_key, self.work_complete,
-                    errback=self.work_failed)
+            self.__task_instance.logger = get_task_logger(self.worker_key, \
+                task_id)
+            return self.__task_instance.start(clean_args, subtask_key, \
+                self.work_complete, errback=self.work_failed)
 
 
     def stop_task(self):

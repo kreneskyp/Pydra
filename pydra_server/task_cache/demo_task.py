@@ -20,9 +20,6 @@
 from pydra_server.cluster.tasks import Task, TaskContainer, ParallelTask
 import time
 
-import logging
-logger = logging.getLogger('root')
-
 from django import forms
 class TestTaskInput(forms.Form):
     """
@@ -66,15 +63,15 @@ class TestTask(Task):
             except KeyError:
                 pass
         except Exception, e:
-            logger.error('[%s] test task exception' %(self.get_worker().worker_key, e))
+            self.logger.error('[%s] test task exception' %(self.get_worker().worker_key, e))
 
-        logger.info('[%s] counting from %s to %s' % (self.get_worker().worker_key, value, value+self.stop))
+        self.logger.info('[%s] counting from %s to %s' % (self.get_worker().worker_key, value, value+self.stop))
 
         while self.count < self.stop and not self.STOP_FLAG:
-            time.sleep(3)
+            time.sleep(1)
             self.count += 1
             value += 1
-            logger.info('[%s] value: %d   progress: %d%%' % (self.get_worker().worker_key, value , self.progress()))
+            self.logger.info('[%s] value: %d   progress: %d%%' % (self.get_worker().worker_key, value , self.progress()))
 
         return {'start':value}
 
@@ -131,9 +128,9 @@ class TestParallelTask(ParallelTask):
         self._finished = []
 
     def work_unit_complete(self, data, results):
-        logger.info('[%s]   Adding results:%s' % (self.get_worker().worker_key, results))
+        self.logger.info('[%s]   Adding results:%s' % (self.get_worker().worker_key, results))
         self._finished.append(results)
 
     def work_complete(self):
-        logger.info('[%s] tabulating results!' % (self.get_worker().worker_key))
-        logger.info(self._finished)
+        self.logger.info('[%s] tabulating results!' % (self.get_worker().worker_key))
+        self.logger.info(self._finished)

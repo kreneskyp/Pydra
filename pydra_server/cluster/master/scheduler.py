@@ -540,13 +540,15 @@ class TaskScheduler(Module):
             
 
         if worker_key:
-            job = WorkerJob(root_task_id, task_key, args, subtask_key, workunit_key, on_main_worker)
+            job = WorkerJob(root_task_id, task_key, args, subtask_key, \
+                workunit_key, on_main_worker)
             self._worker_mappings[worker_key] = job
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
-            d = worker.remote.callRemote('run_task', task_key, args,
-                 subtask_key, workunit_key, task_instance.main_worker)
+            d = worker.remote.callRemote('run_task', task_key, args, \
+                 subtask_key, workunit_key, task_instance.main_worker, \
+                 task_instance.id)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 
@@ -844,10 +846,9 @@ class TaskScheduler(Module):
         updates the list of statuses.  this function is used because all
         workers must be queried to receive status updates.  This results in a
         list of deferred objects.  There is no way to block until the results
-        are ready.  instead this function updates all the statuses.  Subsequent
+        are ready.  instead this function updates all the statuses. Subsequent
         calls for status will be able to fetch the status.  It may be delayed 
-        by a few seconds but thats minor when considering a task that could run
-        for hours.
+        by a few seconds but thats minor when a task could run for hours.
 
         For now, statuses are only queried for Main Workers.  Including 
         statuses of subtasks requires additional logic and overhead to pass the
@@ -864,7 +865,8 @@ class TaskScheduler(Module):
                         continue
                     task_instance_id = data.root_task_id
                     deferred = worker.remote.callRemote('task_status')
-                    deferred.addCallback(self.fetch_task_status_success, task_instance_id)
+                    deferred.addCallback(self.fetch_task_status_success, \
+                    task_instance_id)
             self.next_task_status_update = now + timedelta(0, 3)
 
 
@@ -898,8 +900,9 @@ class TaskScheduler(Module):
                 progress = self._task_statuses[instance.id]
 
             except KeyError:
-                # its possible that the progress does not exist yet. because
-                # the task has just started and fetch_task_status is not complete
+                # its possible that the progress does not exist yet. Because
+                # the task has just started and fetch_task_status is not 
+                # complete
                 pass
                 progress = -1
 

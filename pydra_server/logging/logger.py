@@ -21,8 +21,11 @@ from __future__ import with_statement
 
 import logging
 import logging.handlers
-import settings
+from logging import FileHandler
 from threading import Lock
+
+import settings
+from pydra_server.util import init_dir
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 
@@ -31,10 +34,13 @@ INIT_LOCK = Lock()
 
 def init_logging(filename):
     """
-    Utility function that configures the root logger so that class that require
+    Utility function that configures the root logger so classes that require
     logging do not have to implement all this code.  After executing this
     function the calling function/class the logging class can be used with
     the root debugger.  ie. logging.info('example')
+
+    This function records initialized loggers so that they are not initalized
+    more than once, which would result in duplicate log messages
     """
 
     global INITED_FILES
@@ -66,7 +72,8 @@ def init_logging(filename):
     return logger
 
 
-def init_task_logger(worker_id, task_instance_id, work_unit_id=None):
+def get_task_logger(worker_id, task_id, subtask_key=None, \
+    workunit_id=None):
     """
     Initializes a logger for tasks and subtasks.  Logs for tasks are stored as
     in separate files and aggregated.  This allow workunits to be viewed in a
@@ -79,25 +86,31 @@ def init_task_logger(worker_id, task_instance_id, work_unit_id=None):
     @param task_instance_id: ID of the instance.  Each task instance receives 
                              its own log.
 
-    @param work_unit_id: optional ID of workunit.  workunits receive their own
-                         log file so that the log can be read separately.  This
-                         is separate from the task instance log.
+    @param subtask_key: (optional) subtask_key.  see workunit_id
+
+    @param workunit_id: (optional) ID of workunit.  workunits receive their
+                         own log file so that the log can be read separately.
+                         This is separate from the task instance log.
     """
 
-    logger_name = 'task.%s' % task_instance_id
+    log_dir = settings.LOG_DIR[:-1] if settings.LOG_DIR.endswith('/') else \
+        settings.LOG_DIR
+    task_dir = '%s/worker.%s/task.%s' % (log_dir, worker_id, task_id)
+    init_dir(task_dir)
 
-    if work_unit_id:
-        filename = '%s/worker.%s/task.%s/workunit.%s.log' % (settings.LOGS_DIR, worker_id, task_instance_id, workunit_)
+    if workunit_id:
+        logger_name = 'workunit.%s.%s' % (task_id, workunit_id)
+        filename = '%s/workunit.%s.%s.log' % \
+            (task_dir, subtask_key, workunit_id)
     else:
-        filename = '%s/worker.%s/task.%s/task.log' % (settings.LOGS_DIR, worker_id, logger_name)
+        logger_name = 'task.%s' % task_id
+        filename = '%s/task.log' % task_dir
 
-    logger = logger.getLogger(logger_name)
-    handler = logging.handlers.basicConfig(
-             filename,              
-             backupCount = settings.LOG_BACKUP)
-    handler.setLevel(settings.LOG_LEVEL)
-
+    logger = logging.getLogger(logger_name)
+    handler = FileHandler(filename)
     formatter = logging.Formatter(LOG_FORMAT)
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    logger.setLevel(settings.LOG_LEVEL)
+
     return logger
