@@ -143,6 +143,7 @@ class TaskContainer(Task):
         Starts a subtask
         """
         subtask = self.subtasks[self._current_subtask]
+        subtask.task.logger = self.logger
         logger.debug('TaskContainer - starting subtask: %s' % subtask)
         subtask.task.start(args=args, callback=self._subtask_complete)
         logger.debug('TaskContainer - STARTED! subtask: %s' % subtask)
