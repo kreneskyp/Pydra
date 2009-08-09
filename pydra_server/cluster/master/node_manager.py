@@ -18,9 +18,9 @@ class NodeManager(Module):
     ]
 
     _shared = [
-        '_workers',
-        '_workers_idle',
-        '_workers_working',
+        'workers',
+        '_idle_workers',
+        '_active_workers',
         'nodes'
     ]
 
@@ -107,7 +107,7 @@ class NodeManager(Module):
         Returns status information about Nodes and Workers in the cluster
         """
         node_status = {}
-        worker_list = self._workers
+        worker_list = self.workers
         #iterate through all the nodes adding their status
         for key, node in self.nodes.items():
             worker_status = {}
@@ -117,10 +117,10 @@ class NodeManager(Module):
                 for i in range(node.cores):
                     w_key = '%s:%s:%i' % (node.host, node.port, i)
                     html_key = '%s_%i' % (node.id, i)
-                    if w_key in self._workers_idle:
+                    if w_key in self._idle_workers:
                         worker_status[html_key] = (1,-1,-1)
-                    elif w_key in self._workers_working:
-                        task_instance_id, task_key, args, subtask_key, workunit_key = self._workers_working[w_key]
+                    elif w_key in self._active_workers:
+                        task_instance_id, task_key, args, subtask_key, workunit_key = self._active_workers[w_key]
                         worker_status[html_key] = (1,task_key,subtask_key,workunit_key if subtask_key else -1)
                     else:
                         worker_status[html_key] = -1

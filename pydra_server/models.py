@@ -18,9 +18,9 @@
 """
 
 from django.db import models
+from threading import Lock
 
 import dbsettings
-from dbsettings.loading import set_setting_value
 
 
 """ ================================
@@ -112,10 +112,10 @@ class TaskInstanceManager(models.Manager):
     Custom manager overridden to supply pre-made queryset for queued and running tasks
     """
     def queued(self):
-        return self.filter(completion_type=None, started=None)
+        return self.filter(status=None, started=None)
 
     def running(self):
-        return self.filter(completion_type=None).exclude(started=None)
+        return self.filter(status=None).exclude(started=None)
 
 
 
@@ -131,9 +131,70 @@ class TaskInstance(models.Model):
     started         = models.DateTimeField(null=True)
     completed       = models.DateTimeField(null=True)
     worker          = models.CharField(max_length=255, null=True)
-    completion_type = models.IntegerField(null=True)
+    status          = models.IntegerField(null=True)
 
     objects = TaskInstanceManager()
+
+    ######################
+    # non-model attributes
+    ######################
+
+    # scheduling-related
+    priority         = 5
+    running_workers  = [] # running workers (keys only, excluding the main worker)
+    waiting_workers  = [] # workers waiting for more workunits
+    last_succ_time   = None # when this task last time gets a worker
+    _worker_requests = [] # (args, subtask_key, workunit_key)
+
+    # others
+    main_worker  = None
+    _request_lock = Lock()
+
+    def compute_score(self):
+        """
+        Computes a priority score for this task, which will be used by the
+        scheduler.
+
+        Empirical analysis may reveal a good calculation formula. But in
+        general, the following guideline is useful:
+        1) Stopped tasks should have higher scores. At least for the current
+           design, a task can well proceed even with only one worker. So letting
+           a stopped task run ASAP makes sense.
+        2) A task with higher priority should obviously have a higher score.
+        3) A task that has been out of worker supply for a long time should
+           have a relatively higher score.
+        """
+        return self.priority 
+
+    def queue_worker_request(self, request):
+        """
+        A worker request is a tuple of:
+        (requesting_worker_key, args, subtask_key, workunit_key).
+        """
+        with self._request_lock:
+            self._worker_requests.append(request)
+
+    def pop_worker_request(self):
+        """
+        A worker request is a tuple of:
+        (requesting_worker_key, args, subtask_key, workunit_key).
+        """
+        with self._request_lock:
+            try:
+                return self._worker_requests.pop(0)
+            except IndexError:
+                return None
+
+    def poll_worker_request(self):
+        """
+        Returns the first worker request in the queue without removing
+        it.
+        """
+        with self._request_lock:
+            try:
+                return self._worker_requests[0]
+            except IndexError:
+                return None
 
     class Meta:
         permissions = (

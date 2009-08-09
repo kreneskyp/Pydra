@@ -24,7 +24,7 @@ admin.autodiscover()
 
 
 urlpatterns = patterns('',
-    (r'^', include('pydra_server.urls')),
+    (r'^', include('pydra_web.urls')),
     (r'^admin/(.*)', admin.site.root),
     (r'^settings/', include('dbsettings.urls')),
 

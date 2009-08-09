@@ -74,7 +74,7 @@ class TaskManager_Test(unittest.TestCase):
             task_instance = TaskInstance()
             task_instance.task_key=task
             task_instance.started = time.strftime('%Y-%m-%d %H:%M:%S')
-            task_instance.completion_type = -1
+            task_instance.status = -1
             task_instance.save()
 
 
