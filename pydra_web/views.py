@@ -208,6 +208,24 @@ def task_history(request):
     }, context_instance=c)
 
 
+def task_history_detail(request):
+    c = RequestContext(request, processors=[pydra_processor,
+            settings_processor])
+
+    error = None
+    id = request.GET['id']
+    try:
+        detail = pydra_controller.remote_task_history_detail(id)
+    except ControllerException, e:
+        history = None
+        error = e.code
+
+    return render_to_response('task_history_detail.html', {
+        'task': detail,
+        'controller_error': error
+    }, context_instance=c)
+
+
 def task_progress(request):
     """
     Handler for retrieving status 
