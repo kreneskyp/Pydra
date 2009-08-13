@@ -57,6 +57,7 @@ class DatasourceDir(object):
 
     def __init__(self, dir):
         self.dir = dir
+        self.subslicer = None
 
     def connect(self):
         pass
@@ -82,16 +83,17 @@ class DatasourceDir(object):
 
 class DatasourceSQL(object):
 
-    def __init__(self, db, **kwargs):
-        self.db = db
+    def __init__(self, **kwargs):
         self.kwargs = kwargs
+        self.subslicer = None
+        self.db = None
 
     def connect(self):
-        #self.db = MySQLdb.connect(**self.kwargs) 
+        self.db = MySQLdb.connect(**self.kwargs) 
         logger.debug("datasource: connecting to DB")
 
     def close(self):
-        #self.db.close()
+        self.db.close()
         logger.debug("datasource: closing connection to DB")
 
 
@@ -100,7 +102,12 @@ class DatasourceSQL(object):
         yield "_mysql",
 
     def load(self, key):
-        return self.db.cursor()
+        obj = self.db.cursor()
+
+        if self.subslicer:
+            return chain_subslicer(obj, self.subslicer)
+
+        return obj
 
 
 ############
@@ -115,11 +122,6 @@ class Slicer(object):
         self.send_as_input = False
         self.subslicer = None
 
-    def connect(self):
-        self.input.connect()
-
-    def close(self):
-        self.input.close()
 
     def __iter__(self):
         """iterator generating keys"""
@@ -270,37 +272,24 @@ class FilePickleOutput(object):
 
 class SQLTableKeyInput(Subslicer):
 
-    def connect(self):
-        #self.db = MySQLdb.connect(**self.kwargs) 
-        logger.debug("dataoutput: connecting to DB")
-
-    def close(self):
-        #self.db.close()
-        logger.debug("dataoutput: closing connection to DB")
-
-
     def __iter__(self):
 
-        try:
-            db = self.kwargs['db']
-            table = self.kwargs['table']
-            c = db.cursor()
+        db = self.kwargs['db']
+        table = self.kwargs['table']
+        c = db.load(None)
 
-            for partition in self.input:
+        for partition in self.input:
 
-                sql = "SELECT k, v FROM %s WHERE partition = '%s'" % (table, partition)
-                logger.debug(sql)
+            sql = "SELECT k, v FROM %s WHERE partition = '%s'" % (table, partition)
+            logger.debug(sql)
 
-                c.execute(sql)
+            c.execute(sql)
+            row = c.fetchone()
+
+            while row:
+                yield row
+
                 row = c.fetchone()
-
-                while row:
-                    yield row
-
-                    row = c.fetchone()
-
-        except Exception, e:
-            logger.debug("WTF? %s" % e)
 
 
 class SQLTableOutput(object):
@@ -309,30 +298,24 @@ class SQLTableOutput(object):
         self.table = table
         self.db = db
         self.kwargs = kwargs
-        self.connect()
-
-    def connect(self):
-        #self.db = MySQLdb.connect(**self.kwargs) 
-        logger.debug("dataoutput: connecting to DB")
-
-    def close(self):
-        #self.db.close()
-        logger.debug("dataoutput: closing connection to DB")
 
 
     def dump(self, key, tuples):
-        c = self.db.cursor()
+        c = self.db.load(None)
         for tuple in tuples:
             k, vals = tuple
+
+            try:
+                vals = iter(vals)
+            except TypeError:
+                vals = [vals]
+
             for v in vals:
-                logger.debug("inserting row '%s' %s %s %s" % (self.table, key, k, v) )
-                try:
-                    sql = "INSERT INTO %s (partition, k, v) VALUES ('%s', '%s', '%s')" % \
-                            (self.table, key, k, str(v))
-                    logger.debug(sql)
+                sql = "INSERT INTO %s (partition, k, v) VALUES ('%s', '%s', '%s')" % \
+                        (self.table, key, k, str(v))
+                logger.debug(sql)
 
-                    r = c.execute(sql)
-                except Exception, e:
-                    logger.debug("WTF? %s" % e)
-
+                r = c.execute(sql)
                 logger.debug("inserted %s" % r)
+
+

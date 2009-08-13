@@ -45,31 +45,36 @@ class ReduceWords(Task):
 
 class CountWords(MapReduceTask):
 
-    #input = DatasourceDict(
-    #            { 
-    #                "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
-    #                "k2": ['seven', 'four', 'seven', 'seven'],
-    #                "k3": ['seven', 'four', 'seven', 'seven'],
-    #            })
+    datasources = \
+            {
+            'dict': DatasourceDict(
+                { 
+                    "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
+                    "k2": ['seven', 'four', 'seven', 'seven'],
+                    "k3": ['seven', 'four', 'seven', 'seven'],
+                }),
+            'sql': DatasourceSQL(user='pydra', passwd='pydra',
+                host='192.168.56.1', db='mapreduce'),
+            }
+
+    #input = datasources['dict']
 
     #input = DatasourceDir(dir='/mnt/shared/in')
 
-    import MySQLdb
-    db = MySQLdb.connect(user='pydra', passwd='pydra', host='192.168.56.1', db='mapreduce')
-
     input = SQLTableSlicer(table='count_words_in')
-    input.input = DatasourceSQL(db)
+    input.input = datasources['sql']
 
     output = {}
 
     map = MapWords
     reduce = ReduceWords
 
-    intermediate = IntermediateResultsFiles
-    intermediate_kwargs = {'dir': '/mnt/shared'}
+    #intermediate = IntermediateResultsFiles
+    #intermediate_kwargs = {'dir': '/mnt/shared'}
 
-    #intermediate = IntermediateResultsSQL
-    #intermediate_kwargs = { 'table': 'count_words_i9t', 'db': db}
+    intermediate = IntermediateResultsSQL
+    intermediate_kwargs = { 'table': 'count_words_i9t',
+            'db': datasources['sql']}
 
     reducers = 2
     #sequential = True

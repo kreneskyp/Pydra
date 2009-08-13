@@ -78,12 +78,6 @@ class IntermediateResults(object):
 
         self.reduce_input = DatasourceDict(self._partitions)
 
-    def connect(self):
-        self.reduce_input.connect()
-
-    def close(self):
-        self.reduce_input.close()
-
     def clear(self):
         self._partitions.clear()
 
@@ -175,6 +169,8 @@ class IntermediateResultsSQL(IntermediateResults):
 
 class MapReduceTask(Task):
 
+    datasources = {}
+
     input = None
     output = None
 
@@ -202,7 +198,8 @@ class MapReduceTask(Task):
 
         self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im, self)
 
-        self.input.connect() # XXX NEW
+        for src in self.datasources.itervalues():
+            src.connect()
 
 
     def map_callback(self, result, mapid=None, local=False):
