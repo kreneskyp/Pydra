@@ -5,13 +5,34 @@ from threading import Lock
 import cPickle as pickle
 import os, logging
 
+import MySQLdb
+
 logger = logging.getLogger('root')
 
+def chain_subslicer(obj, ss_list):
+
+    last_ss = obj
+    for ss in ss_list:
+        ss.input = last_ss
+        ss.send_as_input = True
+        last_ss = ss
+
+    return last_ss
+
+############
+# sources
 
 class DatasourceDict(object):
 
     def __init__(self, dict):
         self.store = dict
+        self.subslicer = None
+
+    def connect(self):
+        pass
+
+    def close(self):
+        pass
 
 
     def __iter__(self):
@@ -23,13 +44,25 @@ class DatasourceDict(object):
     def load(self, key):
         """data reading"""
         # we are the source len(key) == 1: key[0] == key[-1]
-        return self.store[key[-1]]
+
+        obj = self.store[key[-1]]
+
+        if self.subslicer:
+            return chain_subslicer(obj, self.subslicer)
+
+        return obj
 
 
 class DatasourceDir(object):
 
     def __init__(self, dir):
         self.dir = dir
+
+    def connect(self):
+        pass
+
+    def close(self):
+        pass
 
 
     def __iter__(self):
@@ -47,12 +80,46 @@ class DatasourceDir(object):
         return open(path)
 
 
+class DatasourceSQL(object):
+
+    def __init__(self, db, **kwargs):
+        self.db = db
+        self.kwargs = kwargs
+
+    def connect(self):
+        #self.db = MySQLdb.connect(**self.kwargs) 
+        logger.debug("datasource: connecting to DB")
+
+    def close(self):
+        #self.db.close()
+        logger.debug("datasource: closing connection to DB")
+
+
+    def __iter__(self):
+        """generate key for database"""
+        yield "_mysql",
+
+    def load(self, key):
+        return self.db.cursor()
+
+
+############
+# slicers
+
 class Slicer(object):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.input = None
-        self.send_as_input = False
+        self.kwargs = kwargs
 
+        self.send_as_input = False
+        self.subslicer = None
+
+    def connect(self):
+        self.input.connect()
+
+    def close(self):
+        self.input.close()
 
     def __iter__(self):
         """iterator generating keys"""
@@ -67,7 +134,12 @@ class Slicer(object):
         if self.send_as_input:
             return key
 
-        return self._load(key)
+        obj = self._load(key)
+
+        if self.subslicer:
+            return chain_subslicer(obj, self.subslicer)
+
+        return obj
 
 
     def _load(self, key):
@@ -128,3 +200,139 @@ class LineFileSlicer(Slicer):
 
         return line
 
+
+class SQLTableSlicer(Slicer):
+
+    def __iter__(self):
+        for input_key in self.input:
+            c = self.input.load(input_key)
+
+            c.execute("SELECT id FROM %s" % self.kwargs['table'])
+            row = c.fetchone()
+
+            while row:
+                id = int(row[0])
+                if self.send_as_input:
+                    yield id
+
+                else:
+                    yield input_key + (id, )
+
+                row = c.fetchone()
+
+
+    def _load(self, key):
+        """reads particular row in table"""
+        parent, id = key[:-1], key[-1]
+        c = self.input.load(parent)
+
+        c.execute("SELECT * FROM %s WHERE id = %d" % (self.kwargs['table'], id))
+        return c.fetchone()
+
+
+############
+# subslicers
+
+class Subslicer(Slicer):
+
+    def __init__(self, **kwargs):
+        super(Subslicer, self).__init__(**kwargs)
+        self.send_as_input = True
+
+
+class FileUnpicleSubslicer(Subslicer):
+
+    def __iter__(self):
+        dir = self.kwargs['dir']
+
+        for filename in self.input:
+
+            try:
+                with open(os.path.join(dir, filename)) as f:
+                    while True:
+                        yield pickle.load(f)
+
+            except EOFError:
+                logger.debug("subslicer: loading from %s done" % f.name)
+                pass
+
+
+class FilePickleOutput(object):
+
+    def __init__(self, dir):
+        self.dir = dir
+
+    def dump(self, key, values):
+        with open(os.path.join(self.dir, key), "w") as f:
+            for obj in values:
+                pickle.dump(obj, f)
+
+
+class SQLTableKeyInput(Subslicer):
+
+    def connect(self):
+        #self.db = MySQLdb.connect(**self.kwargs) 
+        logger.debug("dataoutput: connecting to DB")
+
+    def close(self):
+        #self.db.close()
+        logger.debug("dataoutput: closing connection to DB")
+
+
+    def __iter__(self):
+
+        try:
+            db = self.kwargs['db']
+            table = self.kwargs['table']
+            c = db.cursor()
+
+            for partition in self.input:
+
+                sql = "SELECT k, v FROM %s WHERE partition = '%s'" % (table, partition)
+                logger.debug(sql)
+
+                c.execute(sql)
+                row = c.fetchone()
+
+                while row:
+                    yield row
+
+                    row = c.fetchone()
+
+        except Exception, e:
+            logger.debug("WTF? %s" % e)
+
+
+class SQLTableOutput(object):
+
+    def __init__(self, db, table, **kwargs):
+        self.table = table
+        self.db = db
+        self.kwargs = kwargs
+        self.connect()
+
+    def connect(self):
+        #self.db = MySQLdb.connect(**self.kwargs) 
+        logger.debug("dataoutput: connecting to DB")
+
+    def close(self):
+        #self.db.close()
+        logger.debug("dataoutput: closing connection to DB")
+
+
+    def dump(self, key, tuples):
+        c = self.db.cursor()
+        for tuple in tuples:
+            k, vals = tuple
+            for v in vals:
+                logger.debug("inserting row '%s' %s %s %s" % (self.table, key, k, v) )
+                try:
+                    sql = "INSERT INTO %s (partition, k, v) VALUES ('%s', '%s', '%s')" % \
+                            (self.table, key, k, str(v))
+                    logger.debug(sql)
+
+                    r = c.execute(sql)
+                except Exception, e:
+                    logger.debug("WTF? %s" % e)
+
+                logger.debug("inserted %s" % r)

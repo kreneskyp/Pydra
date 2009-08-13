@@ -3,6 +3,11 @@ from __future__ import with_statement
 from tasks import Task, TaskNotFoundException, \
     STATUS_RUNNING, STATUS_COMPLETE
 
+from pydra_server.cluster.tasks.datasource import DatasourceDict, \
+        SequenceSlicer, \
+        FileUnpicleSubslicer, FilePickleOutput, \
+        SQLTableKeyInput, SQLTableOutput
+
 from twisted.internet import reactor, threads
 
 from threading import Lock
@@ -39,14 +44,48 @@ class IntermediateResults(object):
     Implements partitioning part. Backend writing/reading needs
     to be implemented in subclass.
 
-    For details please refer IntermediateResultsFiles docstring"""
+    map stage:
+    * map task output is a dictionary;
+    * when map._work() is completed output dict is partitioned and dumped;
+    * partition_output() partitions items depending on a partition() function;
+    * dump() dumps them into a unique file, returns partition-dictionary;
+    * every map task's dump partition-dictionary is collected and provided
+      to update_partitions() function for future iterator generation.
+
+    partition:
+    * number of partitions equals number of reducers;
+    * partition must assure that a specific key will be processed by
+      one and only one reduce task.
+
+    reduce stage:
+    * __iter__() returns an iterator, which generates input keys for each partition;
+    * load() returns iterator which is used as a input iterator
+      for a reduce task (subslicers);
+    * iterator loads (key, values) tuples from a backend.
+    """
+
+    # mapreduce-i9t-(taks_id)-(partition)-(map_id)
+    pattern = "mapreduce-i9t-%s-%d-%s"
+
 
     def __init__(self, task_id, reducers):
         self.task_id = task_id
         self.reducers = reducers
 
-        self._lock = Lock()
         self._partitions = {}
+
+        self.map_output = None
+
+        self.reduce_input = DatasourceDict(self._partitions)
+
+    def connect(self):
+        self.reduce_input.connect()
+
+    def close(self):
+        self.reduce_input.close()
+
+    def clear(self):
+        self._partitions.clear()
 
 
     def partition(self, key):
@@ -76,73 +115,23 @@ class IntermediateResults(object):
     def update_partitions(self, partitions):
         """updates partition-dictionary for future iterator generation."""
 
-        with self._lock:
-            for p, filename in partitions.items():
-                if p in self._partitions:
-                    self._partitions[p].append(filename)
-                else:
-                    self._partitions[p] = [filename]
+        for p, filename in partitions.items():
+            if p in self._partitions:
+                self._partitions[p].append(filename)
+            else:
+                self._partitions[p] = [filename]
 
 
     def __iter__(self):
-        return self
+        return self.reduce_input.__iter__()
 
 
-    def next(self):
-        """return next partition's files list (workunit)"""
-        try:
-            with self._lock:
-                p, fs = self._partitions.popitem()
-        except KeyError:
-            raise StopIteration
-
-        return fs
-
-
-    # backend
-    def dump(self, pdict, id):
-        raise NotImplementedError
-
-
-    def load(self, partitions):
-        raise NotImplementedError
-
-
-class IntermediateResultsFiles(IntermediateResults):
-    """Storing intermediate results in flat files.
-
-    map stage:
-    * map task output is a dictionary (which must be pick-able);
-    * when map._work() is completed output dict is partitioned and dumped;
-    * partition_output() partitions items depending on a partition() function;
-    * dump() dumps them into a unique file, returns partition-dictionary;
-    * every map task's dump partition-dictionary is collected and provided
-      to update_partitions() function for future iterator generation.
-
-    partition:
-    * number of partitions equals number of reducers;
-    * partition must assure that a specific key will be processed by
-      one and only one reduce task.
-
-    reduce stage:
-    * next() method returns list of all files within one partition;
-    * list of files is provided to load() for every reduce task;
-    * load() returns iterator which is used as a input iterator
-      for a reduce task;
-    * iterator loads (key, values) tuples from a files.
-    """
-
-    # mapreduce-i9t-(taks_id)-(partition)
-    pattern = "mapreduce-i9t-%s-%d-%s"
-
-
-    def __init__(self, task_id, reducers, dir):
-        super(IntermediateResultsFiles, self).__init__(task_id, reducers)
-        self.dir = dir
+    def load(self, key):
+        return self.reduce_input.load(key)
 
 
     def dump(self, pdict, mapid):
-        """dumps a dictionary to a files.
+        """dumps a dictionary to a backend.
         returns corresponding partitions-dictionary"""
 
         logger.debug("im: dumping %s" % str(pdict))
@@ -151,30 +140,37 @@ class IntermediateResultsFiles(IntermediateResults):
 
         for p, tuples in pdict:
 
-            filename = self.pattern % (self.task_id, p, mapid)
-            partitions[p] = filename
+            key = self.pattern % (self.task_id, p, mapid)
+            partitions[p] = key
 
-            logger.debug("im: dumping %s to %s" % (str(tuples), filename))
-            with open(os.path.join(self.dir, filename), "w") as f:
-                for tuple in tuples:
-                    pickle.dump(tuple, f)
+            logger.debug("im: dumping %s to %s" % (str(tuples), key))
+
+            self.map_output.dump(key, tuples)
 
         return partitions
 
 
-    def load(self, files):
-        """returns an iterator for a reduce task input"""
+class IntermediateResultsFiles(IntermediateResults):
+    """Storing intermediate results in flat files."""
 
-        for filename in files:
-            logger.debug("im: loading from %s" % filename)
-            with open(os.path.join(self.dir, filename)) as f:
-                try:
-                    while True:
-                        yield pickle.load(f)
+    def __init__(self, task_id, reducers, dir):
+        super(IntermediateResultsFiles, self).__init__(task_id, reducers)
+        self.dir = dir
 
-                except EOFError:
-                    logger.debug("im: loading from %s done" % filename)
-                    pass
+        self.map_output = FilePickleOutput(dir=self.dir)
+        self.reduce_input.subslicer = FileUnpicleSubslicer(dir=self.dir), # tuple
+
+
+class IntermediateResultsSQL(IntermediateResults):
+    """Storing intermediate results in SQL table."""
+
+    def __init__(self, task_id, reducers, table, db,  **kwargs):
+        super(IntermediateResultsSQL, self).__init__(task_id, reducers)
+        self.table = table
+        self.kwargs = kwargs
+
+        self.map_output = SQLTableOutput(db=db, table=table)
+        self.reduce_input.subslicer = SQLTableKeyInput(db=db, table=table), # tuple
 
 
 class MapReduceTask(Task):
@@ -205,6 +201,8 @@ class MapReduceTask(Task):
         self.maptask = MapWrapper(self.map('MapTask'), self.im, self)
 
         self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im, self)
+
+        self.input.connect() # XXX NEW
 
 
     def map_callback(self, result, mapid=None, local=False):
@@ -396,6 +394,8 @@ class MapReduceTask(Task):
             reactor.callLater(1, self._complete)
             return
 
+        self.im.clear()
+
         logger.debug('mapreduce: finished')
         logger.info(self.output)
 
@@ -514,6 +514,8 @@ class MapWrapper(MapReduceWrapper):
         self.task._work(**args) # ignoring results
 
         pdict = self.im.partition_output(output)
+
+        logger.debug("%s._work() dumping i9t" % id)
         results = self.im.dump(pdict, id) # partitions are our results
 
         logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)

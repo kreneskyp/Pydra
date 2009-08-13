@@ -16,6 +16,10 @@ class DatasourceDict_Test(unittest.TestCase):
 
     def setUp(self):
         self.source = DatasourceDict(in_dict)
+        self.source.connect()
+
+    def tearDown(self):
+        self.source.close()
 
 
     def test_datasourcedict(self):
@@ -89,9 +93,10 @@ class DatasourceDir_Test(unittest.TestCase):
 
         # set source
         self.source = DatasourceDir(self.tempdir)
-
+        self.source.connect()
 
     def tearDown(self):
+        self.source.close()
         shutil.rmtree(self.tempdir)
 
 
@@ -130,4 +135,5 @@ class DatasourceDir_Test(unittest.TestCase):
                 expected = expected_seq.pop(0)
                 self.assertEqual(val, expected,
                         "failed on key %s: %s == %s" % (str(key), str(val), str(expected)) )
+
 
