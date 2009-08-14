@@ -73,11 +73,11 @@ class DatasourceDir(object):
             yield filename,
 
 
-    def load(self, key):
+    def load(self, key, mode="r"):
         """open particular input file"""
         filename = key[-1]
         path = os.path.join(self.dir, filename)
-        return open(path)
+        return open(path, mode)
 
 
 class DatasourceSQL(object):
@@ -249,7 +249,7 @@ class FileUnpicleSubslicer(Subslicer):
         for filename in self.input:
 
             try:
-                with open(os.path.join(dir, filename)) as f:
+                with dir.load((filename, )) as f:
                     while True:
                         yield pickle.load(f)
 
@@ -264,7 +264,7 @@ class FilePickleOutput(object):
         self.dir = dir
 
     def dump(self, key, values):
-        with open(os.path.join(self.dir, key), "w") as f:
+        with self.dir.load((key, ), "w") as f:
             for obj in values:
                 pickle.dump(obj, f)
 

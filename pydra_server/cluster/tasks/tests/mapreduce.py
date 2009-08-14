@@ -30,6 +30,7 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
         self.task_name = "test_task"
+        self.dir = DatasourceDir(self.tempdir)
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
@@ -38,18 +39,18 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
 
         a = { 'a': 1, 'b': 1, }
 
-        im1 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
+        im1 = IntermediateResultsFiles(self.task_name, 2, self.dir) 
         pdict = im1.partition_output(a)
         p1 = im1.dump(pdict, 'map1')
 
         b = { 'b': 1, 'c': 1, }
 
-        im2 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
+        im2 = IntermediateResultsFiles(self.task_name, 2, self.dir) 
         pdict = im2.partition_output(b)
         p2 = im2.dump(pdict, 'map2')
 
         # getting results
-        im = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
+        im = IntermediateResultsFiles(self.task_name, 2, self.dir) 
         im.update_partitions(p1)
         im.update_partitions(p2)
 
