@@ -75,8 +75,7 @@ class IntermediateResults(object):
         self._partitions = {}
 
         self.map_output = None
-
-        self.reduce_input = DatasourceDict(self._partitions)
+        self.reduce_input = None
 
     def clear(self):
         self._partitions.clear()
@@ -117,11 +116,12 @@ class IntermediateResults(object):
 
 
     def __iter__(self):
-        return self.reduce_input.__iter__()
+        return self._partitions.itervalues()
 
 
     def load(self, key):
-        return self.reduce_input.load(key)
+        self.reduce_input.input = key
+        return self.reduce_input
 
 
     def dump(self, pdict, mapid):
@@ -152,7 +152,7 @@ class IntermediateResultsFiles(IntermediateResults):
         self.dir = dir
 
         self.map_output = FilePickleOutput(dir=self.dir)
-        self.reduce_input.subslicer = FileUnpicleSubslicer(dir=self.dir), # tuple
+        self.reduce_input = FileUnpicleSubslicer(dir=self.dir)
 
 
 class IntermediateResultsSQL(IntermediateResults):
@@ -164,7 +164,7 @@ class IntermediateResultsSQL(IntermediateResults):
         self.kwargs = kwargs
 
         self.map_output = SQLTableOutput(db=db, table=table)
-        self.reduce_input.subslicer = SQLTableKeyInput(db=db, table=table), # tuple
+        self.reduce_input = SQLTableKeyInput(db=db, table=table)
 
 
 class MapReduceTask(Task):

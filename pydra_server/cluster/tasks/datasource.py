@@ -43,7 +43,6 @@ class DatasourceDict(object):
 
     def load(self, key):
         """data reading"""
-        # we are the source len(key) == 1: key[0] == key[-1]
 
         obj = self.store[key[-1]]
 
@@ -294,10 +293,9 @@ class SQLTableKeyInput(Subslicer):
 
 class SQLTableOutput(object):
 
-    def __init__(self, db, table, **kwargs):
+    def __init__(self, db, table):
         self.table = table
         self.db = db
-        self.kwargs = kwargs
 
 
     def dump(self, key, tuples):
