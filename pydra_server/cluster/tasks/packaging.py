@@ -135,8 +135,6 @@ class TaskPackage:
 
         @param phase: the phase in which invocation of this method is made
         @param received: the data received from the remote side
-        @return a pair of values consisting of the response as a string, and
-                a flag indicating whether it expect a remote response any more.
         """
         if self.version <> snapshot:
             out_file = cStringIO.StringIO()
@@ -147,8 +145,8 @@ class TaskPackage:
             diff = out_file.getvalue()
             diff = zlib.compress(diff)
             out_file.close()
-            return diff, False
-        return '', False
+            return diff
+        return ''
 
 
     def _init(self, pkg_folder):

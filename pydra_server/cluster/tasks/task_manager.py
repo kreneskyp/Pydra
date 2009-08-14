@@ -45,7 +45,7 @@ class TaskManager(Module):
     ]
 
     _shared = [
-        'registry'
+        'get_task',
     ]    
 
     def __init__(self, manager, scan_interval=10):
@@ -56,15 +56,15 @@ class TaskManager(Module):
         ]
 
         self._listeners = {
-            'MANAGER_INIT':self.autodiscover
+            'MANAGER_INIT':self.autodiscover,
         }
 
         Module.__init__(self, manager)
 
         self.task_packages = {} # pkg_name: pkg_object
         self.package_dependency = graph.DirectedGraph()
-        slef.tasks = {} # task_key: pkg_name
 
+        # currently no way to customize this value
         self.scan_interval = scan_interval
 
     
@@ -192,7 +192,7 @@ class TaskManager(Module):
         """
         task_dir = pydraSettings.tasks_dir
 
-        # TODO emit TASK_UPDATED signal when task updates are found
+        # TODO emit TASK_UPDATED signal etc. when task updates are found
         files = os.listdir(task_dir)
         for filename in files:
             pkg_dir = os.path.join(task_dir, filename)
@@ -274,59 +274,61 @@ class TaskManager(Module):
 
 
 
-    def get_module_search_path(self, task_key):
+    def get_task(self, task_key):
         """
         task_key is referenced as 'package_name.task_name'
+
+        @return task_class, pkg_version, additional_module_search_path
         """
-        pkg = self.tasks.get(task_key, None)
-        if pkg:
-            st, cycle = graph.dfs(self.task_dependency, pkg.name)
-            if cycle:
-                raise RuntimeError('Cycle detected in task dependency')
-            else:
-                required_pkgs = [self.task_packages[x].folder for x in \
-                        st.keys() if  st[x] is not None]
-                return required_pkgs + [(x + '/lib') for x in required_pkgs]
-        else:
-             return None
+        name = task_key.split('.')
+        if len(name) == 2:
+            pkg_name, task_name = name
+            pkg = self.task_packages.get(pkg_name, None)
+            if pkg:
+                st, cycle = graph.dfs(self.package_dependency, pkg_name)
+                if cycle:
+                    raise RuntimeError('Cycle detected in task dependency')
+                else:
+                    required_pkgs = [self.task_packages[x].folder for x in \
+                            st.keys() if  st[x] is not None]
+                    return pkg.tasks[task_key], pkg.version, required_pkgs + \
+                        [(x + '/lib') for x in required_pkgs]
+        return None, None, None
 
 
-    def sync(self, pkg_name):
+    def active_sync(self, task_key, response=None, phase=1):
         """
-        Generates a sync request according to current state of the package.
+        Generates an appropriate sync request.
 
-        Typically called on the worker side.
+        @param pkg_name: the name of the task package to be updated
+        @param response: response received from the remote side
+        @param phase: which step the sync process is in
         """
         pkg = self.task_packages.get(pkg_name, None)
-        if pkg:
-            phase = 1
-            request = pkg.active_sync(None, phase)
-            while request is not None:
-                phase += 1
-                request = pkg.active_sync(received, phase)
-                # send the request along with the pkg_name to the remote
-                # side (usually the master)
-        else:
+        if not pkg:
             # the package does not exist yet
             pkg_folder = os.path.join(pydraSettings.tasks_dir, pkg_name)
             os.mkdir(pkg_folder)
             self._read_task_package(pkg_folder)
+
+        pkg = self.task_packages.get(pkg_name, None)
             
 
-    def handle_sync_request(self, pkg_name, initial_request):
+    def passive_sync(self, pkg_name, request, phase=1):
         """
-        Handles an incoming package sync request and its potentially subsequent
-        requests.
+        Generates an appropriate sync response.
 
-        Typically called on the master side.
+        @param pkg_name: the name of the task package to be updated
+        @param response: response received from the remote side
+        @param phase: which step the sync process is in
         """
         pkg = self.task_packages.get(pkg_name, None)
         if pkg:
-            phase = 1
-            resp = pkg.passive_sync(initial_request)
-            while resp is not None:
-                # send the response to the remote side (usually the worker)
-                resp = pkg.passive_sync(received)
+            self.emit_signal('TASK_PASSIVE_SYNC_DATA',
+                    pkg.passive_sync(request, phase))
+        else:
+            # no such task package
+            self.emit_sigal('TASK_PASSIVE_SYNC_DATA', None)
 
 
     def _read_task_package(self, pkg_dir):
@@ -334,7 +336,7 @@ class TaskManager(Module):
         for task_key in pkg.tasks.keys():
             self.tasks[task_key] = pkg
         self.task_packages[pkg.name] = pkg
-        self.task_dependency.add_vertex(pkg.name)
+        self.package_dependency.add_vertex(pkg.name)
         for dep in pkg.dependency:
-            self.task_dependency.add_edge(pkg.name, dep)
+            self.package_dependency.add_edge(pkg.name, dep)
 

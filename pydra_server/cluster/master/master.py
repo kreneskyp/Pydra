@@ -75,6 +75,7 @@ class Master(ModuleManager):
             NodeConnectionManager,
             WorkerConnectionManager,
             TaskManager,
+            TaskSyncModule,
             TaskScheduler,
             AMFInterface,
             NodeManager

@@ -49,6 +49,14 @@ class WorkerTaskControls(Module):
             ('MASTER', self.return_work)
         ]
 
+        self._listeners = {
+            'TASK_PASSIVE_SYNC_DATA':self.sync_task,
+        }
+
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
+
         Module.__init__(self, manager)
 
         self._lock = Lock()
@@ -62,7 +70,7 @@ class WorkerTaskControls(Module):
         self.__local_task_instance = None
         
 
-    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, \
+    def run_task(self, key, version, args={}, subtask_key=None, workunit_key=None, \
         main_worker=None, task_id=None):
         """
         Runs a task on this worker
@@ -75,6 +83,14 @@ class WorkerTaskControls(Module):
         with self._lock:
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
+
+            task_class, version, module_path = self.task_manager.get_task( key)
+
+            if task_class is None or (version is not None and version <>
+                    pkg_version):
+                # need synchronization with the master
+                self._sync_task(key, 1)
+                return 'FAILURE: TASK CODE OUT-DATED'
 
             # is this task being run locally for the mainworker?
             run_local = subtask_key and self.worker_key == main_worker
@@ -304,4 +320,15 @@ class WorkerTaskControls(Module):
         recursive task key generation function.  This stops the recursion
         """
         return None    
+
+
+    def _sync_task(self, task_key, response=None, phase=1):
+        # send the request to the master
+        request = self.task_manager.active_sync(task_key, response, phase)
+        if request[1]:
+            # still expecting a remote answer; now send the req to the master
+            deferred = self.master.callRemote('sync_task', task_key, request[0],
+                    phase)
+            # using self as a callback
+            deferred.addCallback(self._sync_task)
 
