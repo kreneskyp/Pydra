@@ -73,7 +73,7 @@ class CountWords(MapReduceTask):
     #intermediate_kwargs = {'dir': '/mnt/shared'}
 
     intermediate = IntermediateResultsSQL
-    intermediate_kwargs = { 'table': 'count_words_i9t',
+    intermediate_kwargs = { 'table': 'count_words_i9e',
             'db': datasources['sql']}
 
     reducers = 2

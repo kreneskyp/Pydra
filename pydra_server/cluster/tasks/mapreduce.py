@@ -64,8 +64,8 @@ class IntermediateResults(object):
     * iterator loads (key, values) tuples from a backend.
     """
 
-    # mapreduce-i9t-(taks_id)-(partition)-(map_id)
-    pattern = "mapreduce-i9t-%s-%d-%s"
+    # mapreduce-i9e-(taks_id)-(partition)-(map_id)
+    pattern = "mapreduce-i9e-%s-%d-%s"
 
 
     def __init__(self, task_id, reducers):
@@ -512,7 +512,7 @@ class MapWrapper(MapReduceWrapper):
 
         pdict = self.im.partition_output(output)
 
-        logger.debug("%s._work() dumping i9t" % id)
+        logger.debug("%s._work() dumping i9e" % id)
         results = self.im.dump(pdict, id) # partitions are our results
 
         logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
