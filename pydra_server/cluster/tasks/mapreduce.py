@@ -68,9 +68,9 @@ class IntermediateResults(object):
     pattern = "mapreduce-i9e-%s-%d-%s"
 
 
-    def __init__(self, task_id, reducers):
-        self.task_id = task_id
-        self.reducers = reducers
+    def __init__(self):
+        self.task_id = "mapreduce_task"
+        self.reducers = 1
 
         self._partitions = {}
 
@@ -147,21 +147,20 @@ class IntermediateResults(object):
 class IntermediateResultsFiles(IntermediateResults):
     """Storing intermediate results in flat files."""
 
-    def __init__(self, task_id, reducers, dir):
-        super(IntermediateResultsFiles, self).__init__(task_id, reducers)
+    def __init__(self, dir):
+        super(IntermediateResultsFiles, self).__init__()
         self.dir = dir
 
-        self.map_output = FilePickleOutput(dir=self.dir)
-        self.reduce_input = FileUnpicleSubslicer(dir=self.dir)
+        self.map_output = FilePickleOutput(dir=dir)
+        self.reduce_input = FileUnpicleSubslicer(dir=dir)
 
 
 class IntermediateResultsSQL(IntermediateResults):
     """Storing intermediate results in SQL table."""
 
-    def __init__(self, task_id, reducers, table, db,  **kwargs):
-        super(IntermediateResultsSQL, self).__init__(task_id, reducers)
+    def __init__(self, table, db):
+        super(IntermediateResultsSQL, self).__init__()
         self.table = table
-        self.kwargs = kwargs
 
         self.map_output = SQLTableOutput(db=db, table=table)
         self.reduce_input = SQLTableKeyInput(db=db, table=table)
@@ -192,7 +191,9 @@ class MapReduceTask(Task):
         self.map_tasks = {}
         self.reduce_tasks = {}
 
-        self.im = self.intermediate(msg, self.reducers, **self.intermediate_kwargs)
+        self.im = self.intermediate
+        self.im.task_id = msg
+        self.im.reducers = self.reducers
 
         self.maptask = MapWrapper(self.map('MapTask'), self.im, self)
 

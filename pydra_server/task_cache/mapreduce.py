@@ -15,11 +15,8 @@ class MapWords(Task):
     def work(self, input, output, **kwargs):
         """map for every input item output (word, 1) pair"""
 
-        try:
-            id, data = input
-            input = data.split(" ")
-        except:
-            pass
+        #id, data = input
+        #input = data.split(" ")
 
         for word in input:
             # emmit (word, 1)
@@ -51,36 +48,32 @@ class CountWords(MapReduceTask):
 
     datasources = \
             {
-            'dict': DatasourceDict(
-                { 
-                    "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
-                    "k2": ['seven', 'four', 'seven', 'seven'],
-                    "k3": ['seven', 'four', 'seven', 'seven'],
-                }),
-            'sql': DatasourceSQL(user='pydra', passwd='pydra',
-                host='192.168.56.1', db='mapreduce'),
+            #'dict': DatasourceDict(
+            #    { 
+            #        "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
+            #        "k2": ['seven', 'four', 'seven', 'seven'],
+            #        "k3": ['seven', 'four', 'seven', 'seven'],
+            #    }),
+            #'sql': DatasourceSQL(user='pydra', passwd='pydra',
+            #    host='192.168.56.1', db='mapreduce'),
             'dir': DatasourceDir(dir='/mnt/shared/in'),
             'dir_i9e': DatasourceDir(dir='/mnt/shared/i9e'),
             }
 
     #input = datasources['dict']
 
-    #input = datasources['dir']
+    input = datasources['dir']
 
-    input = SQLTableSlicer(table='count_words_in')
-    input.input = datasources['sql']
+    #input = SQLTableSlicer(table='count_words_in')
+    #input.input = datasources['sql']
 
     output = {}
 
     map = MapWords
     reduce = ReduceWords
 
-    #intermediate = IntermediateResultsFiles
-    #intermediate_kwargs = {'dir': datasources['dir_i9e']}
-
-    intermediate = IntermediateResultsSQL
-    intermediate_kwargs = { 'table': 'count_words_i9e',
-            'db': datasources['sql']}
+    intermediate = IntermediateResultsFiles(dir=datasources['dir_i9e'])
+    #intermediate = IntermediateResultsSQL(table='count_words_i9e', db=datasources['sql'])
 
     reducers = 2
     #sequential = True

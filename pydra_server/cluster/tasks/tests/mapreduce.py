@@ -39,18 +39,27 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
 
         a = { 'a': 1, 'b': 1, }
 
-        im1 = IntermediateResultsFiles(self.task_name, 2, self.dir) 
+        im1 = IntermediateResultsFiles(self.dir) 
+        im1.task_id = self.task_name
+        im1.reducers = 2
+
         pdict = im1.partition_output(a)
         p1 = im1.dump(pdict, 'map1')
 
         b = { 'b': 1, 'c': 1, }
 
-        im2 = IntermediateResultsFiles(self.task_name, 2, self.dir) 
+        im2 = IntermediateResultsFiles(self.dir) 
+        im2.task_id = self.task_name
+        im2.reducers = 2
+
         pdict = im2.partition_output(b)
         p2 = im2.dump(pdict, 'map2')
 
         # getting results
-        im = IntermediateResultsFiles(self.task_name, 2, self.dir) 
+        im = IntermediateResultsFiles(self.dir) 
+        im.task_id = self.task_name
+        im.reducers = 2
+
         im.update_partitions(p1)
         im.update_partitions(p2)
 
