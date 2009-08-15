@@ -120,6 +120,10 @@ class TaskScheduler(Module):
             ('REMOTE_WORKER', self.release_worker)
         ]
 
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
+
         self._interfaces = [
             self.task_statuses,
             self.cancel_task,
@@ -546,7 +550,9 @@ class TaskScheduler(Module):
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
-            d = worker.remote.callRemote('run_task', task_key, args, \
+            # get the current version of the task
+            version = self.task_manager.get_task(task_key)[1]
+            d = worker.remote.callRemote('run_task', task_key, version, args, \
                  subtask_key, workunit_key, task_instance.main_worker, \
                  task_instance.id)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)

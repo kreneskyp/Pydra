@@ -68,12 +68,6 @@ class TaskPackage:
         self._init(folder)
 
 
-    def get_task(self, task_key):
-        """Returns the task class keyed by task_key.
-        """
-        return self.tasks.get(task_key, None)
-
-
     def active_sync(self, received, phase=1):
         """
         Actively generates requests to update the local package to make
@@ -150,7 +144,9 @@ class TaskPackage:
 
 
     def _init(self, pkg_folder):
-        self.name = os.path.basename(pkg_folder)
+        name = os.path.basename(pkg_folder)
+        if name.find('.') != -1:
+            raise RuntimeError('Package name should not contain dots (.)')
 
         meta = _read_config(os.path.join(pkg_folder, 'META'))
         try:
@@ -159,7 +155,7 @@ class TaskPackage:
             pass
 
         # copied from task_manager.py
-        sys.path.append(pkg_folder) # TODO hack this logic
+        sys.path.append(pkg_folder) # FIXME importing logic seems incorrect
         files = os.listdir(pkg_folder)
         for filename in files:
             if filename <> '__init__.py' and filename[-3:] == '.py':

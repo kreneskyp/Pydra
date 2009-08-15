@@ -84,12 +84,15 @@ class WorkerTaskControls(Module):
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
-            task_class, version, module_path = self.task_manager.get_task( key)
+            task_class, pkg_version, module_path = self.task_manager.get_task(
+                    key)
 
             if task_class is None or (version is not None and version <>
                     pkg_version):
                 # need synchronization with the master
-                self._sync_task(key, 1)
+
+                # this is an async call
+                self._sync_task(key)
                 return 'FAILURE: TASK CODE OUT-DATED'
 
             # is this task being run locally for the mainworker?
@@ -331,4 +334,7 @@ class WorkerTaskControls(Module):
                     phase)
             # using self as a callback
             deferred.addCallback(self._sync_task)
+        else:
+            # the task has been successfully synchronized
+            pass
 

@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from __future__ import with_statement
 
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.template import Context, loader
@@ -26,6 +27,8 @@ from pydra_server.models import *
 from pydra_server.util import graph
 
 from twisted.internet import reactor
+
+from threading import Lock
 
 import logging
 logger = logging.getLogger('root')
@@ -61,29 +64,15 @@ class TaskManager(Module):
 
         Module.__init__(self, manager)
 
-        self.task_packages = {} # pkg_name: pkg_object
+        # full_task_key or pkg_name: pkg_object
+        # preserved for both compatibility and efficiency
+        self.registry = {} 
         self.package_dependency = graph.DirectedGraph()
+
+        self._lock = Lock()
 
         # currently no way to customize this value
         self.scan_interval = scan_interval
-
-    
-    def register(self, key, task):
-        """ Registers a task making it available through the manager
-
-        @param key: key for task
-        @param task: task instance
-        """
-        self.registry[key] = task
-
-
-    def deregister(self, key):
-        """ deregisters a task, stopping it and removing it from the manager
-
-        @param key: key for task
-        """
-        # remove the task from the registry
-        del self.registry[key]
 
 
     def processTask(self, task, tasklist=None, parent=False):
@@ -142,7 +131,7 @@ class TaskManager(Module):
         message = {}
         # show all tasks by default
         if keys == None:
-            keys = self.registry.keys()
+            keys = self.list_task_keys()
 
         for key in keys:
             try:
@@ -174,7 +163,7 @@ class TaskManager(Module):
 
         # show all tasks by default
         if keys == None:
-            keys = self.registry.keys()
+            keys = self.list_task_keys()
 
         # store progress of each task in a dictionary
         for key in keys:
@@ -186,70 +175,25 @@ class TaskManager(Module):
         return message
 
 
-    def discover(self):
+    def autodiscover(self):
         """
-        A new discover method to periodically scan the task_cache folder.
+        Periodically scan the task_cache folder.
         """
         task_dir = pydraSettings.tasks_dir
 
-        # TODO emit TASK_UPDATED signal etc. when task updates are found
+        old_packages = self.list_task_packages()
+
         files = os.listdir(task_dir)
         for filename in files:
             pkg_dir = os.path.join(task_dir, filename)
             if os.isdir(pkg_dir):
-                self._read_task_package(pkg_dir)
+                pkg = self._read_task_package(pkg_dir)
+                old_packages.remove(pkg.name)
 
-        reactor.callLater(self.scan_interval, self.discover)
+        for pkg_name in old_packages:
+            self.emit_signal('TASK_REMOVED', pkg_name)
 
- 
-    def autodiscover(self):
-        """
-        Auto-discover any tasks that are in the tasks directory
-        """
-        import imp, os, sys, inspect
-
-        for tasks_dir in pydraSettings.tasks_dir.split(','):
-
-            # Step 1: get all python files in the tasks directory
-            files = os.listdir(tasks_dir)
-            sys.path.append(tasks_dir)
-
-            # Step 2: iterate through all the python files importing each one and 
-            #         and add it as an available Task
-            for filename in files:
-                if filename <> '__init__.py' and filename[-3:] == '.py':
-                    module = filename[:-3]
-                    
-                    try:
-                        tasks = __import__(module, {}, {}, ['Task'])
-                    except Exception, e:
-                        logger.warn('Failed to load tasks from: %s (%s) - %s' % (module, filename, e))
-                        continue
-
-                    # iterate through the objects in  the module to find Tasks
-                    # TODO replace this logic with code in Task that adds all tasks
-                    # to module.tasks when they are created.  This would be similar
-                    # to how django does this in db/base.py.  It's extremely complicated
-                    # and would take more time than is possible now.
-
-                    #class exclusions.  do not include any of these class
-                    class_exclusions = ('Task', 'ParallelTask', 'TaskContainer')
-
-                    for key, task_class in tasks.__dict__.items():
-
-                        # Add any classes that a runnable task.
-                        # TODO: filter out subtasks not marked as standalone
-                        if inspect.isclass(task_class) and key not in class_exclusions and issubclass(task_class, (Task,)):
-
-                            try:
-                                #generate a unique key for this 
-                                task_key = key
-
-                                self.register(task_key, task_class)
-                                logger.info('Loaded task: %s' % key)
-
-                            except:
-                                logger.error('ERROR Loading task: %s' % key)
+        reactor.callLater(self.scan_interval, self.autodiscover)
 
 
     def task_history(self, key, page):
@@ -280,19 +224,17 @@ class TaskManager(Module):
 
         @return task_class, pkg_version, additional_module_search_path
         """
-        name = task_key.split('.')
-        if len(name) == 2:
-            pkg_name, task_name = name
-            pkg = self.task_packages.get(pkg_name, None)
-            if pkg:
-                st, cycle = graph.dfs(self.package_dependency, pkg_name)
-                if cycle:
-                    raise RuntimeError('Cycle detected in task dependency')
-                else:
-                    required_pkgs = [self.task_packages[x].folder for x in \
-                            st.keys() if  st[x] is not None]
-                    return pkg.tasks[task_key], pkg.version, required_pkgs + \
-                        [(x + '/lib') for x in required_pkgs]
+        pkg = self.registry.get(pkg_name, None)
+        if pkg:
+            st, cycle = graph.dfs(self.package_dependency, pkg_name)
+            if cycle:
+                raise RuntimeError('Cycle detected in task dependency')
+            else:
+                # computed packages on which this task depends
+                required_pkgs = [self.registry[x].folder for x in \
+                        st.keys() if  st[x] is not None]
+                return pkg.registry[task_key], pkg.version, required_pkgs + \
+                    [(x + '/lib') for x in required_pkgs]
         return None, None, None
 
 
@@ -304,17 +246,18 @@ class TaskManager(Module):
         @param response: response received from the remote side
         @param phase: which step the sync process is in
         """
-        pkg = self.task_packages.get(pkg_name, None)
+        pkg = self.registry.get(task_key, None)
         if not pkg:
             # the package does not exist yet
             pkg_folder = os.path.join(pydraSettings.tasks_dir, pkg_name)
             os.mkdir(pkg_folder)
             self._read_task_package(pkg_folder)
 
-        pkg = self.task_packages.get(pkg_name, None)
+        pkg = self.registry.get(task_key, None)
+        return pkg.active_sync(response, phase)
             
 
-    def passive_sync(self, pkg_name, request, phase=1):
+    def passive_sync(self, task_key, request, phase=1):
         """
         Generates an appropriate sync response.
 
@@ -322,21 +265,46 @@ class TaskManager(Module):
         @param response: response received from the remote side
         @param phase: which step the sync process is in
         """
-        pkg = self.task_packages.get(pkg_name, None)
+        pkg = self.registry.get(pkg_name, None)
         if pkg:
-            self.emit_signal('TASK_PASSIVE_SYNC_DATA',
-                    pkg.passive_sync(request, phase))
+            return pkg.passive_sync(request, phase)
         else:
             # no such task package
-            self.emit_sigal('TASK_PASSIVE_SYNC_DATA', None)
+            return None
+
+
+    def list_task_keys(self):
+        return [k for k in self.registry.keys() if k.find('.') != -1]
+    
+
+    def list_task_packages(self):
+        return [k for k in self.registry.keys() if k.find('.') == -1]
 
 
     def _read_task_package(self, pkg_dir):
-        pkg = packaging.TaskPackage(pkg_dir)
-        for task_key in pkg.tasks.keys():
-            self.tasks[task_key] = pkg
-        self.task_packages[pkg.name] = pkg
-        self.package_dependency.add_vertex(pkg.name)
-        for dep in pkg.dependency:
-            self.package_dependency.add_edge(pkg.name, dep)
+        # this method is slow in finding updates of tasks
+        with self._lock:
+            old_packages = set(self.list_task_packages())
+            signals = []
+            pkg = packaging.TaskPackage(pkg_dir)
+
+            # find updates
+            if pkg.name not in self.registry:
+                signals.append( ('TASK_ADDED', pkg.name) )
+            else:
+                if pkg.version <> self.registry[pkg.name].version:
+                    signals.append( ('TASK_UPDATED', pkg.name) )
+                old_packages.remove(pkg.name)
+
+            for task in pkg.tasks:
+                key = '%s.%s' % (pkg.name, task.__class__.__name__)
+                self.registry[key] = pkg
+            self.registry[pkg.name] = pkg
+            self.package_dependency.add_vertex(pkg.name)
+            for dep in pkg.dependency:
+                self.package_dependency.add_edge(pkg.name, dep)
+
+        for signal in signals:
+            self.emit_signal(signal[0], signal[1])
+        return pkg
 
