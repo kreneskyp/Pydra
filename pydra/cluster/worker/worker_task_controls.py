@@ -19,10 +19,10 @@
 from __future__ import with_statement
 from threading import Lock
 
-from pydra_server.cluster.constants import *
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks import ParallelTask
-from pydra_server.logging import get_task_logger
+from pydra.cluster.constants import *
+from pydra.cluster.module import Module
+from pydra.cluster.tasks import ParallelTask
+from pydra.logging import get_task_logger
 
 # init logging
 import logging

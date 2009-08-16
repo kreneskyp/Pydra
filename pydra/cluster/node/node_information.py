@@ -18,7 +18,7 @@
 """
 import os
 
-from pydra_server.cluster.module import Module
+from pydra.cluster.module import Module
 
 import logging
 logger = logging.getLogger('root')

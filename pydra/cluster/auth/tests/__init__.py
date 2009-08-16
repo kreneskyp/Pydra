@@ -19,7 +19,7 @@
 
 import unittest
 
-from pydra_server.cluster.auth.tests.rsa_auth import suite as rsa_auth_suite
+from pydra.cluster.auth.tests.rsa_auth import suite as rsa_auth_suite
 
 
 def suite():

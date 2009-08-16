@@ -22,7 +22,7 @@ import os
 from Crypto.PublicKey import RSA
 from twisted.python.randbytes import secureRandom
 from django.utils import simplejson
-from pydra_server.cluster.auth.rsa_auth import *
+from pydra.cluster.auth.rsa_auth import *
 
 """
 This file contains tests related to the rsa_auth handshaking used

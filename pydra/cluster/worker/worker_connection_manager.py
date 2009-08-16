@@ -23,8 +23,8 @@ from twisted.cred import credentials
 from twisted.internet import reactor
 from twisted.spread import pb
 
-from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
-from pydra_server.cluster.module import Module, ModuleReferenceable
+from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
+from pydra.cluster.module import Module, ModuleReferenceable
 
 # init logging
 import logging

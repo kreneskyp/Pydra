@@ -22,7 +22,7 @@ from subprocess import Popen
 from threading import Lock
 
 
-from pydra_server.cluster.module import Module
+from pydra.cluster.module import Module
 
 import logging
 logger = logging.getLogger('root')
@@ -71,6 +71,6 @@ class WorkerManager(Module):
         Starts all of the workers.  By default there will be one worker for each core
         """
         self.pids = [
-            Popen(["python", "pydra_server/cluster/worker/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
+            Popen(["python", "pydra/cluster/worker/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
             for i in range(self.info['cores'])
             ]

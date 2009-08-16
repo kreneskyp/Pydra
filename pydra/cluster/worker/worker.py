@@ -36,14 +36,14 @@ if __name__ == '__main__':
 
 from twisted.internet import reactor
 
-from pydra_server.cluster.module import ModuleManager
-from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.cluster.worker import WorkerTaskControls, WorkerConnectionManager
+from pydra.cluster.module import ModuleManager
+from pydra.cluster.tasks.task_manager import TaskManager
+from pydra.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 
 
 # init logging
 import settings
-from pydra_server.logging.logger import init_logging
+from pydra.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_NODE)
 
 

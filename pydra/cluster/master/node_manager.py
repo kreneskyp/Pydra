@@ -1,7 +1,7 @@
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 
-from pydra_server.cluster.module import Module
-from pydra_server.models import Node, pydraSettings
+from pydra.cluster.module import Module
+from pydra.models import Node, pydraSettings
 
 import logging
 logger = logging.getLogger('root')

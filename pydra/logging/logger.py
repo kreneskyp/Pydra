@@ -25,7 +25,7 @@ from logging import FileHandler
 from threading import Lock
 
 import settings
-from pydra_server.util import init_dir
+from pydra.util import init_dir
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 

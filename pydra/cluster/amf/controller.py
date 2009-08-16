@@ -24,7 +24,7 @@ from twisted.python.randbytes import secureRandom
 from pyamf.remoting.client import RemotingService
 from django.utils import simplejson
 
-from pydra_server.cluster.auth.rsa_auth import load_crypto
+from pydra.cluster.auth.rsa_auth import load_crypto
 import httplib
 
 

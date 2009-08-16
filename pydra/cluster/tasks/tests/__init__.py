@@ -19,8 +19,8 @@
 
 import unittest
 
-from pydra_server.cluster.tasks.tests.task_manager import suite as task_manager_suite
-from pydra_server.cluster.tasks.tests.tasks import suite as task_suite
+from pydra.cluster.tasks.tests.task_manager import suite as task_manager_suite
+from pydra.cluster.tasks.tests.tasks import suite as task_suite
 
 
 def suite():

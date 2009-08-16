@@ -97,8 +97,8 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.sites',
     'dbsettings',
-    'pydra_server',
-    'pydra_web'
+    'pydra',
+    'pydra.web'
 )
 
 

@@ -18,7 +18,7 @@
 """
 
 from rsa_auth import RSAAvatar
-from pydra_server.cluster.auth.module_avatar import ModuleAvatar
+from pydra.cluster.auth.module_avatar import ModuleAvatar
 
 import logging
 logger = logging.getLogger('root')

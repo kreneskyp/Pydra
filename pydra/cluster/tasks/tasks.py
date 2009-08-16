@@ -18,8 +18,8 @@
 """
 
 from twisted.internet import reactor, threads
-from pydra_server.util import deprecated
-from pydra_server.cluster.tasks import TaskNotFoundException,\
+from pydra.util import deprecated
+from pydra.cluster.tasks import TaskNotFoundException,\
     STATUS_CANCELLED, STATUS_CANCELLED,STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,\
     STATUS_PAUSED,STATUS_COMPLETE
 

@@ -32,7 +32,7 @@ try:
         host        = dbsettings.StringValue('host', 'IP Address or hostname for this server.  This value will be used by all nodes in the cluster to connect', default='localhost')
         port        = dbsettings.IntegerValue('port','Port this server listens on for Workers to connect to', default=18800)
         controller_port = dbsettings.IntegerValue('controller_port','Port this server listens on for Controllers', default=18801)
-        tasks_dir = dbsettings.StringValue('tasks_dir', 'Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
+        tasks_dir = dbsettings.StringValue('tasks_dir', 'Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra/task_cache')
         multicast_all    = dbsettings.BooleanValue('multicast_all', 'Automatically use all the nodes found', default=False)
     pydraSettings = PydraSettings('Pydra')
 

@@ -2,9 +2,9 @@ import unittest
 
 import tempfile, shutil
 
-from pydra_server.cluster.tasks.mapreduce import *
-from pydra_server.cluster.tasks.tasks import Task
-from pydra_server.task_cache.mapreduce import *
+from pydra.cluster.tasks.mapreduce import *
+from pydra.cluster.tasks.tasks import Task
+from pydra.task_cache.mapreduce import *
 from proxies import *
 
 

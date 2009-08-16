@@ -46,15 +46,15 @@ glib2reactor.install()
 
 from twisted.application import service
 
-from pydra_server.cluster.amf.interface import AMFInterface
-from pydra_server.cluster.module import ModuleManager
-from pydra_server.cluster.master import *
-from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.models import pydraSettings
+from pydra.cluster.amf.interface import AMFInterface
+from pydra.cluster.module import ModuleManager
+from pydra.cluster.master import *
+from pydra.cluster.tasks.task_manager import TaskManager
+from pydra.models import pydraSettings
 
 # init logging
 import settings
-from pydra_server.logging.logger import init_logging
+from pydra.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_MASTER)
 
 

@@ -1,5 +1,5 @@
-from pydra_server.cluster.tasks.tasks import Task
-from pydra_server.cluster.tasks.mapreduce import MapReduceTask, \
+from pydra.cluster.tasks.tasks import Task
+from pydra.cluster.tasks.mapreduce import MapReduceTask, \
         IntermediateResultsFiles
 
 import logging

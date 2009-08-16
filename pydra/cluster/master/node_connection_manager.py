@@ -24,10 +24,10 @@ from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.spread import pb
 
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.amf.interface import authenticated
-from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
-from pydra_server.models import Node, pydraSettings
+from pydra.cluster.module import Module
+from pydra.cluster.amf.interface import authenticated
+from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
+from pydra.models import Node, pydraSettings
 
 
 import logging

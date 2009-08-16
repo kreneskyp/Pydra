@@ -39,13 +39,13 @@ if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
 from twisted.internet import reactor
 from twisted.application import service
 
-from pydra_server.cluster.module import ModuleManager
-from pydra_server.cluster.node import *
-from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra.cluster.module import ModuleManager
+from pydra.cluster.node import *
+from pydra.cluster.tasks.task_manager import TaskManager
 
 # init logging
 import settings
-from pydra_server.logging.logger import init_logging
+from pydra.logging.logger import init_logging
 logger = init_logging(settings.LOG_FILENAME_NODE)
 
 

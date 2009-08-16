@@ -27,10 +27,10 @@ from django.template import RequestContext
 from django.utils import simplejson
 import settings
 
-from pydra_server.cluster.amf.controller import AMFController, ControllerException
-from pydra_server.forms import NodeForm
-from pydra_server.models import Node, TaskInstance, pydraSettings
-from pydra_server.models import pydraSettings
+from pydra.cluster.amf.controller import AMFController, ControllerException
+from pydra.forms import NodeForm
+from pydra.models import Node, TaskInstance, pydraSettings
+from pydra.models import pydraSettings
 
 """
 pydraController is a global variable that stores an instance of a Controller.
@@ -84,7 +84,7 @@ def nodes(request):
     }, context_instance=c)
 
 
-@user_passes_test(lambda u: u.has_perm('pydra_server.can_edit_nodes'))
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_edit_nodes'))
 def node_edit(request, id=None):
     """
     Handler for creating and editing nodes
@@ -115,7 +115,7 @@ def node_edit(request, id=None):
     }, context_instance=RequestContext(request, processors=[settings_processor]))
 
 
-@user_passes_test(lambda u: u.has_perm('pydra_server.can_edit_nodes'))
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_edit_nodes'))
 def discover(request):
     """
     allow users to activate the nodes that have been discovered via avahi
@@ -241,7 +241,7 @@ def task_progress(request):
     return HttpResponse(data, mimetype='application/javascript');
 
 
-@user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_run'))
 def run_task(request):
     """
     handler for sending a run_task signal
@@ -265,7 +265,7 @@ def run_task(request):
     return HttpResponse(response, mimetype='application/javascript')
 
 
-@user_passes_test(lambda u: u.has_perm('pydra_server.can_run'))
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_run'))
 def cancel_task(request):
     """
     handler for sending a cancel_task signal

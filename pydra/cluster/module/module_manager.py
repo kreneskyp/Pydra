@@ -17,8 +17,8 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.module.interface_module import InterfaceModule
-from pydra_server.cluster.module.attribute_wrapper import AttributeWrapper
+from pydra.cluster.module.interface_module import InterfaceModule
+from pydra.cluster.module.attribute_wrapper import AttributeWrapper
 
 import logging
 logger = logging.getLogger('root')

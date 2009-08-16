@@ -19,7 +19,7 @@
 
 from threading import Event
 from twisted.internet import reactor
-from pydra_server.cluster.tasks.tasks import Task
+from pydra.cluster.tasks.tasks import Task
 
 
 class WorkerProxy():

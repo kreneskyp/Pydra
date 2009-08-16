@@ -18,8 +18,8 @@
 """
 
 
-from pydra_server.cluster.module.module import Module
-from pydra_server.cluster.module.attribute_wrapper import AttributeWrapper
+from pydra.cluster.module.module import Module
+from pydra.cluster.module.attribute_wrapper import AttributeWrapper
 
 import logging
 logger = logging.getLogger('root')

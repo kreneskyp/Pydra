@@ -18,8 +18,8 @@
 """
 
 import platform
-from pydra_server.cluster.module import Module
-from pydra_server.util.zero_conf_service import ZeroConfService
+from pydra.cluster.module import Module
+from pydra.util.zero_conf_service import ZeroConfService
 
 class NodeZeroConfService(Module):
     """

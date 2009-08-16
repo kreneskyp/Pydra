@@ -21,9 +21,9 @@ from twisted.trial import unittest as twisted_unittest
 from twisted.internet import threads
 from threading import Event
 
-from pydra_server.cluster.tasks.tasks import *
-from pydra_server.cluster.worker import Worker
-from pydra_server.task_cache.demo_task import *
+from pydra.cluster.tasks.tasks import *
+from pydra.cluster.worker import Worker
+from pydra.task_cache.demo_task import *
 from proxies import *
 
 

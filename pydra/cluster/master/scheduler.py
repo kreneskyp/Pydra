@@ -26,11 +26,11 @@ import simplejson
 from heapq import heappush, heappop, heapify
 from twisted.internet import reactor, threads
 
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks import *
-from pydra_server.cluster.constants import *
-from pydra_server.models import TaskInstance, WorkUnit
-from pydra_server.util import deprecated
+from pydra.cluster.module import Module
+from pydra.cluster.tasks import *
+from pydra.cluster.constants import *
+from pydra.models import TaskInstance, WorkUnit
+from pydra.util import deprecated
 
 # init logging
 import logging

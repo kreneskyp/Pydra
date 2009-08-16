@@ -25,12 +25,12 @@ from twisted.application import internet
 from twisted.cred import checkers, portal
 from twisted.spread import pb
 
-from pydra_server.models import pydraSettings
-from pydra_server.cluster.auth.master_realm import MasterRealm
-from pydra_server.cluster.auth.rsa_auth import load_crypto
-from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
-from pydra_server.cluster.constants import *
-from pydra_server.cluster.module import Module
+from pydra.models import pydraSettings
+from pydra.cluster.auth.master_realm import MasterRealm
+from pydra.cluster.auth.rsa_auth import load_crypto
+from pydra.cluster.auth.worker_avatar import WorkerAvatar
+from pydra.cluster.constants import *
+from pydra.cluster.module import Module
 
 
 # init logging

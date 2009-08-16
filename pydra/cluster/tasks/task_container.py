@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
+from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 
 import logging

@@ -20,9 +20,9 @@
 import unittest
 import os
 import time
-from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.task_cache.demo_task import TestTask, TestContainerTask, TestParallelTask
-from pydra_server.models import TaskInstance
+from pydra.cluster.tasks.task_manager import TaskManager
+from pydra.task_cache.demo_task import TestTask, TestContainerTask, TestParallelTask
+from pydra.models import TaskInstance
 
 
 def suite():

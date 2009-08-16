@@ -22,9 +22,9 @@ from twisted.cred import portal, checkers
 from twisted.spread import pb
 from zope.interface import implements
 
-from pydra_server.cluster.auth.rsa_auth import load_crypto
-from pydra_server.cluster.auth.master_avatar import MasterAvatar
-from pydra_server.cluster.module import Module
+from pydra.cluster.auth.rsa_auth import load_crypto
+from pydra.cluster.auth.master_avatar import MasterAvatar
+from pydra.cluster.module import Module
 
 import logging
 logger = logging.getLogger('root')

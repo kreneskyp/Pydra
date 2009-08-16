@@ -26,9 +26,9 @@ from twisted.python.randbytes import secureRandom
 from twisted.web import server, resource
 
 
-from pydra_server.models import pydraSettings
-from pydra_server.cluster.auth.rsa_auth import load_crypto
-from pydra_server.cluster.module import InterfaceModule
+from pydra.models import pydraSettings
+from pydra.cluster.auth.rsa_auth import load_crypto
+from pydra.cluster.module import InterfaceModule
 
 
 # init logging

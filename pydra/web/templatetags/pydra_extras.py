@@ -22,7 +22,7 @@ from django import template
 from django.utils.safestring import mark_safe
 register = template.Library()
 
-from pydra_server.cluster.tasks import STATUS_CANCELLED, STATUS_FAILED, STATUS_STOPPED, STATUS_RUNNING, STATUS_PAUSED, STATUS_COMPLETE
+from pydra.cluster.tasks import STATUS_CANCELLED, STATUS_FAILED, STATUS_STOPPED, STATUS_RUNNING, STATUS_PAUSED, STATUS_COMPLETE
 
 
 @register.filter(name='available_cores')

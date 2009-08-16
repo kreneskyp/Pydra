@@ -19,8 +19,8 @@
 
 import unittest
 
-from pydra_server.cluster.auth.tests import suite as auth_suite
-from pydra_server.cluster.tasks.tests import suite as tasks_suite
+from pydra.cluster.auth.tests import suite as auth_suite
+from pydra.cluster.tasks.tests import suite as tasks_suite
 
 
 def suite():

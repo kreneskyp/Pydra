@@ -20,9 +20,9 @@
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.template import Context, loader
 
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks.tasks import *
-from pydra_server.models import TaskInstance
+from pydra.cluster.module import Module
+from pydra.cluster.tasks.tasks import *
+from pydra.models import TaskInstance
 
 import logging
 logger = logging.getLogger('root')
@@ -185,7 +185,7 @@ class TaskManager(Module):
         Auto-discover any tasks that are in the tasks directory
         """
         import imp, os, sys, inspect
-        from pydra_server.models import pydraSettings
+        from pydra.models import pydraSettings
 
         for tasks_dir in pydraSettings.tasks_dir.split(','):
 
