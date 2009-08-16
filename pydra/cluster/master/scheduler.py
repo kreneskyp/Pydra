@@ -19,7 +19,7 @@
 from __future__ import with_statement
 from threading import Lock
 
-import settings
+
 import time
 from datetime import datetime, timedelta
 import simplejson
@@ -31,6 +31,7 @@ from pydra.cluster.tasks import *
 from pydra.cluster.constants import *
 from pydra.models import TaskInstance, WorkUnit
 from pydra.util import deprecated
+
 
 # init logging
 import logging

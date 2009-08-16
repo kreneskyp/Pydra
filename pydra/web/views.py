@@ -29,15 +29,15 @@ import settings
 
 from pydra.cluster.amf.controller import AMFController, ControllerException
 from pydra.forms import NodeForm
-from pydra.models import Node, TaskInstance, pydraSettings
-from pydra.models import pydraSettings
+from pydra.models import Node, TaskInstance
+import pydra_settings
 
 """
 pydraController is a global variable that stores an instance of a Controller.
 The current controller does not involve much setup so this may not be required
 any longer, but it will improve resource usage slightly
 """
-pydra_controller = AMFController(pydraSettings.host , pydraSettings.port)
+pydra_controller = AMFController(pydra_settings.HOST , pydra_settings.PORT)
 
 
 def pydra_processor(request):
@@ -48,7 +48,7 @@ def pydra_processor(request):
     global pydra_controller
 
     if pydra_controller == None:
-        pydra_controller = AMFController(pydraSettings.host , pydraSettings.port)
+        pydra_controller = AMFController(pydra_settings.HOST , pydra_settings.PORT)
 
     return {'controller':pydra_controller}
 

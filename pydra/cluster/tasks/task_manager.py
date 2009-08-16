@@ -184,10 +184,13 @@ class TaskManager(Module):
         """
         Auto-discover any tasks that are in the tasks directory
         """
-        import imp, os, sys, inspect
-        from pydra.models import pydraSettings
+        import imp
+        import inspect
+        import os
+        import sys
+        import pydra_settings as settings
 
-        for tasks_dir in pydraSettings.tasks_dir.split(','):
+        for tasks_dir in settings.TASKS_DIR.split(','):
 
             # Step 1: get all python files in the tasks directory
             files = os.listdir(tasks_dir)

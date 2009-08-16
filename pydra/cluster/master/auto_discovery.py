@@ -16,12 +16,13 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import settings
+import avahi
+import dbus
 from dbus.mainloop.glib import DBusGMainLoop
-import dbus, avahi
 
 from pydra.cluster.module import Module
-from pydra.models import pydraSettings, Node
+from pydra.models import Node
+import pydra_settings
 
 # init logging
 import logging
@@ -56,7 +57,7 @@ class AutoDiscoveryModule(Module):
         """
         def service_resolved(*args):
             # at this point we have all the info about the node we need
-            if pydraSettings.multicast_all:
+            if pydra_settings.MULTICAST_ALL:
 
                 # add the node (without the restart)
                 node = Node.objects.create(host=args[7], port=args[8])

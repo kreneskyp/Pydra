@@ -19,19 +19,16 @@
 from __future__ import with_statement
 from threading import Lock
 
-import settings
-
 from twisted.application import internet
 from twisted.cred import checkers, portal
 from twisted.spread import pb
 
-from pydra.models import pydraSettings
 from pydra.cluster.auth.master_realm import MasterRealm
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.auth.worker_avatar import WorkerAvatar
 from pydra.cluster.constants import *
 from pydra.cluster.module import Module
-
+import pydra_settings
 
 # init logging
 import logging
@@ -81,7 +78,7 @@ class WorkerConnectionManager(Module):
 
         p = portal.Portal(realm, [self.worker_checker])
  
-        return internet.TCPServer(pydraSettings.port, pb.PBServerFactory(p))
+        return internet.TCPServer(pydra_settings.PORT, pb.PBServerFactory(p))
 
 
     def worker_authenticated(self, worker_avatar):

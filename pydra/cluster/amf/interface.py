@@ -25,8 +25,10 @@ from twisted.internet import reactor
 from twisted.python.randbytes import secureRandom
 from twisted.web import server, resource
 
+# load the settings file
+from pydra.config import load_settings
+settings = load_settings()
 
-from pydra.models import pydraSettings
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.module import InterfaceModule
 
@@ -223,7 +225,7 @@ class AMFInterface(InterfaceModule):
             logger.critical('Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh')
             sys.exit()
 
-        return internet.SSLServer(pydraSettings.controller_port, server.Site(root), contextFactory=context)
+        return internet.SSLServer(settings.CONTROLLER_PORT, server.Site(root), contextFactory=context)
 
 
     @authenticated

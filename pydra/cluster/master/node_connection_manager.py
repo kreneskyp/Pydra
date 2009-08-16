@@ -24,10 +24,11 @@ from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.spread import pb
 
+from pydra.models import Node
 from pydra.cluster.module import Module
 from pydra.cluster.amf.interface import authenticated
 from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
-from pydra.models import Node, pydraSettings
+import pydra_settings
 
 
 import logging
@@ -314,7 +315,7 @@ class NodeConnectionManager(Module):
 
 
         # we have allowed access for all the workers, tell the node to init
-        d = node.ref.callRemote('init_node', self.host, pydraSettings.port, node_key_str)
+        d = node.ref.callRemote('init_node', self.host, pydra_settings.PORT, node_key_str)
         d.addCallback(self.node_ready, node)
 
 

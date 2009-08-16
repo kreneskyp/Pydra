@@ -19,43 +19,15 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# ==========================================================
-# Setup django environment 
-# ==========================================================
-
-import sys
-import os
-
-#python magic to add the current directory to the pythonpath
-sys.path.append(os.getcwd())
-
-#
-if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
-
-# ==========================================================
-# Done setting up django environment
-# ==========================================================
-import time
-
-# should be executed before any other reactor stuff to prevent from using non
-# glib2 event loop which we need for dbus
-from twisted.internet import glib2reactor
-glib2reactor.install()
-
-
-from twisted.application import service
-
 from pydra.cluster.amf.interface import AMFInterface
 from pydra.cluster.module import ModuleManager
 from pydra.cluster.master import *
 from pydra.cluster.tasks.task_manager import TaskManager
-from pydra.models import pydraSettings
+import pydra_settings
 
 # init logging
-import settings
 from pydra.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_MASTER)
+logger = init_logging(pydra_settings.LOG_FILENAME_MASTER)
 
 
 class Master(ModuleManager):
@@ -85,12 +57,5 @@ class Master(ModuleManager):
         self.emit_signal('MANAGER_INIT')
 
 
-#setup application used by twistd
-master = Master()
 
-application = service.Application("Pydra Master")
-
-for service in master.get_services():
-    logger.info('Starting service: %s' % service)
-    service.setServiceParent(application)
 
