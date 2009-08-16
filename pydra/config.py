@@ -8,6 +8,7 @@ import sys
 
 CONFIG_DIR = '/etc/pydra'
 LOGGING_DIR = '/var/log/pydra'
+RUNTIME_FILES_DIR = '/var/lib/pydra'
 
 def load_settings():
     """

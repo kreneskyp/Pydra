@@ -16,7 +16,11 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import sys, datetime, time, hashlib
+import hashlib
+import datetime
+import sys
+import time
+
 
 from authenticator import AMFAuthenticator
 from twisted.application import internet
@@ -25,13 +29,10 @@ from twisted.internet import reactor
 from twisted.python.randbytes import secureRandom
 from twisted.web import server, resource
 
-# load the settings file
-from pydra.config import load_settings
-settings = load_settings()
-
+from pydra import config
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.module import InterfaceModule
-
+import pydra_settings
 
 # init logging
 import logging
@@ -220,12 +221,14 @@ class AMFInterface(InterfaceModule):
         #setup services
         from twisted.internet.ssl import DefaultOpenSSLContextFactory
         try:
-            context = DefaultOpenSSLContextFactory('ca-key.pem', 'ca-cert.pem')
+            key = '%s/ca-key.pem' % config.RUNTIME_FILES_DIR
+            cert = '%s/ca-cert.pem' % config.RUNTIME_FILES_DIR
+            context = DefaultOpenSSLContextFactory(key, cert)
         except:
             logger.critical('Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh')
             sys.exit()
 
-        return internet.SSLServer(settings.CONTROLLER_PORT, server.Site(root), contextFactory=context)
+        return internet.SSLServer(pydra_settings.CONTROLLER_PORT, server.Site(root), contextFactory=context)
 
 
     @authenticated

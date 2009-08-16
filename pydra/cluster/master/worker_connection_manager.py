@@ -23,12 +23,14 @@ from twisted.application import internet
 from twisted.cred import checkers, portal
 from twisted.spread import pb
 
+from pydra import config
 from pydra.cluster.auth.master_realm import MasterRealm
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.auth.worker_avatar import WorkerAvatar
 from pydra.cluster.constants import *
 from pydra.cluster.module import Module
 import pydra_settings
+
 
 # init logging
 import logging
@@ -56,7 +58,7 @@ class WorkerConnectionManager(Module):
         self._lock = Lock() #general lock, use when multiple shared resources are touched
 
         #load rsa crypto
-        self.pub_key, self.priv_key = load_crypto('./master.key')
+        self.pub_key, self.priv_key = load_crypto('%s/master.key' % config.RUNTIME_FILES_DIR)
 
         #cluster management
         self.workers = {}
