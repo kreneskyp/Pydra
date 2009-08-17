@@ -1,7 +1,10 @@
 #!/usr/bin/env python
-
+"""
+Script for starting Pydra Node.
+"""
 import os
-from pydra.config import CONFIG_DIR
+import pydra
 
-os.system('twistd -ny %s/node.tac --pidfile=node.pid' % CONFIG_DIR)
+pydra_root = pydra.__file__[:pydra.__file__.rfind('/')]
+os.system('twistd -ny %s/twisted/node.tac --pidfile=node.pid' % pydra_root)
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env python
+"""
+Script for starting Pydra Master.
+"""
 import os
-from pydra.config import CONFIG_DIR
-os.system('twistd -ny %s/master.tac' % CONFIG_DIR)
+import pydra
+
+pydra_root = pydra.__file__[:pydra.__file__.rfind('/')]
+os.system('twistd -ny %s/twisted/master.tac' % pydra_root)
 
