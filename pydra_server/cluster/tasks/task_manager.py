@@ -45,6 +45,7 @@ class TaskManager(Module):
         'TASK_UPDATED',
         'TASK_REMOVED',
         'TASK_INVALID',
+        'TASK_OUTDATED',
     ]
 
     _shared = [
@@ -60,6 +61,7 @@ class TaskManager(Module):
 
         self._listeners = {
             'MANAGER_INIT':self.autodiscover,
+            'TASK_RELOAD':self.read_task_package,
         }
 
         Module.__init__(self, manager)
@@ -68,6 +70,8 @@ class TaskManager(Module):
         # preserved for both compatibility and efficiency
         self.registry = {} 
         self.package_dependency = graph.DirectedGraph()
+
+        self._task_callbacks = {} # task_key : callback list
 
         self._lock = Lock()
 
@@ -187,7 +191,7 @@ class TaskManager(Module):
         for filename in files:
             pkg_dir = os.path.join(task_dir, filename)
             if os.isdir(pkg_dir):
-                pkg = self._read_task_package(pkg_dir)
+                pkg = self.read_task_package(pkg_dir)
                 old_packages.remove(pkg.name)
 
         for pkg_name in old_packages:
@@ -218,27 +222,62 @@ class TaskManager(Module):
 
 
 
-    def get_task(self, task_key):
+    def retrieve_task(self, task_key, version, callback, errcallback,
+            *callback_args, **callback_kwargs):
         """
         task_key is referenced as 'package_name.task_name'
 
+        @task_key: the task key
+        @version: the version of the task
+        @callback: callback to make after the latest task code is retrieved
+        @errcallback: callback to make if task retrieval fails
+        @callback_args: additional args for the callback
+        @callback_kwargs: additional keyword args for the callback
         @return task_class, pkg_version, additional_module_search_path
         """
-        pkg = self.registry.get(pkg_name, None)
-        if pkg:
-            st, cycle = graph.dfs(self.package_dependency, pkg_name)
-            if cycle:
-                raise RuntimeError('Cycle detected in task dependency')
+        pkg_name = task_key[:task_key.find('.')]
+        needs_update = False
+        with self._lock:
+            pkg = self.registry.get(pkg_name, None)
+            if pkg:
+                pkg_status = pkg.status
+                if pkg_status == packaging.STATUS_OUTDATED:
+                    # package has already entered a sync process;
+                    # append the callback
+                    self._task_callbacks[pkg_name].append( (callback,
+                                callback_args, callback_kwargs) )
+                task_class = pkg.tasks.get(task_key, None)
+                if task_class and (version is None or pkg.version == version):
+                    module_search_path = [pkg.folder, pkg.folder + '/lib']
+                    extra_path, cycle = self._compute_module_search_path(
+                            pkg_name)
+                    if cycle:
+                        errcallback(task_key, verison,
+                                'Cycle detected in dependency')
+                    else:
+                        callback(task_key, version, task_class,
+                                module_search_path + extra_path, *callback_args,
+                                **callback_kwargs)
+                else:
+                    # needs update
+                    pkg.status = packaging.STATUS_OUTDATED
+                    needs_update = True
             else:
-                # computed packages on which this task depends
-                required_pkgs = [self.registry[x].folder for x in \
-                        st.keys() if  st[x] is not None]
-                return pkg.registry[task_key], pkg.version, required_pkgs + \
-                    [(x + '/lib') for x in required_pkgs]
-        return None, None, None
+                # no local package contains the specified task key, but this
+                # does NOT mean it is an error - try synchronizing tasks first
+                needs_update = True
+
+        if needs_update:
+            self.emit_signal('TASK_OUTDATED', pkg_name)
+            try:
+                self._task_callbacks[pkg_name].append( (task_key, callback,
+                            callback_args, callback_kwargs) )
+            except KeyError:
+                self._task_callbacks[pkg_name]= [ (task_key, callback,
+                            callback_args, callback_kwargs) ]
 
 
-    def active_sync(self, task_key, response=None, phase=1):
+    def active_sync(self, pkg_name, response=None, phase=1):
         """
         Generates an appropriate sync request.
 
@@ -246,18 +285,18 @@ class TaskManager(Module):
         @param response: response received from the remote side
         @param phase: which step the sync process is in
         """
-        pkg = self.registry.get(task_key, None)
+        pkg = self.registry.get(pkg_name, None)
         if not pkg:
             # the package does not exist yet
-            pkg_folder = os.path.join(pydraSettings.tasks_dir, pkg_name)
+            pkg_folder = os.path.join(pydraSettings.tasks_dir, pkg.name)
             os.mkdir(pkg_folder)
-            self._read_task_package(pkg_folder)
+            self.read_task_package(pkg_folder)
 
-        pkg = self.registry.get(task_key, None)
+        pkg = self.registry.get(pkg_name, None)
         return pkg.active_sync(response, phase)
             
 
-    def passive_sync(self, task_key, request, phase=1):
+    def passive_sync(self, pkg_name, request, phase=1):
         """
         Generates an appropriate sync response.
 
@@ -281,20 +320,19 @@ class TaskManager(Module):
         return [k for k in self.registry.keys() if k.find('.') == -1]
 
 
-    def _read_task_package(self, pkg_dir):
+    def read_task_package(self, pkg_name):
         # this method is slow in finding updates of tasks
+        pkg_dir = os.path.join(pydraSettings.tasks_dir, pkg_name)
         with self._lock:
-            old_packages = set(self.list_task_packages())
             signals = []
             pkg = packaging.TaskPackage(pkg_dir)
 
             # find updates
             if pkg.name not in self.registry:
-                signals.append( ('TASK_ADDED', pkg.name) )
+                signals.append('TASK_ADDED')
             else:
                 if pkg.version <> self.registry[pkg.name].version:
-                    signals.append( ('TASK_UPDATED', pkg.name) )
-                old_packages.remove(pkg.name)
+                    signals.append('TASK_UPDATED')
 
             for task in pkg.tasks:
                 key = '%s.%s' % (pkg.name, task.__class__.__name__)
@@ -302,9 +340,29 @@ class TaskManager(Module):
             self.registry[pkg.name] = pkg
             self.package_dependency.add_vertex(pkg.name)
             for dep in pkg.dependency:
+                if dep not in self.registry.keys():
+                    raise RuntimeError('Package %s has unresolved dependency
+                            issues: %s' % (pkg_name, dep)
                 self.package_dependency.add_edge(pkg.name, dep)
 
         for signal in signals:
-            self.emit_signal(signal[0], signal[1])
+            # invoke attached task callbacks
+            callbacks = self._task_callbacks.get(pkg_name, None)           
+            while callbacks:
+                task_key, callback, args, kwargs = callbacks.pop()
+                callback(task_key, self.registry[pkg_name).version, *args,
+                        **kwargs)
+            self.emit_signal(signal, pkg_name)
         return pkg
+
+
+    def _compute_module_search_path(self, pkg_name):
+        module_search_path = []
+        st, cycle = graph.dfs(self.package_dependency, pkg_name)
+        # computed packages on which this task depends
+        required_pkgs = [self.registry[x].folder for x in \
+                st.keys() if  st[x] is not None]
+        module_search_path += required_pkgs
+        module_search_path += [(x + '/lib') for x in required_pkgs]
+        return module_search_path, cycle
 

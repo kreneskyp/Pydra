@@ -2,8 +2,7 @@
 
 """
     Copyright 2009 Oregon State University
-
-    This file is part of Pydra.
+This file is part of Pydra.
 
     Pydra is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -40,6 +39,9 @@ from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 
+# TaskSyncClient will eventually migrate to the node
+from pydra_server.cluster.node.task_sync import TaskSyncClient
+
 
 # init logging
 import settings
@@ -63,7 +65,8 @@ class Worker(ModuleManager):
         self.modules = [
             TaskManager,
             WorkerConnectionManager,
-            WorkerTaskControls
+            WorkerTaskControls,
+            TaskSyncClient,
         ]
 
         ModuleManager.__init__(self)

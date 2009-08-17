@@ -41,6 +41,7 @@ from twisted.application import service
 
 from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.node import *
+from pydra_server.cluster.node.task_sync import TaskSyncClient
 from pydra_server.cluster.tasks.task_manager import TaskManager
 
 # init logging
@@ -64,6 +65,7 @@ class NodeServer(ModuleManager):
             NodeInformation,
             WorkerManager,
             MasterConnectionManager,
+            TaskSyncClient,
             NodeZeroConfService
         ]
 

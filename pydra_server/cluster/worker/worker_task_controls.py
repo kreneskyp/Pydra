@@ -68,9 +68,16 @@ class WorkerTaskControls(Module):
         self.__workunit_key = None
         self.__local_workunit_key = None
         self.__local_task_instance = None
-        
+
 
     def run_task(self, key, version, args={}, subtask_key=None, workunit_key=None, \
+            main_worker=None, task_id=None):
+        self.task_manager.retrieve_task(key, version,
+                self._run_task, self.retrieve_task_failed, args, subtask_key,
+                workunit_key, main_worker, task_id)
+        
+
+    def _run_task(self, key, version, args={}, subtask_key=None, workunit_key=None, \
         main_worker=None, task_id=None):
         """
         Runs a task on this worker
@@ -84,8 +91,8 @@ class WorkerTaskControls(Module):
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
-            task_class, pkg_version, module_path = self.task_manager.get_task(
-                    key)
+            self.task_manager.retrieve_task(key, version,
+                    self.retrieve_task_succeeded, self.retrieve_task_failed)
 
             if task_class is None or (version is not None and version <>
                     pkg_version):
@@ -323,6 +330,15 @@ class WorkerTaskControls(Module):
         recursive task key generation function.  This stops the recursion
         """
         return None    
+
+
+    def retrieve_task_succeeded(self, task_key, version, task_class,
+            module_search_path):
+        pass
+
+
+    def retrieve_task_failed(self, task_key, version, err):
+        pass
 
 
     def _sync_task(self, task_key, response=None, phase=1):

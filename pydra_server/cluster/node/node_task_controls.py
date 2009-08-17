@@ -16,24 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-
 from pydra_server.cluster.module import Module
 
-class TaskSyncServer(Module):
-
-    def __init__(self):
-
-        self._remotes = [
-            ('REMOTE_WORKER', self.sync_task),
-        ]
-
-        self._friends = {
-            'task_manager' : TaskManager,
-        }
-
-        Module.__init__(self, module)
-
-    def sync_task(self, pkg_name, request, phase):
-        resp = self.task_manager.passive_sync(pkg_name, request, phase)
-        return task_key, resp, phase + 1
-
+# after refactoring master-node relationship, this module will resemble
+# the current worker_task_controls module

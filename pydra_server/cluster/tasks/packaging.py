@@ -55,6 +55,9 @@ from pydra_server.cluster.tasks.tasks import *
 import logging
 logger = logging.getLogger('root')
 
+STATUS_NORMAL = 0
+STATUS_OUTDATED = 1
+
 class TaskPackage:
     
     def __init__(self, folder):
@@ -62,13 +65,15 @@ class TaskPackage:
         self.name = None
         self.dependency = [] # a list of depended package names
 
+        self.status = STATUS_NORMAL
+
         self.tasks = {} # task_key: task_class
         self.version = None
 
         self._init(folder)
 
 
-    def active_sync(self, received, phase=1):
+    def active_sync(self, response=None, phase=1):
         """
         Actively generates requests to update the local package to make
         it be the same as a remote package.
@@ -82,8 +87,8 @@ class TaskPackage:
         Subclass implementators should guarantee that active_sync() and
         passive_sync() match.
 
+        @param response: the response received from the remote side
         @param phase: the phase in which invocation of this method is made
-        @param received: the data received from the remote side
         @return a pair of values consisting of the request as a string, and
                 a flag indicating whether it expect a remote response any more.
         """
@@ -94,8 +99,8 @@ class TaskPackage:
         if phase == 1:
             return self.version, True
         elif phase == 2:
-            if received:
-                buf = zlib.decompress(received)
+            if response:
+                buf = zlib.decompress(response)
                 in_file = cStringIO.StringIO(buf)
                 tar = tarfile.open(mode='r', fileobj=in_file)
 
@@ -114,7 +119,7 @@ class TaskPackage:
             return '', False
 
 
-    def passive_sync(self, received, phase=1):
+    def passive_sync(self, request, phase=1):
         """
         Passively generates response to a remote sync request. The other side
         of the synchronization can make use this response to synchronize its
@@ -127,8 +132,9 @@ class TaskPackage:
         Subclass implementators should guarantee that active_sync() and
         passive_sync() match.
 
+        @param request: the request received from the remote side
         @param phase: the phase in which invocation of this method is made
-        @param received: the data received from the remote side
+        @return the response data
         """
         if self.version <> snapshot:
             out_file = cStringIO.StringIO()
@@ -228,10 +234,10 @@ def _compute_sha1_hash(folder):
 
 class BsdiffTaskPackage(TaskPackage):
 
-    def active_sync(self, received, phase=1):
+    def active_sync(self, response=None, phase=1):
         pass
 
 
-    def passive_sync(self, received, phase=1):
+    def passive_sync(self, request, phase=1):
         pass
 
