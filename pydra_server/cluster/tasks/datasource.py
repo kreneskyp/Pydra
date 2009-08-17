@@ -22,10 +22,9 @@ def chain_subslicer(obj, ss_list):
 ############
 # sources
 
-class DatasourceDict(object):
+class Datasource(object):
 
-    def __init__(self, dict):
-        self.store = dict
+    def __init__(self):
         self.subslicer = None
 
     def connect(self):
@@ -36,15 +35,15 @@ class DatasourceDict(object):
 
 
     def __iter__(self):
-        """key generation"""
-        for key in self.store.iterkeys():
-            yield key, # tuple
+        # implement this
+        raise NotImplementedError
 
+    def _load(self, key):
+        # implement this
+        raise NotImplementedError
 
     def load(self, key):
-        """data reading"""
-
-        obj = self.store[key[-1]]
+        obj = self._load(key)
 
         if self.subslicer:
             return chain_subslicer(obj, self.subslicer)
@@ -52,17 +51,29 @@ class DatasourceDict(object):
         return obj
 
 
-class DatasourceDir(object):
+class DatasourceDict(Datasource):
+
+    def __init__(self, dict):
+        super(DatasourceDict, self).__init__()
+        self.store = dict
+
+
+    def __iter__(self):
+        """key generation"""
+        for key in self.store.iterkeys():
+            yield key, # tuple
+
+    def _load(self, key):
+        """data reading"""
+
+        return self.store[key[-1]]
+
+
+class DatasourceDir(Datasource):
 
     def __init__(self, dir):
+        super(DatasourceDir, self).__init__()
         self.dir = dir
-        self.subslicer = None
-
-    def connect(self):
-        pass
-
-    def close(self):
-        pass
 
 
     def __iter__(self):
@@ -72,19 +83,18 @@ class DatasourceDir(object):
         for filename in files:
             yield filename,
 
-
-    def load(self, key, mode="r"):
+    def _load(self, key, mode="r"):
         """open particular input file"""
         filename = key[-1]
         path = os.path.join(self.dir, filename)
         return open(path, mode)
 
 
-class DatasourceSQL(object):
+class DatasourceSQL(Datasource):
 
     def __init__(self, **kwargs):
+        super(DatasourceSQL, self).__init__()
         self.kwargs = kwargs
-        self.subslicer = None
         self.db = None
 
     def connect(self):
@@ -100,13 +110,8 @@ class DatasourceSQL(object):
         """generate key for database"""
         yield "_mysql",
 
-    def load(self, key):
-        obj = self.db.cursor()
-
-        if self.subslicer:
-            return chain_subslicer(obj, self.subslicer)
-
-        return obj
+    def _load(self, key):
+        return self.db.cursor()
 
 
 ############
@@ -141,7 +146,6 @@ class Slicer(object):
             return chain_subslicer(obj, self.subslicer)
 
         return obj
-
 
     def _load(self, key):
         """loading data corresponding with particular key"""
@@ -205,10 +209,13 @@ class LineFileSlicer(Slicer):
 class SQLTableSlicer(Slicer):
 
     def __iter__(self):
+        id_column = self.kwargs.get('id_column', 'id')
+        table = self.kwargs['table']
+
         for input_key in self.input:
             c = self.input.load(input_key)
 
-            c.execute("SELECT id FROM %s" % self.kwargs['table'])
+            c.execute("SELECT %s FROM %s" % (id_column, table))
             row = c.fetchone()
 
             while row:
@@ -264,7 +271,7 @@ class FilePickleOutput(object):
         self.dir = dir
 
     def dump(self, key, values):
-        with self.dir.load((key, ), "w") as f:
+        with self.dir._load((key, ), mode="w") as f:
             for obj in values:
                 pickle.dump(obj, f)
 
