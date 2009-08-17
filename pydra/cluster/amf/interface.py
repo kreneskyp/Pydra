@@ -117,7 +117,9 @@ class AMFInterface(InterfaceModule):
         InterfaceModule.__init__(self, manager)
 
         #load rsa crypto
-        self.pub_key, self.priv_key = load_crypto('./master.key')
+        self.pub_key, self.priv_key = load_crypto('%s/master.key' % \
+                                        config.RUNTIME_FILES_DIR)
+        self.priv_key_encrypt = self.priv_key.encrypt
 
         # setup AMF gateway security.  This just uses a default user/pw
         # the real authentication happens after the AMF client connects
@@ -132,9 +134,6 @@ class AMFInterface(InterfaceModule):
         # it can use the same key.  Theres no way with the AMF interface to
         # restrict access to localhost connections only.
         self.key_size=4096
-
-        pub_key, priv_key = load_crypto('./master.key')
-        self.priv_key_encrypt = priv_key.encrypt
 
 
     def auth(self, user, password):

@@ -68,9 +68,21 @@ class WorkerManager(Module):
 
     def start_workers(self):
         """
-        Starts all of the workers.  By default there will be one worker for each core
+        Starts all of the workers.  By default there will be one worker for
+        each core
         """
+
+        # dirty hack to locate worker file.  This can later be replaced/
+        import pydra
+        pydra_root = pydra.__file__[:pydra.__file__.rfind('/')]
+        print '%s/cluster/worker/worker.py' % pydra_root
         self.pids = [
-            Popen(["python", "pydra/cluster/worker/worker.py", self.master_host, str(self.master_port), self.node_key, '%s:%s' % (self.node_key, i)]).pid 
+            Popen([
+                    'python',
+                    '%s/cluster/worker/worker.py' % pydra_root,
+                    self.master_host,
+                    str(self.master_port),
+                    self.node_key, '%s:%s' % (self.node_key, i)
+                ]).pid 
             for i in range(self.info['cores'])
             ]

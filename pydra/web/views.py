@@ -30,7 +30,8 @@ import settings
 from pydra.cluster.amf.controller import AMFController, ControllerException
 from pydra.forms import NodeForm
 from pydra.models import Node, TaskInstance
-import pydra_settings
+from pydra.config import load_settings
+pydra_settings = load_settings()
 
 """
 pydraController is a global variable that stores an instance of a Controller.

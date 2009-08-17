@@ -19,19 +19,23 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-#
-# Setup django environment
-#
-if __name__ == '__main__':
-    import sys
-    import os
+# ==========================================================
+# Setup django environment 
+# ==========================================================
+import os
+import sys
+from pydra.config import CONFIG_DIR
 
-    #python magic to add the current directory to the pythonpath
-    sys.path.append(os.getcwd())
+# python magic to add the config directory to the python path.
+# the config directory contains the django settings file
+sys.path.append(CONFIG_DIR)
 
-    #
-    if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
-        os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+#
+if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'pydra_settings'
+# ==========================================================
+# Done setting up django environment
+# ==========================================================
 
 
 from twisted.internet import reactor
@@ -42,9 +46,9 @@ from pydra.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 
 
 # init logging
-import settings
+import pydra_settings
 from pydra.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_NODE)
+logger = init_logging(pydra_settings.LOG_FILENAME_NODE)
 
 
 class Worker(ModuleManager):

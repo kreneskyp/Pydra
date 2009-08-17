@@ -183,5 +183,4 @@ class AMFController(object):
         # re-encrypt using servers key and then sha hash it.
         response_encode = self.priv_key.encrypt(challenge, None)
         response_hash = hashlib.sha512(response_encode[0]).hexdigest()
-
         return self.service.challenge_response(self.user, response_hash)

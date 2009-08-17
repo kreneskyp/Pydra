@@ -18,35 +18,14 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-
-# ==========================================================
-# Setup django environment 
-# ==========================================================
-
-import sys
-import os
-
-#python magic to add the current directory to the pythonpath
-sys.path.append(os.getcwd())
-
-if not os.environ.has_key('DJANGO_SETTINGS_MODULE'):
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
-# ==========================================================
-# Done setting up django environment
-# ==========================================================
-
-from twisted.internet import reactor
-from twisted.application import service
-
 from pydra.cluster.module import ModuleManager
 from pydra.cluster.node import *
 from pydra.cluster.tasks.task_manager import TaskManager
 
 # init logging
-import settings
+import pydra_settings
 from pydra.logging.logger import init_logging
-logger = init_logging(settings.LOG_FILENAME_NODE)
+logger = init_logging(pydra_settings.LOG_FILENAME_NODE)
 
 
 class NodeServer(ModuleManager):
@@ -73,13 +52,4 @@ class NodeServer(ModuleManager):
         logger.info('Node - Started')
 
 
-#root application object
-application = service.Application('Pydra Node')
 
-#create node server
-node_server = NodeServer()
-
-# attach service
-for service in node_server.get_services():
-    logger.info('Starting service: %s' % service)
-    service.setServiceParent(application)
