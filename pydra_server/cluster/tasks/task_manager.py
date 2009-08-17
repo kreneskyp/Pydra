@@ -23,12 +23,15 @@ from django.template import Context, loader
 
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks.tasks import *
+from pydra_server.cluster.tasks import packaging
 from pydra_server.models import *
 from pydra_server.util import graph
 
 from twisted.internet import reactor
 
 from threading import Lock
+
+import os
 
 import logging
 logger = logging.getLogger('root')
@@ -146,14 +149,15 @@ class TaskManager(Module):
                 last_run = None
 
             # render the form if the task has one
-            if self.registry[key].form:
+            task = self.registry[key].tasks[key]
+            if task.form:
                 t = loader.get_template('task_parameter_form.html')
-                c = Context ({'form':self.registry[key].form()})
+                c = Context ({'form':task.form()})
                 rendered_form = t.render(c)
             else:
                 rendered_form = None
 
-            message[key] = {'description':self.registry[key].description ,'last_run':last_run, 'form':rendered_form}
+            message[key] = {'description':task.description ,'last_run':last_run, 'form':rendered_form}
 
         return message
 
@@ -190,12 +194,15 @@ class TaskManager(Module):
         files = os.listdir(task_dir)
         for filename in files:
             pkg_dir = os.path.join(task_dir, filename)
-            if os.isdir(pkg_dir):
-                pkg = self.read_task_package(pkg_dir)
-                old_packages.remove(pkg.name)
+            if os.path.isdir(pkg_dir):
+                pkg = self.read_task_package(filename)
+                try:
+                    old_packages.remove(pkg.name)
+                except ValueError:
+                    pass
 
         for pkg_name in old_packages:
-            self.emit_signal('TASK_REMOVED', pkg_name)
+            self.emit('TASK_REMOVED', pkg_name)
 
         reactor.callLater(self.scan_interval, self.autodiscover)
 
@@ -248,7 +255,8 @@ class TaskManager(Module):
                                 callback_args, callback_kwargs) )
                 task_class = pkg.tasks.get(task_key, None)
                 if task_class and (version is None or pkg.version == version):
-                    module_search_path = [pkg.folder, pkg.folder + '/lib']
+                    module_search_path = [pydraSettings.tasks_dir, pkg.folder \
+                                         + '/lib']
                     extra_path, cycle = self._compute_module_search_path(
                             pkg_name)
                     if cycle:
@@ -268,7 +276,7 @@ class TaskManager(Module):
                 needs_update = True
 
         if needs_update:
-            self.emit_signal('TASK_OUTDATED', pkg_name)
+            self.emit('TASK_OUTDATED', pkg_name)
             try:
                 self._task_callbacks[pkg_name].append( (task_key, callback,
                             callback_args, callback_kwargs) )
@@ -334,15 +342,15 @@ class TaskManager(Module):
                 if pkg.version <> self.registry[pkg.name].version:
                     signals.append('TASK_UPDATED')
 
-            for task in pkg.tasks:
-                key = '%s.%s' % (pkg.name, task.__class__.__name__)
+            for key, task in pkg.tasks.iteritems():
                 self.registry[key] = pkg
             self.registry[pkg.name] = pkg
             self.package_dependency.add_vertex(pkg.name)
             for dep in pkg.dependency:
                 if dep not in self.registry.keys():
-                    raise RuntimeError('Package %s has unresolved dependency
-                            issues: %s' % (pkg_name, dep)
+                    raise RuntimeError(
+                            'Package %s has unresolved dependency issues: %s' %\
+                            (pkg_name, dep))
                 self.package_dependency.add_edge(pkg.name, dep)
 
         for signal in signals:
@@ -350,9 +358,9 @@ class TaskManager(Module):
             callbacks = self._task_callbacks.get(pkg_name, None)           
             while callbacks:
                 task_key, callback, args, kwargs = callbacks.pop()
-                callback(task_key, self.registry[pkg_name).version, *args,
+                callback(task_key, self.registry[pkg_name].version, *args,
                         **kwargs)
-            self.emit_signal(signal, pkg_name)
+            self.emit(signal, pkg_name)
         return pkg
 
 

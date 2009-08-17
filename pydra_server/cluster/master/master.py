@@ -50,6 +50,7 @@ from pydra_server.cluster.amf.interface import AMFInterface
 from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.master import *
 from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra_server.cluster.master.task_sync import TaskSyncServer
 from pydra_server.models import pydraSettings
 
 # init logging

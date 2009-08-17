@@ -30,7 +30,7 @@ class TaskSyncClient(Module):
         'master',
     ]
 
-    def __init__(self):
+    def __init__(self, manager):
 
         self._listeners = {
             'TASK_OUTDATED' : self.request_sync,
@@ -40,14 +40,14 @@ class TaskSyncClient(Module):
             'task_manager' : TaskManager,
         }
 
-        Module.__init__(self, module)
+        Module.__init__(self, manager)
 
 
     def request_sync(self, pkg_name):
         self._request_sync_internal(pkg_name, None)
 
 
-    def _request_sync_internal(self, pkg_name, response=None, phase=1)
+    def _request_sync_internal(self, pkg_name, response=None, phase=1):
         # send the request to the master
         request = self.task_manager.active_sync(pkg_name, response, phase)
         if request[1]:

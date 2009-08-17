@@ -150,8 +150,8 @@ class TaskPackage:
 
 
     def _init(self, pkg_folder):
-        name = os.path.basename(pkg_folder)
-        if name.find('.') != -1:
+        self.name = os.path.basename(pkg_folder)
+        if self.name.find('.') != -1:
             raise RuntimeError('Package name should not contain dots (.)')
 
         meta = _read_config(os.path.join(pkg_folder, 'META'))
@@ -192,7 +192,8 @@ class TaskPackage:
                             #generate a unique key for this 
                             task_key = key
 
-                            self.tasks[task_key] = task_class
+                            self.tasks['%s.%s.%s' % (self.name, module,
+                                    task_key)] = task_class
                             logger.info('Loaded task: %s' % key)
 
                         except:

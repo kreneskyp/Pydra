@@ -18,10 +18,11 @@
 """
 
 from pydra_server.cluster.module import Module
+from pydra_server.cluster.tasks.task_manager import TaskManager
 
 class TaskSyncServer(Module):
 
-    def __init__(self):
+    def __init__(self, manager):
 
         self._remotes = [
             ('REMOTE_WORKER', self.sync_task),
@@ -31,7 +32,7 @@ class TaskSyncServer(Module):
             'task_manager' : TaskManager,
         }
 
-        Module.__init__(self, module)
+        Module.__init__(self, manager)
 
     def sync_task(self, pkg_name, request, phase):
         resp = self.task_manager.passive_sync(pkg_name, request, phase)
