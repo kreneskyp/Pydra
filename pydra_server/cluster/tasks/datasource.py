@@ -209,13 +209,16 @@ class LineFileSlicer(Slicer):
 class SQLTableSlicer(Slicer):
 
     def __iter__(self):
-        id_column = self.kwargs.get('id_column', 'id')
-        table = self.kwargs['table']
+        select_args = {'id_column': 'id'}
+        select_args.update(self.kwargs)
+
+        select_query = select_args.pop('select_query',
+                "SELECT %(id_column)s FROM %(table)s")
 
         for input_key in self.input:
             c = self.input.load(input_key)
 
-            c.execute("SELECT %s FROM %s" % (id_column, table))
+            c.execute(select_query % select_args)
             row = c.fetchone()
 
             while row:
@@ -234,7 +237,13 @@ class SQLTableSlicer(Slicer):
         parent, id = key[:-1], key[-1]
         c = self.input.load(parent)
 
-        c.execute("SELECT * FROM %s WHERE id = %d" % (self.kwargs['table'], id))
+        select_args = {'id_column': 'id','id': id}
+        select_args.update(self.kwargs)
+
+        load_query = select_args.pop('load_query',
+                "SELECT * FROM %(table)s WHERE %(id_column)s = %(id)d")
+
+        c.execute(load_query % select_args)
         return c.fetchone()
 
 
