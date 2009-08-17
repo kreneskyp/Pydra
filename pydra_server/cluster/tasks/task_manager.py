@@ -59,7 +59,8 @@ class TaskManager(Module):
 
         self._interfaces = [
             self.list_tasks,
-            self.task_history
+            self.task_history,
+            self.task_history_detail
         ]
 
         self._listeners = {
@@ -208,11 +209,15 @@ class TaskManager(Module):
 
 
     def task_history(self, key, page):
+        """
+        Returns a paginated list of of times a task was run.
+        """
 
-        instances = TaskInstance.objects.filter(task_key=key).order_by('-completed').order_by('-started')
+        instances = TaskInstance.objects.filter(task_key=key) \
+            .order_by('-completed').order_by('-started')
         paginator = Paginator(instances, 10)
 
-         # If page request (9999) is out of range, deliver last page of results.
+         # If page request (9999) is out of range, deliver last page.
         try:
             paginated = paginator.page(page)
 
@@ -227,6 +232,27 @@ class TaskManager(Module):
                 'instances':[instance for instance in paginated.object_list]
                }
 
+
+    def task_history_detail(self, task_id):
+        """
+        Returns detailed history about a specific task_instance
+        """
+
+        try:
+            task_instance = TaskInstance.objects.get(id=task_id)
+        except TaskInstance.DoesNotExist:
+            return None
+
+        workunits = [workunit for workunit in task_instance.workunits.all() \
+            .order_by('id')]
+        task_key = task_instance.task_key
+        task = self.registry[task_key].tasks[task_key]
+        return {
+                    'details':task_instance,
+                    'name':task.__name__,
+                    'description':task.description,
+                    'workunits':workunits
+               }
 
 
     def retrieve_task(self, task_key, version, callback, errcallback,
@@ -373,4 +399,5 @@ class TaskManager(Module):
         module_search_path += required_pkgs
         module_search_path += [(x + '/lib') for x in required_pkgs]
         return module_search_path, cycle
+
 

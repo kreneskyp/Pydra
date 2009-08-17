@@ -35,22 +35,44 @@
 
         <style>
             #content { padding-top:30px; }
-
-            .pagination {
-                height:23px;
-                margin-left:auto;
-                margin-right:auto;
-                width:140px;
+  
+            .label {
+                float:left;
+                font-weight:bold;
+                min-width:75px;
+            }
+ 
+            #description {
+                float:left;
+                height:100px;
+                margin-right:30px;
+                width: 450px;
+            }
+         
+            #status {
+                -moz-border-radius:5px;
+                border:1px solid black;
+                float:right;
+                line-height:15px;
+                padding:5px;
+                width:160px;
             }
 
-            .prev { float:left; }
-            .next { float:right; }
+            #status._-2, #status._-1, #status._0 {
+                border-color:red;
+            }
+            #status._1, #status._3{
+                background-color:#c2e192;
+                border-color:#124612;
+                color:#124612;
+            }
+            #status.status_2 {border-color:yellow;}
 
-            #history {
+            #workunits {
                 border: 0px solid black;
                 border-spacing:0;
                 border-collapse:collapse;
-                margin-top:5px;
+                margin-top:20px;
                 width:100%;
             }
 
@@ -77,7 +99,7 @@
 
             .buttons { width: 5.25em; }
 
-            .task_status { width:18px; padding-right:1px;}
+            .status { width:18px; padding-right:1px;}
             .task_id     { width:70px; }
             .queue_time, .start_time, .buttons, .completion_time {
                 text-align:center;
@@ -110,41 +132,46 @@
 {% endblock %}
 
 {% block content %}
-
-        <div class="pagination">
-          {% if history.prev %}<a class="prev" href="/jobs/history/?key={{task_key}}&page={{history.page|add:"-1"}}" href="3"><< Prev</a>{% endif %}
-          {% if history.next %}<a class="next" href="/jobs/history/?key={{task_key}}&page={{history.page|add:1}}" href="3">Next >></a>{% endif %}
+        <div id="details">
+            <div id="description">
+                <div class="label">Name:</div><div>{{task.name}}</div>
+                <div class="label">Description:</div><div>{{task.description}}</div>
+            </div>
+            <div id="run">
+                <div id="status" class="_{{task.details.status}}">
+                    {{task.details.status|task_status}}{{task.details.status|task_status_text|capfirst}}
+                </div>
+                <div class="label">Queued:</div><div>{{task.details.queued|default:"--"}}</div>
+                <div class="label">Started:</div><div>{{task.details.started|default:"--"}}</div>
+                <div class="label">Completed:</div><div>{{task.details.completed|default:"--"}}</div>
+            </div>
         </div>
 
-        <table id="history">
+        {% if task.workunits %}
+        <table id="workunits">
             <thead>
-                <tr><th colspan="100%" class="title">Task History</th></tr>
+                <tr><th colspan="100%" class="title">Work Units</th></tr>
                 <tr>
-                    <th class="task_status"></th>
-                    <th class="task_id">ID</th>
-                    <th class="description">Description</th>
-                    <th class="queue_time">Queued</th>
+                    <th class="status"></th>
+                    <th class="subtask_key">Subtask</th>
+                    <th class="workunit_key">Workunit Key</th>
+                    <th class="args">Arguments</th>
                     <th class="start_time">Started</th>
                     <th class="completion_time">Completed</th>
-                    <th class="buttons"></th>
                 </tr>
             </thead>
 
-            {% for instance in history.instances %}
+            {% for workunit in task.workunits %}
                 <tr id="instance_{{instance.id}}" class="{% cycle '' 'stripe' %}">
-                    <td class="task_status">{{instance.status|task_status}}</td>
-                    <td class="task_id"><a href="{{SITE_ROOT}}/jobs/history/detail/?id={{instance.id}}">{{instance.id}}</a></td>
-                    <td class="description"></td>
-                    <td class="queue_time">{{instance.queued|default:"--"}}</td>
-                    <td class="start_time">{{instance.started|default:"--"}}</td>
-                    <td class="completion_time">{{instance.completed|default:"--"}}</td>
-                    <td class="buttons">
-                        {% if perms.pydra_server.can_run_tasks %}
-                            <div class="button_rerun icon" title="Run Task"></div>
-                        {% endif %}
-                    </td>
-                </tr>
+                    <td class="status">{{workunit.status|task_status}}</td>
+                    <td class="subtask_key">{{workunit.subtask_key}}</td>
+                    <td class="workunit_id">{{workunit.workunit_key}}</td>
+                    <td class="args">{{workunit.args}}</td>
+                    <td class="start_time">{{workunit.started|default:"--"}}</td>
+                    <td class="completion_time">{{workunit.completed|default:"--"}}</td>
+               </tr>
             {% endfor %}
         </table>
+        {% endif %}
 
 {% endblock %}
