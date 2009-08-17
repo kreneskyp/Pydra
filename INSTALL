@@ -1,0 +1,14 @@
+Installing Pydra:
+
+1) update paths in pydra/config.py if needed
+2) run setup.py in this folder.  requires root
+3) set ownership/groups appropriately for these:
+    config.RUNTIME
+    config.RUNTIME_FILES_DIR
+    config.LOGGING_DIR
+4) update CONFIG_DIR/pydra_settings.py to contain your database information
+5) create database with: pydra_manage syncdb
+6) start pydra with pydra_master and pydra_node
+
+Notes:
+    * This installer does not yet allow variable configuration of config paths
