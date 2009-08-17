@@ -22,6 +22,7 @@ from threading import Lock
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import ParallelTask
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.logging import get_task_logger
 
 # init logging
@@ -33,7 +34,6 @@ class WorkerTaskControls(Module):
 
     _shared = [
         'worker_key',
-        'registry',
         'master',
         '_lock_connection',
     ]
@@ -48,10 +48,6 @@ class WorkerTaskControls(Module):
             ('MASTER', self.receive_results),
             ('MASTER', self.return_work)
         ]
-
-        self._listeners = {
-            'TASK_PASSIVE_SYNC_DATA':self.sync_task,
-        }
 
         self._friends = {
             'task_manager' : TaskManager,
@@ -77,8 +73,8 @@ class WorkerTaskControls(Module):
                 workunit_key, main_worker, task_id)
         
 
-    def _run_task(self, key, version, args={}, subtask_key=None, workunit_key=None, \
-        main_worker=None, task_id=None):
+    def _run_task(self, key, version, task_class, args={}, subtask_key=None,
+            workunit_key=None, main_worker=None, task_id=None):
         """
         Runs a task on this worker
         """
@@ -90,17 +86,6 @@ class WorkerTaskControls(Module):
         with self._lock:
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
-
-            self.task_manager.retrieve_task(key, version,
-                    self.retrieve_task_succeeded, self.retrieve_task_failed)
-
-            if task_class is None or (version is not None and version <>
-                    pkg_version):
-                # need synchronization with the master
-
-                # this is an async call
-                self._sync_task(key)
-                return 'FAILURE: TASK CODE OUT-DATED'
 
             # is this task being run locally for the mainworker?
             run_local = subtask_key and self.worker_key == main_worker
@@ -139,7 +124,7 @@ class WorkerTaskControls(Module):
 
         # Create task instance and start it
         if run_local:
-            self.__local_task_instance = object.__new__(self.registry[key])
+            self.__local_task_instance = object.__new__(task_class)
             self.__local_task_instance.__init__()
             self.__local_task_instance.parent = self
             self.__local_task_instance.logger = get_task_logger( \
@@ -149,7 +134,7 @@ class WorkerTaskControls(Module):
 
         else:
             #create an instance of the requested task
-            self.__task_instance = object.__new__(self.registry[key])
+            self.__task_instance = object.__new__(task_class)
             self.__task_instance.__init__()
             self.__task_instance.parent = self
             self.__task_instance.logger = get_task_logger(self.worker_key, \
@@ -332,25 +317,6 @@ class WorkerTaskControls(Module):
         return None    
 
 
-    def retrieve_task_succeeded(self, task_key, version, task_class,
-            module_search_path):
-        pass
-
-
     def retrieve_task_failed(self, task_key, version, err):
         pass
-
-
-    def _sync_task(self, task_key, response=None, phase=1):
-        # send the request to the master
-        request = self.task_manager.active_sync(task_key, response, phase)
-        if request[1]:
-            # still expecting a remote answer; now send the req to the master
-            deferred = self.master.callRemote('sync_task', task_key, request[0],
-                    phase)
-            # using self as a callback
-            deferred.addCallback(self._sync_task)
-        else:
-            # the task has been successfully synchronized
-            pass
 

@@ -101,7 +101,6 @@ class TaskScheduler(Module):
         'workers',
         '_idle_workers',
         '_active_workers',
-        'registry'
     ]    
 
     def __init__(self, manager):
@@ -158,6 +157,7 @@ class TaskScheduler(Module):
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
+        self._active_workers = []
         self._worker_mappings = {}  # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
 
