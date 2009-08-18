@@ -78,6 +78,7 @@ class WorkerTaskControls(Module):
         """
         Runs a task on this worker
         """
+        logger.info(task_class)
         logger.info('[%s] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
             % (self.worker_key, key, args, subtask_key, workunit_key, \
             main_worker))

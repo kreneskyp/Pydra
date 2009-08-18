@@ -31,11 +31,14 @@ from twisted.internet import reactor
 
 from threading import Lock
 
+import tarfile, cStringIO, zlib
 import os
 
 import logging
 logger = logging.getLogger('root')
 
+# FIXME what we gonna do if a task is removed at the master side
+# it seems that only an active pushing sync scheme will solve this problem
 
 class TaskManager(Module):
     """ 
@@ -70,6 +73,8 @@ class TaskManager(Module):
 
         Module.__init__(self, manager)
 
+        self.tasks_dir = pydraSettings.tasks_dir
+
         # full_task_key or pkg_name: pkg_object
         # preserved for both compatibility and efficiency
         self.registry = {} 
@@ -78,8 +83,11 @@ class TaskManager(Module):
         self._task_callbacks = {} # task_key : callback list
 
         self._lock = Lock()
+        self._callback_lock = Lock()
 
-        # currently no way to customize this value
+        self.__initialized = False
+
+        # in seconds; currently no way to customize this value
         self.scan_interval = scan_interval
 
 
@@ -205,6 +213,9 @@ class TaskManager(Module):
         for pkg_name in old_packages:
             self.emit('TASK_REMOVED', pkg_name)
 
+        if not self.__initialized:
+            self.__initialized = True
+
         reactor.callLater(self.scan_interval, self.autodiscover)
 
 
@@ -253,6 +264,15 @@ class TaskManager(Module):
                     'description':task.description,
                     'workunits':workunits
                }
+
+
+    def get_task_package(self, key):
+        """
+        Returns the TaskPackage indexed by a specified key.
+
+        @param key: either a full task key or the package name
+        """
+        return self.registry.get(key, None)
 
 
     def retrieve_task(self, task_key, version, callback, errcallback,
@@ -304,8 +324,8 @@ class TaskManager(Module):
         if needs_update:
             self.emit('TASK_OUTDATED', pkg_name)
             try:
-                self._task_callbacks[pkg_name].append( (task_key, callback,
-                            callback_args, callback_kwargs) )
+                self._task_callbacks[pkg_name].append( (task_key,
+                            callback, callback_args, callback_kwargs) )
             except KeyError:
                 self._task_callbacks[pkg_name]= [ (task_key, callback,
                             callback_args, callback_kwargs) ]
@@ -313,36 +333,92 @@ class TaskManager(Module):
 
     def active_sync(self, pkg_name, response=None, phase=1):
         """
-        Generates an appropriate sync request.
+        Actively generates requests to update the local package to make
+        it be the same as a remote package.
+
+        This synchronization process may take one or more times of
+        communication with the remote side. The 'phase' parameter, starting
+        from 1, specifies the phase that the invocation of this method is in.
+        The final step typically manipulates the local file system and makes
+        the package content consistent with the remote package.
+
+        Subclass implementators should guarantee that active_sync() and
+        passive_sync() match.
 
         @param pkg_name: the name of the task package to be updated
-        @param response: response received from the remote side
-        @param phase: which step the sync process is in
+        @param response: the response received from the remote side
+        @param phase: the phase in which invocation of this method is made
+        @return a pair of values consisting of the request as a string, and
+                a flag indicating whether it expect a remote response any more.
         """
-        pkg = self.registry.get(pkg_name, None)
-        if not pkg:
-            # the package does not exist yet
-            pkg_folder = os.path.join(pydraSettings.tasks_dir, pkg.name)
-            os.mkdir(pkg_folder)
-            self.read_task_package(pkg_folder)
+        def on_remove_error(func, path, execinfo):
+            logger.error('Error %s occurred while trying to remove %s' %
+                    (execinfo, path))
 
         pkg = self.registry.get(pkg_name, None)
-        return pkg.active_sync(response, phase)
+        if phase == 1:
+            return pkg.version if pkg else None, True
+        elif phase == 2:
+            pkg_folder = self.get_package_location(pkg_name)
+            if response:
+                buf = zlib.decompress(response)
+                in_file = cStringIO.StringIO(buf)
+                tar = tarfile.open(mode='r', fileobj=in_file)
+
+                # remove old package files
+                if pkg:
+                    for f in os.listdir(pkg_folder):
+                        full_path = os.path.join(pkg_folder, f)
+                        if os.path.isdir(full_path):
+                            shutil.rmtree(full_path, onerror=on_remove_error)
+                        else:
+                            os.remove(full_path)
+                else:
+                    # create the folder
+                    os.mkdir(pkg_folder)
+
+                # extract the new package files
+                tar.extractall(pkg_folder)
+                tar.close()
+                in_file.close()
+            self.read_task_package(pkg_name)
+            return None, False
             
 
     def passive_sync(self, pkg_name, request, phase=1):
         """
-        Generates an appropriate sync response.
+        Passively generates response to a remote sync request. The other side
+        of the synchronization can make use this response to synchronize its
+        package content with this package.
+
+        This synchronization process may take one or more times of
+        communication with the remote side. The 'phase' parameter, starting
+        from 1, specifies the phase that the invocation of this method is in.
+
+        Subclass implementators should guarantee that active_sync() and
+        passive_sync() match.
 
         @param pkg_name: the name of the task package to be updated
-        @param response: response received from the remote side
-        @param phase: which step the sync process is in
+        @param request: the request received from the remote side
+        @param phase: the phase in which invocation of this method is made
+        @return the response data
         """
         pkg = self.registry.get(pkg_name, None)
         if pkg:
-            return pkg.passive_sync(request, phase)
+            if pkg.version <> request:
+                pkg_folder = self.get_package_location(pkg.name)
+                out_file = cStringIO.StringIO()
+                tar = tarfile.open(mode='w', fileobj=out_file)
+                for f in os.listdir(pkg_folder):
+                    tar.add(os.path.join(pkg_folder, f), f)
+                tar.close()
+                diff = out_file.getvalue()
+                diff = zlib.compress(diff)
+                out_file.close()
+                return diff
+            return ''
         else:
-            # no such task package
+            # no such package
             return None
 
 
@@ -356,16 +432,16 @@ class TaskManager(Module):
 
     def read_task_package(self, pkg_name):
         # this method is slow in finding updates of tasks
-        pkg_dir = os.path.join(pydraSettings.tasks_dir, pkg_name)
         with self._lock:
+            pkg_dir = self.get_package_location(pkg_name)
             signals = []
             pkg = packaging.TaskPackage(pkg_dir)
 
             # find updates
-            if pkg.name not in self.registry:
-                signals.append('TASK_ADDED')
-            else:
-                if pkg.version <> self.registry[pkg.name].version:
+            if self.__initialized:
+                if pkg.name not in self.registry:
+                    signals.append('TASK_ADDED')
+                elif pkg.version <> self.registry[pkg.name].version:
                     signals.append('TASK_UPDATED')
 
             for key, task in pkg.tasks.iteritems():
@@ -383,11 +459,17 @@ class TaskManager(Module):
             # invoke attached task callbacks
             callbacks = self._task_callbacks.get(pkg_name, None)           
             while callbacks:
-                task_key, callback, args, kwargs = callbacks.pop()
-                callback(task_key, self.registry[pkg_name].version, *args,
+                task_key, callback, args, kwargs = callbacks.pop(0)
+                pkg = self.registry[pkg_name]
+                callback(task_key, pkg.version, pkg.tasks[task_key], *args,
                         **kwargs)
             self.emit(signal, pkg_name)
+
         return pkg
+
+
+    def get_package_location(self, pkg_name):
+        return os.path.join(self.tasks_dir, pkg_name)
 
 
     def _compute_module_search_path(self, pkg_name):
@@ -399,5 +481,4 @@ class TaskManager(Module):
         module_search_path += required_pkgs
         module_search_path += [(x + '/lib') for x in required_pkgs]
         return module_search_path, cycle
-
 

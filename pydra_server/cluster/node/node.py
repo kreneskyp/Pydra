@@ -61,7 +61,7 @@ class NodeServer(ModuleManager):
         logger.info('===== Node - Starting =====')
 
         self.modules = [
-            TaskManager,
+            #TaskManager,
             NodeInformation,
             WorkerManager,
             MasterConnectionManager,

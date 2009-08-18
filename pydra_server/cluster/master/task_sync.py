@@ -34,7 +34,10 @@ class TaskSyncServer(Module):
 
         Module.__init__(self, manager)
 
-    def sync_task(self, pkg_name, request, phase):
+    def sync_task(self, worker_key, pkg_name, request, phase):
+        """
+        A remote method for TaskSyncClient's to sync task packages
+        """
         resp = self.task_manager.passive_sync(pkg_name, request, phase)
-        return task_key, resp, phase + 1
+        return pkg_name, resp, phase + 1
 

@@ -555,11 +555,10 @@ class TaskScheduler(Module):
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
-            # get the current version of the task
-            version = self.task_manager.get_task(task_key)[1]
-            d = worker.remote.callRemote('run_task', task_key, version, args, \
-                 subtask_key, workunit_key, task_instance.main_worker, \
-                 task_instance.id)
+            pkg = self.task_manager.get_task_package(task_key)
+            d = worker.remote.callRemote('run_task', task_key, pkg.version,
+                    args, subtask_key, workunit_key, task_instance.main_worker,
+                    task_instance.id)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 

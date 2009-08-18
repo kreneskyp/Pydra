@@ -44,11 +44,17 @@ class TaskSyncClient(Module):
 
 
     def request_sync(self, pkg_name):
-        self._request_sync_internal(pkg_name, None)
+        self._request_sync_internal( (pkg_name, None, 1) )
 
 
-    def _request_sync_internal(self, pkg_name, response=None, phase=1):
+    def _request_sync_internal(self, response_tuple):
+        """
+        Internal method to send sync requests to the TaskSyncServer.
+
+        @param response_tuple: a tuple of (pkg_name, response, phase)
+        """
         # send the request to the master
+        pkg_name, response, phase = response_tuple
         request = self.task_manager.active_sync(pkg_name, response, phase)
         if request[1]:
             # still expecting a remote answer; now send the req to the master
@@ -58,5 +64,5 @@ class TaskSyncClient(Module):
             deferred.addCallback(self._request_sync_internal)
         else:
             # the task has been successfully synchronized
-            self.emit_signal('TASK_RELOAD', pkg_name)
+            self.emit('TASK_RELOAD', pkg_name)
 
