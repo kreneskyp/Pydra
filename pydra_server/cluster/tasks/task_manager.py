@@ -196,13 +196,11 @@ class TaskManager(Module):
         """
         Periodically scan the task_cache folder.
         """
-        task_dir = pydraSettings.tasks_dir
-
         old_packages = self.list_task_packages()
 
-        files = os.listdir(task_dir)
+        files = os.listdir(self.tasks_dir)
         for filename in files:
-            pkg_dir = os.path.join(task_dir, filename)
+            pkg_dir = os.path.join(self.tasks_dir, filename)
             if os.path.isdir(pkg_dir):
                 pkg = self.read_task_package(filename)
                 try:
@@ -301,17 +299,14 @@ class TaskManager(Module):
                                 callback_args, callback_kwargs) )
                 task_class = pkg.tasks.get(task_key, None)
                 if task_class and (version is None or pkg.version == version):
-                    module_search_path = [pydraSettings.tasks_dir, pkg.folder \
-                                         + '/lib']
-                    extra_path, cycle = self._compute_module_search_path(
+                    module_path, cycle = self._compute_module_search_path(
                             pkg_name)
                     if cycle:
                         errcallback(task_key, verison,
                                 'Cycle detected in dependency')
                     else:
-                        callback(task_key, version, task_class,
-                                module_search_path + extra_path, *callback_args,
-                                **callback_kwargs)
+                        callback(task_key, version, task_class, module_path,
+                                *callback_args, **callback_kwargs)
                 else:
                     # needs update
                     pkg.status = packaging.STATUS_OUTDATED
@@ -324,11 +319,11 @@ class TaskManager(Module):
         if needs_update:
             self.emit('TASK_OUTDATED', pkg_name)
             try:
-                self._task_callbacks[pkg_name].append( (task_key,
+                self._task_callbacks[pkg_name].append( (task_key, errcallback,
                             callback, callback_args, callback_kwargs) )
             except KeyError:
-                self._task_callbacks[pkg_name]= [ (task_key, callback,
-                            callback_args, callback_kwargs) ]
+                self._task_callbacks[pkg_name]= [ (task_key, errcallback,
+                        callback, callback_args, callback_kwargs) ]
 
 
     def active_sync(self, pkg_name, response=None, phase=1):
@@ -459,10 +454,15 @@ class TaskManager(Module):
             # invoke attached task callbacks
             callbacks = self._task_callbacks.get(pkg_name, None)           
             while callbacks:
-                task_key, callback, args, kwargs = callbacks.pop(0)
+                task_key, errcallback, callback, args, kwargs = callbacks.pop(0)
                 pkg = self.registry[pkg_name]
-                callback(task_key, pkg.version, pkg.tasks[task_key], *args,
-                        **kwargs)
+                module_path, cycle = self._compute_module_search_path(pkg_name)
+                if cycle:
+                    errcallback(task_key, pkg.verison,
+                            'Cycle detected in dependency')
+                else:
+                    callback(task_key, pkg.version, pkg.tasks[task_key],
+                            module_path, *args, **kwargs)
             self.emit(signal, pkg_name)
 
         return pkg
@@ -473,10 +473,11 @@ class TaskManager(Module):
 
 
     def _compute_module_search_path(self, pkg_name):
-        module_search_path = []
+        pkg_location = self.get_package_location(pkg_name)
+        module_search_path = [pkg_location, pkg_location + '/lib']
         st, cycle = graph.dfs(self.package_dependency, pkg_name)
         # computed packages on which this task depends
-        required_pkgs = [self.registry[x].folder for x in \
+        required_pkgs = [self.get_package_location(x) for x in \
                 st.keys() if  st[x] is not None]
         module_search_path += required_pkgs
         module_search_path += [(x + '/lib') for x in required_pkgs]

@@ -73,8 +73,8 @@ class WorkerTaskControls(Module):
                 workunit_key, main_worker, task_id)
         
 
-    def _run_task(self, key, version, task_class, args={}, subtask_key=None,
-            workunit_key=None, main_worker=None, task_id=None):
+    def _run_task(self, key, version, task_class, module_search_path, args={},
+            subtask_key=None, workunit_key=None, main_worker=None, task_id=None):
         """
         Runs a task on this worker
         """
