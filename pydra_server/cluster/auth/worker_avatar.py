@@ -28,15 +28,14 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
     """
     Avatar used by Workers connecting to the Master.
     """
-    def __init__(self, name, server, node):
-        self.name = name
+    def __init__(self, server, name):
         self.server = server
+        self.name = name
 
-        node_key = node.load_pub_key()
-        node_key = node_key if node_key else None
-        master_key = RSA.construct(server.pub_key) if server.pub_key else None
+        node_key = server.priv_key
+        master_key = server.priv_key
 
-        ModuleAvatar.__init__(self, server.manager._remotes['REMOTE_WORKER'])
+        ModuleAvatar.__init__(self, server.manager._remotes['WORKER'])
         RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
 

@@ -63,6 +63,7 @@ class NodeServer(ModuleManager):
             TaskManager,
             NodeInformation,
             WorkerManager,
+            WorkerConnectionManager,
             MasterConnectionManager,
             NodeZeroConfService
         ]

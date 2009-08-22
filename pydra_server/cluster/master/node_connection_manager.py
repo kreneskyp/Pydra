@@ -24,7 +24,7 @@ from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.spread import pb
 
-from pydra_server.cluster.module import Module
+from pydra_server.cluster.module import Module, ModuleReferenceable
 from pydra_server.cluster.amf.interface import authenticated
 from pydra_server.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra_server.models import Node, pydraSettings
@@ -32,6 +32,16 @@ from pydra_server.models import Node, pydraSettings
 
 import logging
 logger = logging.getLogger('root')
+
+class WorkerAvatarWrapper():
+    def __init__(self, name, node_avatar):
+        self.name = name
+        self.avatar = node_avatar
+        self.remote = self
+
+    def callRemote(self, function, *args, **kwargs):
+        return self.avatar.callRemote(function, self.name, *args, **kwargs)
+
 
 class NodeClientFactory(pb.PBClientFactory):
     """
@@ -75,7 +85,7 @@ class NodeConnectionManager(Module):
     _shared = [
         'nodes',
         'known_nodes',
-        'worker_checker',
+        'workers'
     ]
 
 
@@ -102,6 +112,7 @@ class NodeConnectionManager(Module):
 
         #cluster management
         self.nodes = self.load_nodes()
+        self.workers = {}
 
         #connection management
         self.connecting = True
@@ -174,7 +185,10 @@ class NodeConnectionManager(Module):
                     #credential = credentials.SSHPrivateKey('master', 'RSA', node.pub_key, '', '')
                     credential = credentials.UsernamePassword('master', '1234')
 
-                    deferred = factory.login(credential, client=self)
+                    # construct referenceable with remotes for NODE
+                    client =  ModuleReferenceable(self.manager._remotes['NODE'])
+
+                    deferred = factory.login(credential, client=client)
                     connections.append(deferred)
                     self.attempts.append(node)
 
@@ -307,10 +321,13 @@ class NodeConnectionManager(Module):
         #node key to be used by node and its workers
         node_key_str = '%s:%s' % (node.host, node.port)
 
-        # add all workers
+
+        # create worker avatars
         for i in range(node.cores):
             worker_key = '%s:%i' % (node_key_str, i)
-            self.worker_checker.addUser(worker_key, '1234')
+            avatar = WorkerAvatarWrapper(worker_key, node.ref)
+            self.workers[worker_key] = avatar
+            self.emit('WORKER_CONNECTED', avatar)
 
 
         # we have allowed access for all the workers, tell the node to init

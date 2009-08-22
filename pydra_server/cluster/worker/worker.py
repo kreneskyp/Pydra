@@ -53,11 +53,9 @@ class Worker(ModuleManager):
             Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
             the first worker will make requests for work to be distributed to other Nodes
     """
-    def __init__(self, master_host, master_port, node_key, worker_key):
+    def __init__(self, port, worker_key):
 
-        self.master_host = master_host
-        self.master_port = master_port
-        self.node_key = node_key
+        self.master_port = port
         self.worker_key = worker_key
 
         self.modules = [
@@ -75,10 +73,9 @@ class Worker(ModuleManager):
 if __name__ == "__main__":
     import sys
 
-    master_host = sys.argv[1]
-    master_port = int(sys.argv[2])
-    node_key    = sys.argv[3]
-    worker_key  = sys.argv[4]
 
-    worker = Worker(master_host, master_port, node_key, worker_key)
+    worker_key  = sys.argv[1]
+    port = int(sys.argv[2])
+
+    worker = Worker(port, worker_key)
     reactor.run()

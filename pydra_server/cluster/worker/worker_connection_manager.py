@@ -64,7 +64,6 @@ class WorkerConnectionManager(Module):
     _shared = [
         'worker_key',
         'master',
-        'master_host',
         'master_port',
         '_lock_connection'
     ]
@@ -77,13 +76,14 @@ class WorkerConnectionManager(Module):
 
         Module.__init__(self, manager)
 
+
         self._lock_connection = Lock()
         self.reconnect_count = 0
 
         # load crypto for authentication
         # workers use the same keys as their parent Node
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
+        #self.master_pub_key = load_crypto('./node.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
 
 
@@ -93,9 +93,9 @@ class WorkerConnectionManager(Module):
         """
         import fileinput
 
-        logger.info('worker:%s - connecting to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port))
+        logger.info('worker:%s - connecting to master @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
         factory = MasterClientFactory(self.reconnect)
-        reactor.connectTCP(self.master_host, self.master_port, factory)
+        reactor.connectTCP('localhost', self.master_port, factory)
 
         # construct referenceable with remotes for MASTER
         client =  ModuleReferenceable(self.manager._remotes['MASTER'])
@@ -123,10 +123,10 @@ class WorkerConnectionManager(Module):
             self.master = result
         self.reconnect_count = 0
 
-        logger.info('worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port))
+        logger.info('worker:%s - connected to master @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
 
         # Authenticate with the master
-        self.rsa_client.auth(result, None, self.master_pub_key)
+        self.rsa_client.auth(result, None, self.priv_key)
 
 
     def connect_failed(self, result):

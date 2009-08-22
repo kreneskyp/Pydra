@@ -112,11 +112,11 @@ class TaskScheduler(Module):
         }
 
         self._remotes = [
-            ('REMOTE_WORKER', self.request_worker),
-            ('REMOTE_WORKER', self.send_results),
-            ('REMOTE_WORKER', self.worker_stopped),
-            ('REMOTE_WORKER', self.task_failed),
-            ('REMOTE_WORKER', self.release_worker)
+            ('NODE', self.request_worker),
+            ('NODE', self.send_results),
+            ('NODE', self.worker_stopped),
+            ('NODE', self.task_failed),
+            ('NODE', self.release_worker)
         ]
 
         self._interfaces = [
@@ -832,7 +832,7 @@ class TaskScheduler(Module):
         Callback when a worker has been successfully authenticated
         """
         #request status to determine what this worker was doing
-        deferred = worker_avatar.remote.callRemote('status')
+        deferred = worker_avatar.remote.callRemote('worker_status')
         deferred.addCallback(self.worker_status_returned, worker=worker_avatar, worker_key=worker_avatar.name)
 
 

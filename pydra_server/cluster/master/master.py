@@ -73,7 +73,6 @@ class Master(ModuleManager):
         self.modules = [
             AutoDiscoveryModule,
             NodeConnectionManager,
-            WorkerConnectionManager,
             TaskManager,
             TaskScheduler,
             AMFInterface,
