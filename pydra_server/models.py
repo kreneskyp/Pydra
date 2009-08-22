@@ -34,6 +34,9 @@ try:
         port        = dbsettings.IntegerValue('port','Port this server listens on for Workers to connect to', default=18800)
         controller_port = dbsettings.IntegerValue('controller_port','Port this server listens on for Controllers', default=18801)
         tasks_dir = dbsettings.StringValue('tasks_dir', 'Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
+        tasks_dir_internal = dbsettings.StringValue('tasks_dir_internal',
+                'Internal directory where tasks are stored.  Absolute paths are
+                prefered.', default='./pydra_server/task_cache_internal')
         multicast_all    = dbsettings.BooleanValue('multicast_all', 'Automatically use all the nodes found', default=False)
     pydraSettings = PydraSettings('Pydra')
 

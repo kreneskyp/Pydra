@@ -32,7 +32,7 @@ from twisted.internet import reactor
 from threading import Lock
 
 import tarfile, cStringIO, zlib
-import os
+import os, shutil
 
 import logging
 logger = logging.getLogger('root')
@@ -69,11 +69,14 @@ class TaskManager(Module):
         self._listeners = {
             'MANAGER_INIT':self.autodiscover,
             'TASK_RELOAD':self.read_task_package,
+            'TASK_STARTED':self._task_started,
+            'TASK_STARTED':self._task_stopped,
         }
 
         Module.__init__(self, manager)
 
         self.tasks_dir = pydraSettings.tasks_dir
+        self.tasks_dir_internal = pydraSettings.tasks_dir_internal
 
         # full_task_key or pkg_name: pkg_object
         # preserved for both compatibility and efficiency
@@ -264,13 +267,25 @@ class TaskManager(Module):
                }
 
 
-    def get_task_package(self, key):
+    def get_task_package(self, key, version):
         """
         Returns the TaskPackage indexed by a specified key.
 
         @param key: either a full task key or the package name
         """
         return self.registry.get(key, None)
+
+
+    def retrieve_local_package(self, pkg_name, version=None):
+        """
+        Retrieves the local task package which contains the specified task.
+
+        An optional "version" parameter can be used to indicate the version
+        of the task package. If version is None, the up-to-date version is
+        returned. 
+        @param task_key:
+        """
+        return self.registry.get( (pkg_name, version) , None)
 
 
     def retrieve_task(self, task_key, version, callback, errcallback,
@@ -289,7 +304,7 @@ class TaskManager(Module):
         pkg_name = task_key[:task_key.find('.')]
         needs_update = False
         with self._lock:
-            pkg = self.registry.get(pkg_name, None)
+            pkg = self.registry.get( (pkg_name, version), None)
             if pkg:
                 pkg_status = pkg.status
                 if pkg_status == packaging.STATUS_OUTDATED:
@@ -312,8 +327,9 @@ class TaskManager(Module):
                     pkg.status = packaging.STATUS_OUTDATED
                     needs_update = True
             else:
-                # no local package contains the specified task key, but this
-                # does NOT mean it is an error - try synchronizing tasks first
+                # no local package contains the task with the specified
+                # version, but this does NOT mean it is an error - 
+                # try synchronizing tasks first
                 needs_update = True
 
         if needs_update:
@@ -398,7 +414,8 @@ class TaskManager(Module):
         @param phase: the phase in which invocation of this method is made
         @return the response data
         """
-        pkg = self.registry.get(pkg_name, None)
+        # always sync with the latest version
+        pkg = self.registry.get( (pkg_name, None), None)
         if pkg:
             if pkg.version <> request:
                 pkg_folder = self.get_package_location(pkg.name)
@@ -434,29 +451,39 @@ class TaskManager(Module):
 
             # find updates
             if self.__initialized:
+                updated = False
                 if pkg.name not in self.registry:
                     signals.append('TASK_ADDED')
+                    updated = True
                 elif pkg.version <> self.registry[pkg.name].version:
                     signals.append('TASK_UPDATED')
+                    updated = True
 
-            for key, task in pkg.tasks.iteritems():
-                self.registry[key] = pkg
-            self.registry[pkg.name] = pkg
-            self.package_dependency.add_vertex(pkg.name)
+                if updated:
+                    # make a copy in tasks_dir_internal
+                    internal_folder = os.path.join(self.tasks_dir_internal,
+                            pkg_name, pkg.version)
+                    shutil.copytree(pkg_dir, internal_folder)
+
             for dep in pkg.dependency:
-                if dep not in self.registry.keys():
+                for key in self.registry.keys():
+                    if key[0] == dep:
+                        break
+                else:
                     raise RuntimeError(
                             'Package %s has unresolved dependency issues: %s' %\
                             (pkg_name, dep))
                 self.package_dependency.add_edge(pkg.name, dep)
+            for key, task in pkg.tasks.iteritems():
+                self.registry[ (key, pkg.version) ] = pkg
+            self.registry[ (pkg.name, pkg.version) ] = pkg
 
         for signal in signals:
             # invoke attached task callbacks
             callbacks = self._task_callbacks.get(pkg_name, None)           
+            module_path, cycle = self._compute_module_search_path(pkg_name)
             while callbacks:
                 task_key, errcallback, callback, args, kwargs = callbacks.pop(0)
-                pkg = self.registry[pkg_name]
-                module_path, cycle = self._compute_module_search_path(pkg_name)
                 if cycle:
                     errcallback(task_key, pkg.verison,
                             'Cycle detected in dependency')
@@ -474,12 +501,22 @@ class TaskManager(Module):
 
     def _compute_module_search_path(self, pkg_name):
         pkg_location = self.get_package_location(pkg_name)
-        module_search_path = [pkg_location, pkg_location + '/lib']
+        module_search_path = [pkg_location, os.path.join(pkg_location,'lib')]
         st, cycle = graph.dfs(self.package_dependency, pkg_name)
         # computed packages on which this task depends
         required_pkgs = [self.get_package_location(x) for x in \
                 st.keys() if  st[x] is not None]
         module_search_path += required_pkgs
-        module_search_path += [(x + '/lib') for x in required_pkgs]
+        module_search_path += [os.path.join(x, 'lib') for x in required_pkgs]
         return module_search_path, cycle
+
+
+    def _task_started(self, task_key, version):
+        # record a task usage
+        pass
+
+
+    def _task_stopped(self, task_key, version):
+        # check if the task is in use, and if not, remove it
+        pass
 
