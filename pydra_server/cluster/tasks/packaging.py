@@ -59,8 +59,8 @@ STATUS_OUTDATED = 1
 
 class TaskPackage:
     
-    def __init__(self, folder):
-        self.name = None
+    def __init__(self, name, folder):
+        self.name = name
         self.dependency = [] # a list of depended package names
 
         self.status = STATUS_NORMAL
@@ -73,10 +73,6 @@ class TaskPackage:
 
     def _init(self, pkg_folder):
         if os.path.exists(pkg_folder):
-            self.name = os.path.basename(pkg_folder)
-            if self.name.find('.') != -1:
-                raise RuntimeError('Package name should not contain dots (.)')
-
             meta = _read_config(os.path.join(pkg_folder, 'META'))
             try:
                 self.dependency = meta['Dependency'].split(', \t')
@@ -122,7 +118,7 @@ class TaskPackage:
                             except:
                                 logger.error('ERROR Loading task: %s' % key)
 
-            self.version = _compute_sha1_hash(pkg_folder)
+            self.version = compute_sha1_hash(pkg_folder)
 
 
 def _read_config(meta_file_name):
@@ -144,7 +140,7 @@ def _read_config(meta_file_name):
     return meta
 
 
-def _compute_sha1_hash(folder):
+def compute_sha1_hash(folder):
     def hash_visitor(digester, dirname, names):
         for name in names:
             f = open(os.path.join(dirname, name), 'r')

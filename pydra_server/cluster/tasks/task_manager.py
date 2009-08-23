@@ -67,7 +67,7 @@ class TaskManager(Module):
         ]
 
         self._listeners = {
-            'MANAGER_INIT':self.autodiscover,
+            'MANAGER_INIT':self.init_task_cache,
             'TASK_RELOAD':self.read_task_package,
             'TASK_STARTED':self._task_started,
             'TASK_STARTED':self._task_stopped,
@@ -161,7 +161,7 @@ class TaskManager(Module):
                 last_run = None
 
             # render the form if the task has one
-            task = self.registry[key].tasks[key]
+            task = self.registry[key, None].tasks[key]
             if task.form:
                 t = loader.get_template('task_parameter_form.html')
                 c = Context ({'form':task.form()})
@@ -187,12 +187,37 @@ class TaskManager(Module):
 
         # store progress of each task in a dictionary
         for key in keys:
-            progress = self.processTaskProgress(self.registry[key])
+            progress = self.processTaskProgress(self.registry[key,
+                        None].tasks[key])
             message[key] = {
                 'status':progress
             }
 
         return message
+
+
+    def init_task_cache(self):
+        with self._lock:
+            # read task_cache_internal (this is one-time job)
+            files = os.listdir(self.tasks_dir_internal)
+            for pkg_name in files:
+                pkg_dir = os.path.join(self.tasks_dir_internal, pkg_name)
+                if os.path.isdir(pkg_dir):
+                    versions = os.listdir(pkg_dir)
+                    if len(versions) != 1:
+                        logger.error('Internal task cache is not clean!')
+                    else:
+                        v = versions[0]
+                        full_pkg_dir = os.path.join(pkg_dir, v)
+                        pkg = packaging.TaskPackage(pkg_name, full_pkg_dir)
+                        if pkg.version <> v:
+                            # verification
+                            logger.warn('Invalid package %s:%s' % (pkg_name, v))
+                        else:
+                            self._add_package(pkg)
+
+        # trigger the autodiscover procedure
+        reactor.callLater(self.scan_interval, self.autodiscover)
 
 
     def autodiscover(self):
@@ -213,9 +238,6 @@ class TaskManager(Module):
 
         for pkg_name in old_packages:
             self.emit('TASK_REMOVED', pkg_name)
-
-        if not self.__initialized:
-            self.__initialized = True
 
         reactor.callLater(self.scan_interval, self.autodiscover)
 
@@ -258,34 +280,13 @@ class TaskManager(Module):
         workunits = [workunit for workunit in task_instance.workunits.all() \
             .order_by('id')]
         task_key = task_instance.task_key
-        task = self.registry[task_key].tasks[task_key]
+        task = self.registry[task_key, None].tasks[task_key]
         return {
                     'details':task_instance,
                     'name':task.__name__,
                     'description':task.description,
                     'workunits':workunits
                }
-
-
-    def get_task_package(self, key, version):
-        """
-        Returns the TaskPackage indexed by a specified key.
-
-        @param key: either a full task key or the package name
-        """
-        return self.registry.get(key, None)
-
-
-    def retrieve_local_package(self, pkg_name, version=None):
-        """
-        Retrieves the local task package which contains the specified task.
-
-        An optional "version" parameter can be used to indicate the version
-        of the task package. If version is None, the up-to-date version is
-        returned. 
-        @param task_key:
-        """
-        return self.registry.get( (pkg_name, version) , None)
 
 
     def retrieve_task(self, task_key, version, callback, errcallback,
@@ -306,6 +307,7 @@ class TaskManager(Module):
         with self._lock:
             pkg = self.registry.get( (pkg_name, version), None)
             if pkg:
+                logger.info('FOUNDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD')
                 pkg_status = pkg.status
                 if pkg_status == packaging.STATUS_OUTDATED:
                     # package has already entered a sync process;
@@ -435,50 +437,45 @@ class TaskManager(Module):
 
 
     def list_task_keys(self):
-        return [k for k in self.registry.keys() if k.find('.') != -1]
+        return [k[0] for k in self.registry.keys() if k[0].find('.') != -1]
     
 
     def list_task_packages(self):
-        return [k for k in self.registry.keys() if k.find('.') == -1]
+        return [k[0] for k in self.registry.keys() if k[0].find('.') == -1]
 
 
     def read_task_package(self, pkg_name):
         # this method is slow in finding updates of tasks
         with self._lock:
             pkg_dir = self.get_package_location(pkg_name)
-            signals = []
-            pkg = packaging.TaskPackage(pkg_dir)
+            signal = None
+            sha1_hash = packaging.compute_sha1_hash(pkg_dir)
+            internal_folder = os.path.join(self.tasks_dir_internal,
+                    pkg_name, sha1_hash)
+            pkg = self.registry.get( (pkg_name, None), None)
+            if not pkg or pkg.version <> sha1_hash:
+                # copy this folder to tasks_dir_internal
+                try:
+                    shutil.copytree(pkg_dir, internal_folder)
+                except OSError:
+                    logger.warn('Package %s v%s already exists' % (pkg_name,
+                                sha1_hash))
+
+            pkg = packaging.TaskPackage(pkg_name, internal_folder)
 
             # find updates
-            if self.__initialized:
-                updated = False
-                if pkg.name not in self.registry:
-                    signals.append('TASK_ADDED')
-                    updated = True
-                elif pkg.version <> self.registry[pkg.name].version:
-                    signals.append('TASK_UPDATED')
-                    updated = True
+            if (pkg.name, None) not in self.registry:
+                signal = 'TASK_ADDED'
+                updated = True
+            elif pkg.version <> self.registry[pkg.name, None].version:
+                signal = 'TASK_UPDATED'
 
-                if updated:
-                    # make a copy in tasks_dir_internal
-                    internal_folder = os.path.join(self.tasks_dir_internal,
-                            pkg_name, pkg.version)
-                    shutil.copytree(pkg_dir, internal_folder)
+            self._add_package(pkg)
 
-            for dep in pkg.dependency:
-                for key in self.registry.keys():
-                    if key[0] == dep:
-                        break
-                else:
-                    raise RuntimeError(
-                            'Package %s has unresolved dependency issues: %s' %\
-                            (pkg_name, dep))
-                self.package_dependency.add_edge(pkg.name, dep)
-            for key, task in pkg.tasks.iteritems():
-                self.registry[ (key, pkg.version) ] = pkg
-            self.registry[ (pkg.name, pkg.version) ] = pkg
+            # make a copy in tasks_dir_internal
 
-        for signal in signals:
+
+        if signal:
             # invoke attached task callbacks
             callbacks = self._task_callbacks.get(pkg_name, None)           
             module_path, cycle = self._compute_module_search_path(pkg_name)
@@ -495,8 +492,32 @@ class TaskManager(Module):
         return pkg
 
 
+    def get_task_package(self, task_key):
+        return self.registry.get( (task_key, None), None)
+
+
     def get_package_location(self, pkg_name):
         return os.path.join(self.tasks_dir, pkg_name)
+
+    
+    def _add_package(self, pkg):
+        for dep in pkg.dependency:
+            for key in self.registry.keys():
+                if key[0] == dep:
+                    break
+            else:
+                raise RuntimeError(
+                        'Package %s has unresolved dependency issues: %s' %\
+                        (pkg_name, dep))
+            self.package_dependency.add_edge(pkg.name, dep)
+        self.package_dependency.add_vertex(pkg.name)
+        for key, task in pkg.tasks.iteritems():
+            self.registry[key, pkg.version] = pkg
+            self.registry[key, None] = pkg
+        self.registry[pkg.name, pkg.version] = pkg
+
+        # mark this package as the latest one
+        self.registry[pkg.name, None] = pkg
 
 
     def _compute_module_search_path(self, pkg_name):

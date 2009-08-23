@@ -26,6 +26,18 @@ class DirectedGraph:
             self.adjacency_lists[vertex] = []
 
 
+    def remove_vertex(self, vertex):
+        try:
+            del self.adjacency_lists[vertex]
+            for l in self.adjacency_lists.values():
+                try:
+                    l.remove(vertex)
+                except ValueError:
+                    pass
+        except KeyError:
+            pass
+
+
     def add_vertices(self, vertices):
         for vertex in vertices:
             self.add_vertex(vertex)
