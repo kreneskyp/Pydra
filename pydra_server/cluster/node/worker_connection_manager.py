@@ -47,13 +47,16 @@ class WorkerConnectionManager(Module):
 
     _shared = [
         'workers',
-        'info'
+        'info',
+        'worker_connection_manager'
     ]
 
     def __init__(self, manager):
         self._services = [self.get_worker_service]
         self._listeners = {'NODE_INITIALIZED':self.enable_workers}
         Module.__init__(self, manager)
+
+        self.worker_connection_manager = self
 
         #locks
         self._lock = Lock() #general lock, use when multiple shared resources are touched
@@ -111,9 +114,6 @@ class WorkerConnectionManager(Module):
         """
         Callback from worker_avatar when it is disconnected
         """
-        with self._lock:
-            del self.workers[worker]
-
         self.emit('WORKER_DISCONNECTED', worker)
         
 

@@ -26,8 +26,20 @@ logger = logging.getLogger('root')
 
 class WorkerAvatar(ModuleAvatar, RSAAvatar):
     """
-    Avatar used by Workers connecting to the Master.
+    Class representing Workers for a Node.  This class encapsulates everything
+    about a worker process and task.  It also contains all functions that the
+    Worker is capable of calling
     """
+    popen = None        # popen instance for controlling worker system process
+    key = None          # 
+    args = None         # Task arguments
+    subtask_key = None  # key to subtask worker is assigned to
+    workunit_key = None # key to workunit worker is assigned to
+    main_worker = None  # worker_key of mainworker for this task
+    task_id = None      # unique identifier of Task this worker is assigned to
+    run_task_deferred = None
+    remote = None
+
     def __init__(self, server, name):
         self.server = server
         self.name = name

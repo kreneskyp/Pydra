@@ -19,6 +19,8 @@
 from __future__ import with_statement
 from threading import Lock
 
+from twisted.internet import reactor
+
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import ParallelTask
@@ -175,6 +177,7 @@ class WorkerTaskControls(Module):
                 if self.master:
                     deferred = self.master.callRemote("stopped")
                     deferred.addErrback(self.send_stopped_failed)
+
                 else:
                     self.__stop_flag = True
 
@@ -184,6 +187,7 @@ class WorkerTaskControls(Module):
             with self._lock_connection:
                 if self.master:
                     deferred = self.master.callRemote("send_results", results, workunit_key)
+                    deferred.addCallback(self.send_successful)
                     deferred.addErrback(self.send_results_failed, results, workunit_key)
 
                 # master disapeared, hold results until it requests them
@@ -221,7 +225,7 @@ class WorkerTaskControls(Module):
             if self.master:
                 # reconnected, just resend the call.  The call is recursive from this point
                 # if by some odd chance it disconnects again while sending
-                logger.error('results failed to send by master is still here')
+                logger.error('[%s] results failed to send but Node is still here' % self.worker_key)
                 #deferred = self.master.callRemote("send_results", task_results, task_results)
                 #deferred.addErrback(self.send_results_failed, task_results, task_results)
 
@@ -251,6 +255,15 @@ class WorkerTaskControls(Module):
                 #nope really isn't connected.  set flag.  even if connection is in progress
                 #this thread has the lock and reconnection cant finish till we release it
                 self.__stop_flag = True
+
+
+    def send_successful(self, results):
+        """
+        Generic callback for when send methods are successful.  This method
+        cleans up and shuts down the worker
+        """
+        self.emit('WORKER_FINISHED')
+        reactor.stop()
 
 
     def task_status(self):

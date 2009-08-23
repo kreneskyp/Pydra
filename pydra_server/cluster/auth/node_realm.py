@@ -36,7 +36,7 @@ class NodeRealm:
     def requestAvatar(self, avatarID, mind, *interfaces):
         assert pb.IPerspective in interfaces
 
-        avatar = WorkerAvatar(self.server, avatarID)
+        avatar = self.server.workers[avatarID]
         avatar.attached(mind)
         logger.info('worker:%s - connected' % avatarID)
 

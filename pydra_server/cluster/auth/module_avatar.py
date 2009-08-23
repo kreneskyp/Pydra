@@ -81,4 +81,4 @@ class ModuleAvatar(pb.Avatar):
                 logger.error('Avatar [%s] tried to call non-existant function: %s' % (self.name, key[12:]))
                 raise Exception('Avatar [%s] tried to call non-existant function: %s' % (self.name, key[12:]))
 
-        return pb.Avatar.__getattr__(key)
+        return pb.Avatar.__dict__[key]
