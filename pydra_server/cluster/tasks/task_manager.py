@@ -307,7 +307,6 @@ class TaskManager(Module):
         with self._lock:
             pkg = self.registry.get( (pkg_name, version), None)
             if pkg:
-                logger.info('FOUNDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD')
                 pkg_status = pkg.status
                 if pkg_status == packaging.STATUS_OUTDATED:
                     # package has already entered a sync process;
