@@ -116,7 +116,7 @@ class TaskScheduler(Module):
             ('NODE', self.send_results),
             ('NODE', self.worker_stopped),
             ('NODE', self.task_failed),
-            ('NODE', self.release_worker)
+            ('NODE', self.request_worker_release)
         ]
 
         self._interfaces = [
@@ -690,20 +690,15 @@ class TaskScheduler(Module):
 
         if job and task_instance:
             if subtask_key:
-                print 'WORK_UNIT!'
-                try:
-                    work_unit = WorkUnit()
-                    work_unit.task_instance = task_instance
-                    work_unit.subtask_key = subtask_key
-                    work_unit.workunit_key = job.workunit_key
-                    work_unit.args = simplejson.dumps(job.args)
-                    work_unit.started = datetime.now()
-                    work_unit.worker = worker_key
-                    work_unit.status = STATUS_RUNNING
-                    work_unit.save()
-                    print 'SAVED!!'
-                except Exception, e:
-                    print e
+                work_unit = WorkUnit()
+                work_unit.task_instance = task_instance
+                work_unit.subtask_key = subtask_key
+                work_unit.workunit_key = job.workunit_key
+                work_unit.args = simplejson.dumps(job.args)
+                work_unit.started = datetime.now()
+                work_unit.worker = worker_key
+                work_unit.status = STATUS_RUNNING
+                work_unit.save()
                 job.model = work_unit
 
             else:
@@ -803,7 +798,7 @@ class TaskScheduler(Module):
         self.add_worker(worker_key, STATUS_CANCELLED)
 
 
-    def release_worker(self, worker_key):
+    def request_worker_release(self, worker_key):
         """
         Release a worker held by the worker calling this function.
 
@@ -813,18 +808,20 @@ class TaskScheduler(Module):
 
         # select the best worker to release.  For now just release the first
         # worker in the waiting worker list
-
-        released_worker = None
+        logger.debug('[%s] request worker release' % worker_key)
+        released_worker_key = None
         job = self._worker_mappings.get(worker_key, None)
         if job:
             task_instance = self._active_tasks.get(job.root_task_id, None)
             if task_instance:
-                released_worker = task_instance.waiting_workers.pop()
+                released_worker_key = task_instance.waiting_workers.pop()
 
-        if released_worker:
+        if released_worker_key:
             logger.debug('Task %s - releasing worker: %s' % \
-                    (worker_key, released_worker))
-            self.add_worker(released_worker)
+                    (worker_key, released_worker_key))
+            worker = self.workers[released_worker_key]
+            worker.remote.callRemote('release_worker')
+            self.add_worker(released_worker_key)
 
 
     def worker_connected(self, worker_avatar):

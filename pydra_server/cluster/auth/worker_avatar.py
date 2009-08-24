@@ -30,15 +30,17 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
     about a worker process and task.  It also contains all functions that the
     Worker is capable of calling
     """
-    popen = None        # popen instance for controlling worker system process
-    key = None          # 
-    args = None         # Task arguments
-    subtask_key = None  # key to subtask worker is assigned to
-    workunit_key = None # key to workunit worker is assigned to
-    main_worker = None  # worker_key of mainworker for this task
-    task_id = None      # unique identifier of Task this worker is assigned to
-    run_task_deferred = None
-    remote = None
+    popen = None         # popen instance for controlling worker system process
+    key = None           # 
+    args = None          # Task arguments
+    subtask_key = None   # key to subtask worker is assigned to
+    local_subtask = None # key of subtask being run locally on the main worker
+    workunit_key = None  # key to workunit worker is assigned to
+    main_worker = None   # worker_key of mainworker for this task
+    task_id = None       # unique identifier of Task this worker is assigned to
+    run_task_deferred = None # defered set if run_task must be delayed
+    remote = None        # remote referenceable object
+    finished = False     # flag indicating this worker is finished and stopping
 
     def __init__(self, server, name):
         self.server = server

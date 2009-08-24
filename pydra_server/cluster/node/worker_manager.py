@@ -33,7 +33,7 @@ logger = logging.getLogger('root')
 
 class WorkerManager(Module):
 
-    _shared = ['master', 'workers','worker_connection_manager']
+    _shared = ['master', 'workers', 'worker_connection_manager']
 
     def __init__(self, manager):
         self._remotes = [
@@ -46,6 +46,8 @@ class WorkerManager(Module):
             ('MASTER', self.worker_status),
             ('MASTER', self.task_status),
             ('MASTER', self.receive_results),
+            ('MASTER', self.receive_results),
+            ('MASTER', self.release_worker),
 
             # master proxy - functions exposed to the workers that are passed
             # through to the Master
@@ -53,7 +55,7 @@ class WorkerManager(Module):
             ('WORKER', self.request_worker),
             ('WORKER', self.worker_stopped),
             ('WORKER', self.task_failed),
-            ('WORKER', self.release_worker)
+            ('WORKER', self.request_worker_release)
 
         ]
 
@@ -139,12 +141,16 @@ class WorkerManager(Module):
         return self.proxy_to_worker('receive_results', *args, **kwargs)
 
 
-    def release_worker(self, *args, **kwargs):
-        return self.proxy_to_master('release_worker', *args, **kwargs)
+    def release_worker(self, master, *args, **kwargs):
+        return self.proxy_to_worker('release_worker', *args, **kwargs)
 
 
-    def request_worker(*args, **kwargs):
+    def request_worker(self, *args, **kwargs):
         return self.proxy_to_master('request_worker', *args, **kwargs)
+
+
+    def request_worker_release(self, *args, **kwargs):
+        return self.proxy_to_master('request_worker_release', *args, **kwargs)
 
 
     def run_task(self, avatar, worker_key, key, args={},
@@ -167,7 +173,7 @@ class WorkerManager(Module):
                 # worker exists.  reuse it.
                 logger.debug('RunTask - Using worker %s' % worker_key)
                 worker = self.workers[worker_key]
-                worker.deferred = worker.remote.callRemote('run_task', \
+                worker.run_task_deferred = worker.remote.callRemote('run_task',\
                         key, args, subtask_key, workunit_key, \
                         main_worker, task_id)
             else:
@@ -186,25 +192,29 @@ class WorkerManager(Module):
 
             worker.key = key
             worker.args = args
-            worker.subtask_key = subtask_key
             worker.workunit_key = workunit_key
             worker.main_worker = main_worker
             worker.task_id=task_id
+            if worker_key == main_worker:
+                worker.local_subtask = subtask_key
+            else:
+                worker.subtask_key = subtask_key
 
             return worker.run_task_deferred
 
 
-    def run_task_delayed(self, worker_avatar):
+    def run_task_delayed(self, worker):
         """
         Callback when a worker has started.  start the intended task.  Attach
         the deferred originally returned in run_task to the deferred returned
         from worker.run_task.  This will cause the result to propagate through
         the deferreds back to master.
-        """        
-        w = self.workers[worker_avatar.name]
-        deferred = self.run_task(None, w.worker_key, w.key, w.args, \
-                    w.subtask_key, w.workunit_key, w.main_worker, w.task_id)
-        deferred.addCallback(w.run_task_deferred.callback)
+        """ 
+        sent_deferred = worker.run_task_deferred
+        deferred = self.run_task(None, worker.worker_key, worker.key, \
+                    worker.args, worker.subtask_key, worker.workunit_key, \
+                    worker.main_worker, worker.task_id)
+        deferred.addCallback(sent_deferred.callback)
 
 
     def send_results(self, worker_key, results, *args, **kwargs):
@@ -220,14 +230,20 @@ class WorkerManager(Module):
         with self.__lock:
             worker = self.workers[worker_key]
 
-            if worker.main_worker == worker_key:
+            if worker.main_worker == worker_key and not worker.local_subtask:
                 del self.workers[worker_key]
                 worker.finished = True
+            else:
+                # worker may be reused to clear all args to avoid confusion
+                worker.subtask_key = None
+                worker.local_subtask = None
 
             deferred = self.proxy_to_master('send_results', worker_key, \
                                                 results, *args, **kwargs)
             worker.results = results
             # deferred.addErrback(self.send_results_failed, worker)
+
+        return worker.finished
 
 
     def send_results_failed(self, worker):

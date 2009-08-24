@@ -19,7 +19,7 @@
 from __future__ import with_statement
 from threading import Lock
 
-from twisted.internet import reactor
+from twisted.internet import reactor, threads
 
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
@@ -48,6 +48,7 @@ class WorkerTaskControls(Module):
             ('MASTER', self.status),
             ('MASTER', self.task_status),
             ('MASTER', self.receive_results),
+            ('MASTER', self.release_worker),
             ('MASTER', self.return_work)
         ]
 
@@ -62,7 +63,7 @@ class WorkerTaskControls(Module):
         self.__workunit_key = None
         self.__local_workunit_key = None
         self.__local_task_instance = None
-        
+
 
     def run_task(self, key, args={}, subtask_key=None, workunit_key=None, \
         main_worker=None, task_id=None):
@@ -262,8 +263,8 @@ class WorkerTaskControls(Module):
         Generic callback for when send methods are successful.  This method
         cleans up and shuts down the worker
         """
-        self.emit('WORKER_FINISHED')
-        reactor.stop()
+        if (results):
+            self.shutdown()
 
 
     def task_status(self):
@@ -281,16 +282,16 @@ class WorkerTaskControls(Module):
         logger.info('Worker:%s - received REMOTE results for: %s' % (self.worker_key, subtask_key))
         subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
         subtask.parent._work_unit_complete(results, workunit_key)
-        
+
 
     def release_worker(self):
-        """
-        Function called by Main Workers to release a worker.  This does not
-        specify which worker to release because the main worker does not know
-        which worker is optimal to release if there is a choice.
-        """
-        self.master.callRemote('release_worker')
+        threads.deferToThread(self.shutdown)
 
+
+    def shutdown(self):
+        logger.debug('[%s] Released, shutting down' % self.worker_key)
+        self.emit('WORKER_FINISHED')
+        reactor.stop()
 
     def request_worker(self, subtask_key, args, workunit_key):
         """
@@ -298,6 +299,15 @@ class WorkerTaskControls(Module):
         """
         logger.info('Worker:%s - requesting worker for: %s' % (self.worker_key, subtask_key))
         deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
+
+
+    def request_worker_release(self):
+        """
+        Function called by Main Workers to release a worker.  This does not
+        specify which worker to release because the main worker does not know
+        which worker is optimal to release if there is a choice.
+        """
+        self.master.callRemote('request_worker_release')
 
 
     def return_work(self, subtask_key, workunit_key):
