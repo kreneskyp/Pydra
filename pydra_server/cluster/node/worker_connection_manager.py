@@ -106,7 +106,6 @@ class WorkerConnectionManager(Module):
         """
         with self._lock:
             self.workers[worker_avatar.name] = worker_avatar
-
         self.emit('WORKER_CONNECTED', worker_avatar)
 
 
@@ -114,6 +113,9 @@ class WorkerConnectionManager(Module):
         """
         Callback from worker_avatar when it is disconnected
         """
+        with self._lock:
+            if worker.name in self.workers:
+                del self.workers[worker.name]
         self.emit('WORKER_DISCONNECTED', worker)
         
 

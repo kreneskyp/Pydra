@@ -66,5 +66,5 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
         """
         logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
-            self.server.worker_disconnected(self.name)
+            self.server.worker_disconnected(self)
         self.remote = None
