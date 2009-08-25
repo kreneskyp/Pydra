@@ -60,7 +60,8 @@ class WorkerManager(Module):
         ]
 
         self._listeners = {
-            'WORKER_CONNECTED':self.run_task_delayed
+            'WORKER_CONNECTED':self.run_task_delayed,
+            'WORKER_DISCONNECTED':self.clean_up_finished_worker
         }
 
         Module.__init__(self, manager)
@@ -69,6 +70,18 @@ class WorkerManager(Module):
         self.workers = {}
         self.workers_finishing = []
         self.initialized = False
+
+
+    def clean_up_finished_worker(self, worker):
+        """
+        Called when workers disconnect.  When a worker shuts itself down it
+        becomes a zombie process (defunct) and while it does not use resources
+        it does exist in the process table.  Just to keep things nice and tidy
+        this function will kill any worker that disconnected and has the
+        finished flag set
+        """
+        if worker.finished:
+            worker.popen.wait()
 
 
     def init_node(self, avatar_name, master_host, master_port, node_key):
@@ -95,7 +108,6 @@ class WorkerManager(Module):
         """
         with self.__lock:
             worker = self.workers[worker_key]
-
             logger.debug('Stopping %s with %s' % \
                         (worker_key, 'SIGKILL' if kill else 'SIGTERM'))
 
@@ -113,7 +125,9 @@ class WorkerManager(Module):
                 else:
                     os.system('kill %s' % worker.popen.pid)
 
-            del self.workers[worker_key]
+            if worker.name in self.workers:
+                worker.finished = True
+                del self.workers[worker_key]
 
 
     def proxy_to_master(self, remote, worker, *args, **kwargs):
