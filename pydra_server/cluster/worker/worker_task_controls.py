@@ -64,6 +64,9 @@ class WorkerTaskControls(Module):
         self.__local_workunit_key = None
         self.__local_task_instance = None
 
+        # shutdown tracking
+        self.__pending_releases = 0
+        self.__pending_shutdown = False
 
     def run_task(self, key, args={}, subtask_key=None, workunit_key=None, \
         main_worker=None, task_id=None):
@@ -264,7 +267,7 @@ class WorkerTaskControls(Module):
         cleans up and shuts down the worker
         """
         if (results):
-            self.shutdown()
+            threads.deferToThread(self.shutdown)
 
 
     def task_status(self):
@@ -285,13 +288,23 @@ class WorkerTaskControls(Module):
 
 
     def release_worker(self):
+        """
+        called be the Node/Master to inform this worker that it is released
+        and may shutdown
+        """
         threads.deferToThread(self.shutdown)
 
 
     def shutdown(self):
+        with self._lock:
+            if self.__pending_releases:
+                self.__pending_shutdown = True
+                return
+
         logger.debug('[%s] Released, shutting down' % self.worker_key)
         self.emit('WORKER_FINISHED')
         reactor.stop()
+
 
     def request_worker(self, subtask_key, args, workunit_key):
         """
@@ -307,7 +320,20 @@ class WorkerTaskControls(Module):
         specify which worker to release because the main worker does not know
         which worker is optimal to release if there is a choice.
         """
-        self.master.callRemote('request_worker_release')
+        with self._lock:
+            self.__pending_releases += 1
+            deferred = self.master.callRemote('request_worker_release')
+            deferred.addCallback(self.release_request_successful)
+
+
+    def release_request_successful(self, results):
+        """
+        A worker release request was successful
+        """
+        with self._lock:
+            self.__pending_releases -= 1
+            if self.__pending_shutdown and self.__pending_releases == 0:
+                threads.deferToThread(self.shutdown)
 
 
     def return_work(self, subtask_key, workunit_key):
