@@ -140,11 +140,13 @@ class WorkerTaskControls(Module):
 
     def stop_task(self):
         """
-        Stops the current task
+        Stops the current task and any local workunits
         """
         logger.info('%s - Received STOP command' % self.worker_key)
         if self.__task_instance:
             self.__task_instance._stop()
+            if self.__local_task_instance:
+                self.__local_task_instance._stop()
 
 
     def status(self):
@@ -166,7 +168,7 @@ class WorkerTaskControls(Module):
         """
         Callback that is called when a job is run in non_blocking mode.
         """
-        if local:    
+        if local:
             workunit_key = self.__local_workunit_key
             task_instance = self.__local_task_instance
             self.__local_workunit_key = None
@@ -176,7 +178,8 @@ class WorkerTaskControls(Module):
             self.__workunit_key = None
 
         if task_instance.STOP_FLAG:
-            #stop flag, this task was canceled.
+            # If stop flag is set for either the main task or local task
+            # then ignore any results and stop the task
             with self._lock_connection:
                 if self.master:
                     deferred = self.master.callRemote("worker_stopped")
@@ -281,11 +284,14 @@ class WorkerTaskControls(Module):
 
     def receive_results(self, worker_key, results, subtask_key, workunit_key):
         """
-        Function called to make the subtask receive the results processed by another worker
+        Function called to make the subtask receive the results processed by
+        another worker.  This call is ignored if STOP flag is already set.
         """
-        logger.info('Worker:%s - received REMOTE results for: %s' % (self.worker_key, subtask_key))
-        subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
-        subtask.parent._work_unit_complete(results, workunit_key)
+        if not self.__task_instance.STOP_FLAG:
+            logger.info('Worker:%s - received REMOTE results for: %s' % \
+                                            (self.worker_key, subtask_key))
+            subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
+            subtask.parent._work_unit_complete(results, workunit_key)
 
 
     def release_worker(self):
