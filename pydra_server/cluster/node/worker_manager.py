@@ -111,7 +111,7 @@ class WorkerManager(Module):
             logger.debug('Stopping %s with %s' % \
                         (worker_key, 'SIGKILL' if kill else 'SIGTERM'))
 
-            # python >= 2.6 required for Popen.kill()
+            # python >= 2.6 required for Popen.kill() and Popen.terminate()
             if 'kill' in Popen.__dict__:
                 if kill:
                     worker.popen.kill()
@@ -309,13 +309,14 @@ class WorkerManager(Module):
         with self.__lock:
             if worker_id in self.workers:
                 return self.proxy_to_worker('status', worker_id)
-
             else:
                 return (WORKER_STATUS_IDLE,)
 
 
-    def worker_stopped(self, *args, **kwargs):
-        self.proxy_to_master('worker_stopped', *args, **kwargs)
+    def worker_stopped(self, worker, *args, **kwargs):
+        with self.__lock:
+            self.workers[worker].finished = True
+        self.proxy_to_master('worker_stopped', worker, *args, **kwargs)
         return 1
 
 
