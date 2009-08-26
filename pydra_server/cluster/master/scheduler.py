@@ -201,49 +201,41 @@ class TaskScheduler(Module):
         return task_instance
 
 
-    def cancel_task_new(self, root_task_id):
+    def cancel_task(self, task_id):
         """
-        Cancels a task either in the ltq or in the stq.
-
-        Returns True if the specified task is found in the queue and is
-        successfully removed, and False otherwise.
-
-        This method does NOT release the workers held by the cancelled task. So
-        BE CAUTIOUS to use this method on a task in the stq because that task
-        may hold unreleased workers. To safely cancel a task in the stq (i.e.,
-        already running), one has to (via the master interface) stop all the
-        workers which are working on the task. Scheduler.add_worker() will
-        handle the rest. So the advice is to only use this method to cancel a
-        running task in case that it does not release workers after being
-        notified to stop.
+        Cancel a task. Used to cancel a task that was scheduled.
+        If the task is in the queue still, remove it.  If it is running then
+        send signals to all workers assigned to it to stop work immediately.
         """
-        try:
-            with self._queue_lock:
-                found = False
-                # find the task in the ltq
-                length = len(self._long_term_queue)
-                for i in range(0, length):
-                    if self._long_term_queue[i][1] == root_task_id:
-                        del self._long_term_queue[i]
+        task_id = int(task_id)
+        with self._queue_lock:
+            found = False
+            # find the task in the ltq
+            for i in range(len(self._long_term_queue)):
+                if self._long_term_queue[i][1] == task_id:
+                    logger.debug('Cancelling Task in LTQ: %s' % task_id)
+                    del self._long_term_queue[i]
+                    found = True
+                    break
+            else:
+                for i in range(len(self._short_term_queue)):
+                    if self._short_term_queue[i][1] == task_id:
+                        logger.debug('Cancelling Task in STQ: %s' % task_id)
+                        del self._short_term_queue[i]
                         found = True
+                        for worker_key in self.get_workers_on_task(task_id):
+                            worker = self.workers[worker_key]
+                            logger.debug('Signalling Stop: %s' % worker_key)
+                            worker.remote.callRemote('stop_task')
                         break
-                else:
-                    length = len(self._long_term_queue)
-                    for i in range(0, length):
-                        if self._long_term_queue[i][1] == root_task_id:
-                            del self._long_term_queue[i]
-                            found = True
-                            # XXX release the workers held by this task?
-                            break
 
-                if found:
-                    task_instance = self._active_tasks.pop(root_task_id)
-                    task_instance.status = STATUS_CANCELLED
-                    task_instance.completed = datetime.now()
-                    task_instance.save()
-                return True
-        except ValueError:
-            return False
+            if found:
+                task_instance = self._active_tasks.pop(task_id)
+                task_instance.status = STATUS_CANCELLED
+                task_instance.completed = datetime.now()
+                task_instance.save()
+
+        return 1
 
 
     def add_worker(self, worker_key, task_status=None):
@@ -652,26 +644,6 @@ class TaskScheduler(Module):
     
 
 
-    def cancel_task(self, task_id):
-        """
-        Cancel a task.  This function is used to cancel a task that was scheduled. 
-        If the task is in the queue still, remove it.  If it is running then
-        send signals to all workers assigned to it to stop work immediately.
-        """
-        logger.info('Cancelling Task: %s' % task_id)
-        task_instance = self.get_task_instance(task_id)
-        if self.cancel_task_new(task_id):
-            #was still in queue
-            logger.debug('Cancelling Task, was in queue: %s' % task_id)
-        else:
-            logger.debug('Cancelling Task, is running: %s' % task_id)
-            #get all the workers to stop
-            for worker_key in self.get_workers_on_task(task_id):
-                worker = self.workers[worker_key]
-                logger.debug('signalling worker to stop: %s' % worker_key)
-                worker.remote.callRemote('stop_task')
- 
-        return 1
 
 
     def run_task_failed(self, results, worker_key):

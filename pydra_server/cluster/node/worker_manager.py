@@ -315,6 +315,7 @@ class WorkerManager(Module):
 
 
     def worker_stopped(self, *args, **kwargs):
-        return self.proxy_to_master('worker_stopped', *args, **kwargs)
+        self.proxy_to_master('worker_stopped', *args, **kwargs)
+        return 1
 
 

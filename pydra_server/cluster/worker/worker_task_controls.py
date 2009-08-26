@@ -179,7 +179,8 @@ class WorkerTaskControls(Module):
             #stop flag, this task was canceled.
             with self._lock_connection:
                 if self.master:
-                    deferred = self.master.callRemote("stopped")
+                    deferred = self.master.callRemote("worker_stopped")
+                    deferred.addCallback(self.send_successful)
                     deferred.addErrback(self.send_stopped_failed)
 
                 else:
