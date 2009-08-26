@@ -228,13 +228,6 @@ class TaskScheduler(Module):
                             logger.debug('Signalling Stop: %s' % worker_key)
                             worker.remote.callRemote('stop_task')
                         break
-
-            if found:
-                task_instance = self._active_tasks.pop(task_id)
-                task_instance.status = STATUS_CANCELLED
-                task_instance.completed = datetime.now()
-                task_instance.save()
-
         return 1
 
 
