@@ -28,6 +28,7 @@ from twisted.internet import reactor, threads
 
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import *
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.constants import *
 from pydra_server.models import TaskInstance, WorkUnit
 from pydra_server.util import deprecated
@@ -100,7 +101,6 @@ class TaskScheduler(Module):
         'workers',
         '_idle_workers',
         '_active_workers',
-        'registry'
     ]    
 
     def __init__(self, manager):
@@ -118,6 +118,10 @@ class TaskScheduler(Module):
             ('NODE', self.task_failed),
             ('NODE', self.request_worker_release)
         ]
+
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
 
         self._interfaces = [
             self.task_statuses,
@@ -153,6 +157,7 @@ class TaskScheduler(Module):
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
+        self._active_workers = []
         self._worker_mappings = {}  # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
 
@@ -535,9 +540,10 @@ class TaskScheduler(Module):
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
-            d = worker.remote.callRemote('run_task', task_key, args, \
-                 subtask_key, workunit_key, task_instance.main_worker, \
-                 task_instance.id)
+            pkg = self.task_manager.get_task_package(task_key)
+            d = worker.remote.callRemote('run_task', task_key, pkg.version,
+                    args, subtask_key, workunit_key, task_instance.main_worker,
+                    task_instance.id)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 

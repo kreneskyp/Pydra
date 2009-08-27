@@ -110,6 +110,15 @@ class ModuleManager(object):
             if isinstance(module,(InterfaceModule,)):
                 self.register_interface_module(module)          
 
+        # adding friends
+        for module in self._modules:
+            if hasattr(module, '_friends'):
+                for friend_name, friend_class  in module._friends.iteritems():
+                    for module_again in self._modules:
+                        # inefficient, but have to
+                        if module_again.__class__ == friend_class:
+                            module.__dict__[friend_name] = module_again
+
 
     def emit_signal(self, signal, *args, **kwargs):
         """

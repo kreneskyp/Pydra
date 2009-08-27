@@ -24,6 +24,7 @@ from twisted.internet import reactor, threads
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
 from pydra_server.cluster.tasks import ParallelTask
+from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.logging import get_task_logger
 
 # init logging
@@ -35,7 +36,6 @@ class WorkerTaskControls(Module):
 
     _shared = [
         'worker_key',
-        'registry',
         'master',
         '_lock_connection',
     ]
@@ -51,6 +51,10 @@ class WorkerTaskControls(Module):
             ('MASTER', self.release_worker),
             ('MASTER', self.return_work)
         ]
+
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
 
         Module.__init__(self, manager)
 
@@ -68,11 +72,19 @@ class WorkerTaskControls(Module):
         self.__pending_releases = 0
         self.__pending_shutdown = False
 
-    def run_task(self, key, args={}, subtask_key=None, workunit_key=None, \
-        main_worker=None, task_id=None):
+    def run_task(self, key, version, args={}, subtask_key=None, workunit_key=None, \
+            main_worker=None, task_id=None):
+        self.task_manager.retrieve_task(key, version,
+                self._run_task, self.retrieve_task_failed, args, subtask_key,
+                workunit_key, main_worker, task_id)
+
+
+    def _run_task(self, key, version, task_class, module_search_path, args={},
+            subtask_key=None, workunit_key=None, main_worker=None, task_id=None):
         """
         Runs a task on this worker
         """
+        logger.info(task_class)
         logger.info('[%s] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
             % (self.worker_key, key, args, subtask_key, workunit_key, \
             main_worker))
@@ -119,7 +131,7 @@ class WorkerTaskControls(Module):
 
         # Create task instance and start it
         if run_local:
-            self.__local_task_instance = object.__new__(self.registry[key])
+            self.__local_task_instance = object.__new__(task_class)
             self.__local_task_instance.__init__()
             self.__local_task_instance.parent = self
             self.__local_task_instance.logger = get_task_logger( \
@@ -129,7 +141,7 @@ class WorkerTaskControls(Module):
 
         else:
             #create an instance of the requested task
-            self.__task_instance = object.__new__(self.registry[key])
+            self.__task_instance = object.__new__(task_class)
             self.__task_instance.__init__()
             self.__task_instance.parent = self
             self.__task_instance.logger = get_task_logger(self.worker_key, \
@@ -360,4 +372,8 @@ class WorkerTaskControls(Module):
         recursive task key generation function.  This stops the recursion
         """
         return None    
+
+
+    def retrieve_task_failed(self, task_key, version, err):
+        pass
 
