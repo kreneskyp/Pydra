@@ -31,7 +31,8 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
     Worker is capable of calling
     """
     popen = None         # popen instance for controlling worker system process
-    key = None           # 
+    key = None           # Key that identifies task
+    version = None       # version of task package containing task
     args = None          # Task arguments
     subtask_key = None   # key to subtask worker is assigned to
     local_subtask = None # key of subtask being run locally on the main worker

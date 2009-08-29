@@ -39,10 +39,6 @@ from pydra_server.cluster.module import ModuleManager
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 
-# TaskSyncClient will eventually migrate to the node
-from pydra_server.cluster.node.task_sync import TaskSyncClient
-
-
 # init logging
 import settings
 from pydra_server.logging.logger import init_logging
@@ -64,7 +60,6 @@ class Worker(ModuleManager):
             TaskManager,
             WorkerConnectionManager,
             WorkerTaskControls,
-            TaskSyncClient,
         ]
 
         ModuleManager.__init__(self)

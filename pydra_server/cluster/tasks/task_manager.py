@@ -216,8 +216,8 @@ class TaskManager(Module):
                         else:
                             self._add_package(pkg)
 
-        # trigger the autodiscover procedure
-        reactor.callLater(self.scan_interval, self.autodiscover)
+        # trigger the autodiscover procedure immediately
+        reactor.callLater(0, self.autodiscover)
 
 
     def autodiscover(self):

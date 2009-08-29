@@ -24,8 +24,9 @@ from threading import RLock
 from twisted.internet.defer import Deferred
 
 from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
-from pydra_server.cluster.module import Module
 from pydra_server.cluster.constants import *
+from pydra_server.cluster.module import Module
+from pydra_server.cluster.tasks.task_manager import TaskManager
 
 import logging
 logger = logging.getLogger('root')
@@ -58,6 +59,10 @@ class WorkerManager(Module):
             ('WORKER', self.request_worker_release)
 
         ]
+
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
 
         self._listeners = {
             'WORKER_CONNECTED':self.run_task_delayed,
@@ -167,8 +172,22 @@ class WorkerManager(Module):
         return self.proxy_to_master('request_worker_release', *args, **kwargs)
 
 
-    def run_task(self, avatar, worker_key, key, args={},
-        subtask_key=None, workunit_key=None, main_worker=None, task_id=None):
+    def retrieve_task_failed(self, *args, **kwargs):
+        pass
+
+
+    def run_task(self, avatar, worker_key, key, version, args={}, \
+            subtask_key=None,workunit_key=None, main_worker=None, task_id=None):
+
+        self.task_manager.retrieve_task(key, version, self._run_task, \
+                self.retrieve_task_failed, \
+                worker_key, args, subtask_key, \
+                workunit_key, main_worker, task_id)
+
+
+    def _run_task(self, key, version, task_class, module_search_path, \
+            worker_key, args={}, subtask_key=None, workunit_key=None, \
+            main_worker=None, task_id=None):
         """
         Runs a task on this node.  The worker scheduler on master makes all
         decisions about which worker to run on.  This method only checks
@@ -205,6 +224,7 @@ class WorkerManager(Module):
                 self.workers[worker_key] = worker
 
             worker.key = key
+            worker.version = version
             worker.args = args
             worker.workunit_key = workunit_key
             worker.main_worker = main_worker
@@ -225,9 +245,9 @@ class WorkerManager(Module):
         the deferreds back to master.
         """ 
         sent_deferred = worker.run_task_deferred
-        deferred = self.run_task(None, worker.worker_key, worker.key, \
-                    worker.args, worker.subtask_key, worker.workunit_key, \
-                    worker.main_worker, worker.task_id)
+        deferred = self._run_task(worker.key, worker.version, None, None, \
+                worker.worker_key, worker.args, worker.subtask_key, \
+                worker.workunit_key, worker.main_worker, worker.task_id)
         deferred.addCallback(sent_deferred.callback)
 
 
