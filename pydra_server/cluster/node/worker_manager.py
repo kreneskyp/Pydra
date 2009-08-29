@@ -178,7 +178,6 @@ class WorkerManager(Module):
 
     def run_task(self, avatar, worker_key, key, version, args={}, \
             subtask_key=None,workunit_key=None, main_worker=None, task_id=None):
-
         self.task_manager.retrieve_task(key, version, self._run_task, \
                 self.retrieve_task_failed, \
                 worker_key, args, subtask_key, \
@@ -207,7 +206,7 @@ class WorkerManager(Module):
                 logger.debug('RunTask - Using worker %s' % worker_key)
                 worker = self.workers[worker_key]
                 worker.run_task_deferred = worker.remote.callRemote('run_task',\
-                        key, args, subtask_key, workunit_key, \
+                        key, version, args, subtask_key, workunit_key, \
                         main_worker, task_id)
             else:
                 # worker not running. start it saving the information required

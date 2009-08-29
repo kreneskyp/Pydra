@@ -25,7 +25,7 @@ class TaskSyncServer(Module):
     def __init__(self, manager):
 
         self._remotes = [
-            ('REMOTE_WORKER', self.sync_task),
+            ('NODE', self.sync_task),
         ]
 
         self._friends = {
@@ -34,7 +34,7 @@ class TaskSyncServer(Module):
 
         Module.__init__(self, manager)
 
-    def sync_task(self, worker_key, pkg_name, request, phase):
+    def sync_task(self, pkg_name, request, phase):
         """
         A remote method for TaskSyncClient's to sync task packages
         """

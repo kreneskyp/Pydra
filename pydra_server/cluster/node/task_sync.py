@@ -58,7 +58,7 @@ class TaskSyncClient(Module):
         request = self.task_manager.active_sync(pkg_name, response, phase)
         if request[1]:
             # still expecting a remote answer; now send the req to the master
-            deferred = self.master.callRemote('sync_task', pkg_name, request[0],
+            deferred = self.master.remote.callRemote('sync_task', pkg_name, request[0],
                     phase)
             # using self as a callback
             deferred.addCallback(self._request_sync_internal)
