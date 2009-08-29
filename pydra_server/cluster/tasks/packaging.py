@@ -15,36 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-This module provides functionalities related to task packaging (ticket #74).
 
-Each task, presented by a runnable item in the web UI, corresponds to a folder
-in the task_cache directory. Such a folder is called a task package. A task
-package is a self-contained unit, which includes the task definition itself
-and other 3rd-party libraries that it depends on.
-
-== Structure of the package folder ==
-The structure of a task package typically looks like:
-
-- lib
-  + lib1_folder
-  + lib2_folder
-- task_def1.py
-- task_def2.py
-- META
-
-where the "lib" folder contains depended modules, task_def1.py and task_def2.py
-contains code defining tasks, and META is a text file describing the meta
-information of this package.
-
-There can be more than one tasks in a task package. To obtain a list of them,
-the logic is to iterate over all the .py files at the root level of the package,
-and then to find all classes derived from Task.
-
-== Format of the META descriptor ==
-Depends = <pkg_name1>, <pkg_name2>, ...
-
-"""
 
 import os, sys, inspect
 import hashlib
@@ -58,6 +29,35 @@ STATUS_NORMAL = 0
 STATUS_OUTDATED = 1
 
 class TaskPackage:
+    """
+    This module provides functionalities related to task packaging (ticket #74).
+
+    Each task, presented by a runnable item in the web UI, corresponds to a folder
+    in the task_cache directory. Such a folder is called a task package. A task
+    package is a self-contained unit, which includes the task definition itself
+    and other 3rd-party libraries that it depends on.
+
+    == Structure of the package folder ==
+    The structure of a task package typically looks like:
+
+    - lib
+      + lib1_folder
+      + lib2_folder
+    - task_def1.py
+    - task_def2.py
+    - META
+
+    where the "lib" folder contains depended modules, task_def1.py and task_def2.py
+    contains code defining tasks, and META is a text file describing the meta
+    information of this package.
+
+    There can be more than one tasks in a task package. To obtain a list of them,
+    the logic is to iterate over all the .py files at the root level of the package,
+    and then to find all classes derived from Task.
+
+    == Format of the META descriptor ==
+    Depends = <pkg_name1>, <pkg_name2>,    
+    """
     
     def __init__(self, name, folder):
         self.name = name
@@ -72,6 +72,13 @@ class TaskPackage:
 
 
     def _init(self, pkg_folder):
+        """
+        Init this package by reading the folder passed in.  The directory name
+        may be as the user defines it.  Or it may be a directory name that
+        specifies the hash of the package.
+
+        @pkg_folder directory containing tasks.
+        """
         if os.path.exists(pkg_folder):
             meta = _read_config(os.path.join(pkg_folder, 'META'))
             try:
@@ -122,6 +129,9 @@ class TaskPackage:
 
 
 def _read_config(meta_file_name):
+    """
+    Reads options from the META config file.
+    """
     meta = {}
     try:
         mfile = open(meta_file_name, 'r')
@@ -141,8 +151,11 @@ def _read_config(meta_file_name):
 
 
 def compute_sha1_hash(folder):
+    """
+    Computes the hash of all files in the task directory.
+    """
     def hash_visitor(digester, dirname, names):
-        for name in names:
+        for name in filter(lambda x: not x.endswith('.pyc'), names):
             f = open(os.path.join(dirname, name), 'r')
             digester.update(f.read())
             f.close()
