@@ -16,25 +16,21 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth import authenticate, login
-from django.shortcuts import render_to_response
-from django.template import RequestContext
-from django.http import HttpResponseRedirect
-from django.core.paginator import Paginator, InvalidPage, EmptyPage
-from django.utils import simplejson
-from django.http import HttpResponse
-
-
 import math
 
-from pydra_server.models import Node, TaskInstance, pydraSettings
-from cluster.amf.controller import AMFController, ControllerException
-from forms import NodeForm
-from models import pydraSettings
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import user_passes_test
+from django.core.paginator import Paginator, InvalidPage, EmptyPage
+from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import render_to_response
+from django.template import RequestContext
+from django.utils import simplejson
 import settings
 
+from pydra_server.cluster.amf.controller import AMFController, ControllerException
+from pydra_server.forms import NodeForm
+from pydra_server.models import Node, TaskInstance, pydraSettings
+from pydra_server.models import pydraSettings
 
 """
 pydraController is a global variable that stores an instance of a Controller.
@@ -212,6 +208,24 @@ def task_history(request):
     }, context_instance=c)
 
 
+def task_history_detail(request):
+    c = RequestContext(request, processors=[pydra_processor,
+            settings_processor])
+
+    error = None
+    id = request.GET['id']
+    try:
+        detail = pydra_controller.remote_task_history_detail(id)
+    except ControllerException, e:
+        history = None
+        error = e.code
+
+    return render_to_response('task_history_detail.html', {
+        'task': detail,
+        'controller_error': error
+    }, context_instance=c)
+
+
 def task_progress(request):
     """
     Handler for retrieving status 
@@ -244,7 +258,7 @@ def run_task(request):
     }, [pydra_processor])
 
     try:
-        response = simplejson.dumps(pydra_controller.remote_run_task(key, args))
+        response = simplejson.dumps(pydra_controller.remote_queue_task(key, args))
     except ControllerException, e:
         response = e.code
 

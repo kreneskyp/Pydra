@@ -92,15 +92,16 @@ class Task(object):
 
         #if this was subtask find it and execute just that subtask
         if subtask_key:
-            logger.debug('Task - starting subtask %s' % (subtask_key))
+            logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
             split = subtask_key.split('.')
             subtask = self.get_subtask(split)
-            logger.debug('Task - got subtask')
+            subtask.logger = self.logger
+            logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
             self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
 
         #else this is a normal task just execute it
         else:
-            logger.debug('Task - starting task: %s' % self)
+            logger.debug('[%s] Task - starting task: %s' % (self.get_worker().worker_key,self))
             self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
         if errback:
@@ -168,10 +169,10 @@ class Task(object):
         self._status = STATUS_COMPLETE
 
         if self.__callback:
-            logger.debug('%s - Task._work() -Making callback' % self)
+            logger.debug('[%s] %s - Task._work() -Making callback' % (self.get_worker().worker_key, self))
             self.__callback(results, **self._callback_args)
         else:
-            logger.warning('%s - Task._work() - NO CALLBACK TO MAKE: %s' % (self, self.__callback))
+            logger.warning('[%s] %s - Task._work() - NO CALLBACK TO MAKE: %s' % (self.get_worker().worker_key, self, self.__callback))
 
 
 

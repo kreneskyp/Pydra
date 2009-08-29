@@ -193,7 +193,7 @@
                                 // what is worker doing
                                 if (worker[1] != -1 && worker[2] != -1) {
                                     // worker is working on subtask
-                                    $task.html(worker[1]+':'+worker[2]);
+                                    $task.html(worker[1]+':'+worker[2] +  ' ('+worker[3]+')');
                                     workers_busy += 1;
                                 } else if (worker[1] != -1) {
                                     // worker is working on task

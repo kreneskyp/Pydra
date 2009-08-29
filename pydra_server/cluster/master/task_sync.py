@@ -17,15 +17,27 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from django.conf.urls.defaults import *
-from django.contrib import admin
+from pydra_server.cluster.module import Module
+from pydra_server.cluster.tasks.task_manager import TaskManager
 
-admin.autodiscover()
+class TaskSyncServer(Module):
 
+    def __init__(self, manager):
 
-urlpatterns = patterns('',
-    (r'^', include('pydra_web.urls')),
-    (r'^admin/(.*)', admin.site.root),
-    (r'^settings/', include('dbsettings.urls')),
+        self._remotes = [
+            ('NODE', self.sync_task),
+        ]
 
-)
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
+
+        Module.__init__(self, manager)
+
+    def sync_task(self, pkg_name, request, phase):
+        """
+        A remote method for TaskSyncClient's to sync task packages
+        """
+        resp = self.task_manager.passive_sync(pkg_name, request, phase)
+        return pkg_name, resp, phase + 1
+

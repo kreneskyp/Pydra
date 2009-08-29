@@ -18,7 +18,7 @@
 """
 
 from __future__ import with_statement
-from threading import Thread, Lock
+from threading import Thread, RLock
 from twisted.internet import reactor, threads
 
 from pydra_server.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
@@ -32,21 +32,30 @@ class ParallelTask(Task):
     ParallelTask - is a task that can be broken into discrete work units
     """
     _lock = None                # general lock
-    _available_workers = 1      # number of workers available to this task
+    #_available_workers = 1      # number of workers available to this task
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
+    _workunit_total = 0
+    _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
     subtask = None              # subtask that is parallelized
     subtask_key = None          # cached key from subtask
 
     def __init__(self, msg=None):
         Task.__init__(self, msg)
-        self._lock = Lock()
+        self._lock = RLock()
 
     def __setattr__(self, key, value):
         Task.__setattr__(self, key, value)
         if key == 'subtask':
             value.parent = self
+
+    def work_complete(self):
+        """
+        Method stub for method called to post process completion of task.  This
+        must be overridden by users for their task specific work
+        """
+        pass
 
 
     def work_unit_complete(self, workunit, results):
@@ -67,7 +76,10 @@ class ParallelTask(Task):
         A parallel task's progress is a derivitive of its workunits:
            COMPLETE_WORKUNITS / TOTAL_WORKUNITS
         """
-        return -1
+        total = self._workunit_completed + len(self._data) + \
+            len(self._data_in_progress)
+
+        return 100 * self._workunit_completed  / total
 
 
     def _stop(self):
@@ -86,30 +98,13 @@ class ParallelTask(Task):
         # save data, if any
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
-            logger.debug('Paralleltask - data was passed in!')
+            self._workunit_total = len(data)
+            logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
 
-        self.subtask_key = self.subtask._generate_key()
+        # request initial workers
+        self._request_workers()
 
-        logger.debug('Paralleltask - getting count of available workers')
-        self._available_workers = self.get_worker().available_workers
-        logger.debug('Paralleltask - starting, workers available: %i' % self._available_workers)
-
-
-        # if theres more than one worker assign values
-        # this check is required for cases where this is run
-        # on a single core machine.  in that case this worker
-        # is the only worker that exists
-        if self._available_workers > 1:
-            #assign initial set of work to other workers
-            for i in range(1, self._available_workers):
-                logger.debug('Paralleltask - trying to assign worker %i' % i)
-                self._assign_work()
-
-        #start a work_unit locally
-        #reactor.callLater(1, self._assign_work_local)
-        self._assign_work(True)
-
-        logger.debug('Paralleltask - initial work assigned')
+        logger.debug('[%s] Paralleltask - initial work assigned' % self.get_worker().worker_key)
 
 
     def get_subtask(self, task_path):
@@ -126,22 +121,20 @@ class ParallelTask(Task):
         return self.subtask.get_subtask(task_path)
 
 
-    def _assign_work(self, local=False):
+    def _request_workers(self):
         """
-        assign a unit of work to a Worker by requesting a worker from the compute cluster
-        """
+        Requests workers to process workunits
+    
+        expand all the work units eagerly. the master will handles these
+        worker requests. other task implementations (like MapReduceTask) may
+        employ a more sophisticated mechanism that allows dependence between
+        work units.
+        """        
         data, index = self.get_work_unit()
-        if not data == None:
-            if local:
-                logger.debug('Paralleltask - starting work locally')
-                self.subtask.start({'data':data}, callback=self._work_unit_complete, callback_args={'index':index, 'local':True})
-
-            else:
-                logger.debug('Paralleltask - assigning remote work')
-                self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
-
-        else:
-            logger.debug('Paralleltask - no workunits retrieved, idling')
+        while data is not None:
+            logger.debug('[%s] Paralleltask - assigning remote work: key=%s, args=%s' % (self.get_worker().worker_key, data, index))
+            self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
+            data, index = self.get_work_unit()
 
 
     def get_work_unit(self):
@@ -152,12 +145,12 @@ class ParallelTask(Task):
 
         This method *MUST* lock while it is altering the lists of data
         """
-        logger.debug('Paralleltask - getting a workunit')
+        logger.debug('[%s] Paralleltask - getting a workunit' % self.get_worker().worker_key)
         data = None
         with self._lock:
 
             #grab from the beginning of the list
-            if len(self._data):
+            if len(self._data) != 0:
                 data = self._data.pop(0)
             else:
                 return None, None
@@ -166,19 +159,19 @@ class ParallelTask(Task):
 
             #remove from _data and add to in_progress
             self._data_in_progress[self._workunit_count] = data
-        logger.debug('Paralleltask - got a workunit: %s %s' % (data, self._workunit_count))
+        logger.debug('[%s] Paralleltask - got a workunit: %s %s' % (self.get_worker().worker_key, data, self._workunit_count))
 
         return data, self._workunit_count;
 
 
-    def _work_unit_complete(self, results, index, local=False):
+    def _work_unit_complete(self, results, index):
         """
         A work unit completed.  Handle the common management tasks to remove the data
         from in_progress.  Also call task specific work_unit_complete(...)
 
         This method *MUST* lock while it is altering the lists of data
         """
-        logger.debug('Paralleltask - Work unit completed, local=%s' % local)
+        logger.debug('[%s] Paralleltask - Work unit completed' % self.get_worker().worker_key)
         with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
@@ -190,27 +183,32 @@ class ParallelTask(Task):
             if self.STOP_FLAG:
                 self.task_complete(None)
 
+            # process any new work requests
+            self._request_workers()
+
+            # no data left in progress, release 1 worker.  If there is work in
+            # the queue the waiting worker will be selected automatically by
+            # the scheduler.  Releasing it must be explicit though.
+            if not self._data_in_progress:
+                logger.debug('[%s] ParallelTask - releasing a worker' % self.get_worker().worker_key)
+                self.get_worker().request_worker_release()
+
+            self._workunit_completed += 1
+
             #check for more work
-            if not (len(self._data_in_progress) or len(self._data)):
+            if not (self._data_in_progress or self._data):
                 #all work is done, call the task specific function to combine the results 
-                logger.debug('Paralleltask - all workunits complete, calling task post process')
+                logger.debug('[%s] Paralleltask - all workunits complete, calling task post process' % self.get_worker().worker_key)
                 results = self.work_complete()
                 self._complete(results)
                 return
-
-        # start another work unit.  its possible there is only 1 unit left and multiple
-        # workers completing at the same time reaching this call.  _assign_work() 
-        # will handle the locking.  It will cause some threads to fail to get work but
-        # that is expected.  to lock here would require a reentrant lock which is slower
-        logger.debug('Paralleltask - still has more work: %s :  %s' % (len(self._data), len(self._data_in_progress)))
-        self._assign_work(local)
 
 
     def _worker_failed(self, index):
         """
         A worker failed while working.  re-add the data to the list
         """
-        logger.warning('Paralleltask - Worker failure during workunit')
+        logger.warning('[%s] Paralleltask - Worker failure during workunit' % self.get_worker().worker_key)
         with self._lock:
 
             #remove data from in progress

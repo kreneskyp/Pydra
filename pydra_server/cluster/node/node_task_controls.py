@@ -16,16 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from pydra_server.cluster.module import Module
 
-from django.conf.urls.defaults import *
-from django.contrib import admin
-
-admin.autodiscover()
-
-
-urlpatterns = patterns('',
-    (r'^', include('pydra_web.urls')),
-    (r'^admin/(.*)', admin.site.root),
-    (r'^settings/', include('dbsettings.urls')),
-
-)
+# after refactoring master-node relationship, this module will resemble
+# the current worker_task_controls module

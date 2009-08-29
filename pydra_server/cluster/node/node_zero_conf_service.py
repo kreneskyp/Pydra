@@ -17,15 +17,31 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from django.conf.urls.defaults import *
-from django.contrib import admin
+import platform
+from pydra_server.cluster.module import Module
+from pydra_server.util.zero_conf_service import ZeroConfService
 
-admin.autodiscover()
+class NodeZeroConfService(Module):
+    """
+    Module that publishes the node port using ZeroConfService (avahi)
+    """
+
+    _shared = [
+        'port',
+        'host'
+    ]
+
+    def __init__(self, manager):
+
+        self._listeners = {
+            '':self.start_service
+        }
+
+        Module.__init__(self, manager)
 
 
-urlpatterns = patterns('',
-    (r'^', include('pydra_web.urls')),
-    (r'^admin/(.*)', admin.site.root),
-    (r'^settings/', include('dbsettings.urls')),
-
-)
+    def start_service(self):
+        
+        self.service = ZeroconfService(name=platform.node(), port=self.port,
+            stype="_pydra._tcp")
+        self.service.publish()

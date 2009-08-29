@@ -17,15 +17,16 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from django.conf.urls.defaults import *
-from django.contrib import admin
+class AttributeWrapper():
+    """
+    Wrapper for attributes that are exposed to the interface.  The wrapper
+    is a callable that turns the attribute into a function that returns
+    the attribute
+    """    
 
-admin.autodiscover()
+    def __call__(self, *args, **kwargs):
+        return self.module.__dict__[self.attribute]
 
-
-urlpatterns = patterns('',
-    (r'^', include('pydra_web.urls')),
-    (r'^admin/(.*)', admin.site.root),
-    (r'^settings/', include('dbsettings.urls')),
-
-)
+    def __init__(self, module, attribute):
+       self.module = module
+       self.attribute = attribute 

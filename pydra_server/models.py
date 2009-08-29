@@ -16,11 +16,12 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from __future__ import with_statement
 
 from django.db import models
+from threading import Lock
 
 import dbsettings
-from dbsettings.loading import set_setting_value
 
 
 """ ================================
@@ -33,6 +34,7 @@ try:
         port        = dbsettings.IntegerValue('port','Port this server listens on for Workers to connect to', default=18800)
         controller_port = dbsettings.IntegerValue('controller_port','Port this server listens on for Controllers', default=18801)
         tasks_dir = dbsettings.StringValue('tasks_dir', 'Directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache')
+        tasks_dir_internal = dbsettings.StringValue('tasks_dir_internal', 'Internal directory where tasks are stored.  Absolute paths are prefered.', default='./pydra_server/task_cache_internal')
         multicast_all    = dbsettings.BooleanValue('multicast_all', 'Automatically use all the nodes found', default=False)
     pydraSettings = PydraSettings('Pydra')
 
@@ -46,10 +48,11 @@ except ProgrammingError:
 Models
 ================================ """
 
-"""
- Represents a node in the cluster
-"""
+
 class Node(models.Model):
+    """
+    Represents a node in the cluster
+    """
     host            = models.CharField(max_length=255)
     port            = models.IntegerField(default=11890)
     cores_available = models.IntegerField(null=True)
@@ -105,22 +108,36 @@ class Node(models.Model):
 
             return  pub_key_obj
 
-"""
-Custom manager overridden to supply pre-made queryset for queued and running tasks
-"""
+
 class TaskInstanceManager(models.Manager):
+    """
+    Custom manager overridden to supply pre-made queryset for queued and running
+    tasks
+    """
     def queued(self):
-        return self.filter(completion_type=None, started=None)
+        return self.filter(status=None, started=None)
 
     def running(self):
-        return self.filter(completion_type=None).exclude(started=None)
+        return self.filter(status=None).exclude(started=None)
 
 
-"""
-Represents and instance of a Task.  This is used to track when a Task was run
-and whether it completed.
-"""
+
 class TaskInstance(models.Model):
+    """
+    Represents and instance of a Task.  This is used to track when a Task was 
+    run and whether it completed.
+
+    task_key:      Key that identifies the code to be run
+    subtask_key:   Path within the task that identifies the child task to run
+    args:          Dictionary of arguments passed to the task
+    queued:        Datetime when this task instance was queued
+    started:       Datetime when this task instance was started
+    completed:     Datetime when this task instance completed successfully or 
+                   failed
+    worker:        Identifier for the worker that ran this task
+    status:        Current Status of the task instance
+    log_retrieved: Was the logfile retrieved from the remote worker
+    """
     task_key        = models.CharField(max_length=255)
     subtask_key     = models.CharField(max_length=255, null=True)
     args            = models.TextField(null=True)
@@ -128,12 +145,103 @@ class TaskInstance(models.Model):
     started         = models.DateTimeField(null=True)
     completed       = models.DateTimeField(null=True)
     worker          = models.CharField(max_length=255, null=True)
-    completion_type = models.IntegerField(null=True)
+    status          = models.IntegerField(null=True)
+    log_retrieved   = models.BooleanField(default=False)
 
     objects = TaskInstanceManager()
+
+    ######################
+    # non-model attributes
+    ######################
+
+    # scheduling-related
+    priority         = 5
+    running_workers  = [] # running workers keys (excluding the main worker)
+    waiting_workers  = [] # workers waiting for more workunits
+    last_succ_time   = None # when this task last time gets a worker
+    _worker_requests = [] # (args, subtask_key, workunit_key)
+
+    # others
+    main_worker  = None
+    _request_lock = Lock()
+
+    def compute_score(self):
+        """
+        Computes a priority score for this task, which will be used by the
+        scheduler.
+
+        Empirical analysis may reveal a good calculation formula. But in
+        general, the following guideline is useful:
+        1) Stopped tasks should have higher scores. At least for the current
+           design, a task can well proceed even with only one worker. So 
+           letting a stopped task run ASAP makes sense.
+        2) A task with higher priority should obviously have a higher score.
+        3) A task that has been out of worker supply for a long time should
+           have a relatively higher score.
+        """
+        return self.priority 
+
+    def queue_worker_request(self, request):
+        """
+        A worker request is a tuple of:
+        (requesting_worker_key, args, subtask_key, workunit_key).
+        """
+        with self._request_lock:
+            self._worker_requests.append(request)
+
+    def pop_worker_request(self):
+        """
+        A worker request is a tuple of:
+        (requesting_worker_key, args, subtask_key, workunit_key).
+        """
+        with self._request_lock:
+            try:
+                return self._worker_requests.pop(0)
+            except IndexError:
+                return None
+
+    def poll_worker_request(self):
+        """
+        Returns the first worker request in the queue without removing
+        it.
+        """
+        with self._request_lock:
+            try:
+                return self._worker_requests[0]
+            except IndexError:
+                return None
 
     class Meta:
         permissions = (
             ("can_run", "Can run tasks on the cluster"),
             ("can_stop_all", "Can stop anyone's tasks")
         )
+
+
+class WorkUnit(models.Model):
+    """
+    Workunits are subtask requests that can be distributed by pydra.  A
+    workunit is generally the smallest unit of work for a task.  This
+    model represents key data points about them.
+
+    subtask_key:   Path within the task that identifies the child task to run
+    workunit_key:  key that uniquely identifies this workunit within the 
+                   datasource for the task.
+    args:          Dictionary of arguments passed to the task
+    started:       Datetime when this workunit was started
+    completed:     Datetime when this workunit completed successfully or 
+                   failed
+    worker:        Identifier for the worker that ran this workunit
+    status:        Current Status of the task instance
+    log_retrieved: Was the logfile retrieved from the remote worker
+    """
+    task_instance   = models.ForeignKey(TaskInstance, related_name='workunits')
+    subtask_key     = models.CharField(max_length=255)
+    workunit_key    = models.CharField(max_length=255)
+    args            = models.TextField(null=True)
+    started         = models.DateTimeField(null=True)
+    completed       = models.DateTimeField(null=True)
+    worker          = models.CharField(max_length=255, null=True)
+    status          = models.IntegerField(null=True)
+    log_retrieved   = models.BooleanField(default=False)
+

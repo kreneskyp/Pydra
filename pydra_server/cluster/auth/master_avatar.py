@@ -18,11 +18,12 @@
 """
 
 from rsa_auth import RSAAvatar
+from pydra_server.cluster.auth.module_avatar import ModuleAvatar
 
 import logging
 logger = logging.getLogger('root')
 
-class MasterAvatar(RSAAvatar):
+class MasterAvatar(ModuleAvatar, RSAAvatar):
     """
     Avatar that exposes and controls what a Master can do on this Node
     """
@@ -34,16 +35,11 @@ class MasterAvatar(RSAAvatar):
         node_pub_key = server.pub_key if server.pub_key else None
         self.master_key = server.master_pub_key if server.master_pub_key else None
 
-        RSAAvatar.__init__(self, node_key, node_pub_key, self.master_key, save_key=self.save_key)
+        ModuleAvatar.__init__(self, server.manager._remotes['MASTER'])
+        RSAAvatar.__init__(self, node_key, node_pub_key, self.master_key, server.master_authenticated, save_key=self.save_key)
+
         logger.info('Master connected to node')
 
-
-    def perspective_get_key(self):
-        """
-        Return the node's public key, so we can do a duplicate detection on the
-        master side
-        """
-        return self.chunks()
 
     def save_key(self, json_key):
         """
@@ -81,18 +77,3 @@ class MasterAvatar(RSAAvatar):
     def perspective_status(self):
         if self.authenticated:
             pass
-
-
-    # Returns a dictionary of useful information about this node
-    def perspective_info(self):
-        if self.authenticated:
-            return self.server.info
-
-
-    def perspective_init(self, master_host, master_port, node_key):
-        """
-        Initializes a node.  The server sends its connection information and
-        credentials for the node
-        """
-        if self.authenticated:
-            return self.server.init_node(master_host, master_port, node_key)
