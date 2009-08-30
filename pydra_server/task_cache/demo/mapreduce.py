@@ -56,8 +56,8 @@ class CountWords(MapReduceTask):
             #    }),
             #'sql': DatasourceSQL(user='pydra', passwd='pydra',
             #    host='192.168.56.1', db='mapreduce'),
-            'dir': DatasourceDir(dir='/mnt/shared/in'),
-            'dir_i9e': DatasourceDir(dir='/mnt/shared/i9e'),
+            'dir': DatasourceDir(dir='/var/lib/pydra/mapreduce/in'),
+            'dir_i9e': DatasourceDir(dir='/var/lib/pydra/mapreduce/i9e'),
             }
 
     #input = datasources['dict']

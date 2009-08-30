@@ -58,7 +58,8 @@ class IntermediateResults(object):
       one and only one reduce task.
 
     reduce stage:
-    * __iter__() returns an iterator, which generates input keys for each partition;
+    * __iter__() returns an iterator, which generates input keys for each
+      partition;
     * load() returns iterator which is used as a input iterator
       for a reduce task (subslicers);
     * iterator loads (key, values) tuples from a backend.
@@ -176,9 +177,6 @@ class MapReduceTask(Task):
     map = None
     reduce = None
 
-    intermediate = IntermediateResultsFiles
-    intermediate_kwargs = {'dir': None }
-
     reducers = 1
 
     description = "Abstract Map-Reduce Task"
@@ -188,6 +186,7 @@ class MapReduceTask(Task):
 
     def __init__(self, msg=None):
         Task.__init__(self, msg)
+        self.__lock = Lock()
         self.map_tasks = {}
         self.reduce_tasks = {}
 
@@ -197,59 +196,31 @@ class MapReduceTask(Task):
 
         self.maptask = MapWrapper(self.map('MapTask'), self.im, self)
 
-        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im, self)
+        self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im,self)
 
         for src in self.datasources.itervalues():
             src.connect()
 
 
-    def map_callback(self, result, mapid=None, local=False):
-        """called on a map task completion"""
-
-        logger.debug('   map_callback %s: %s' % (mapid, result))
-        self.im.update_partitions(result)
-
-        try:
-            del self.map_tasks[mapid]
-        except KeyError:
-            logger.debug('   map_callback: no such task -> %s' % mapid)
-
-        # more work?
-        self.map_next(local)
-
-
-    def reduce_callback(self, result, reduceid=None, local=False):
-        """called on a reduce task completion"""
-
-        logger.debug('   reduce_callback %s: %s' % (reduceid, result))
-        self.output.update(result)
-
-        try:
-            del self.reduce_tasks[reduceid]
-        except KeyError:
-            logger.debug('   reduce_callback: no such task -> %s' % reduceid)
-
-        # more work?
-        self.reduce_next(local)
-
-
     def _start(self, args, callback, callback_args={}):
         """overridden to prevent early cleanup.
         
-        MapReduceTask does not implement work() and don't expect user to provide its own. Instead it requires user to provide map and reduce attributes which should be classes derived from MapTask and ReduceTask respectively.
+        MapReduceTask does not implement work() and doesn't expect user to
+        provide its own. Instead it requires user to provide map and reduce
+        attributes which should be classes derived from MapTask and ReduceTask
+        respectively.
 
-        Cleanup is in _complete() which will be called when there is no more work remaining.
+        Cleanup is in _complete() which will be called when there is no more
+        work remaining.
         map:
-        * work(): initialization and calling map_next() for every worker available;
+        * work(): initialization and calling map_next() for every worker
+          available;
         * map_next(): checking if any data to process and starting a map task,
           if no more data available, call reduce_stage();
-        * map_callback(): updating results (partition) and calling map_next() for more work.
         
         reduce:
-        * reduce_stage: calling reduce_next() for every worker available;
-        * reduce_next(): checking if any data to process and starting a reduce task,
-          if no more data available, call _complete();
-        * reduce_callback(): updating results (output) and calling reduce_next() for more work.
+        * reduce_next(): checking if any data to process and starting a reduce
+          task, if no more data available, call _complete();
 
         _complete:
         * cleanup and callbacks.
@@ -259,127 +230,106 @@ class MapReduceTask(Task):
         self._callback_args = callback_args
 
         self._status = STATUS_RUNNING
-
         self._reduce_called = False
-        self._complete_called = False
-
-        # XXX we use current worker
-        self._available_workers = self.get_worker().available_workers
         self._input_iter = enumerate(self.input)
 
         # let's start the processing
         logger.debug('mapreduce: map stage')
 
-        if self._available_workers > 1 and self.sequential is False:
-            for i in range(1, self._available_workers):
-                self.map_next(local=False)
+        self.request_work()
 
-        self.map_next(local=True)
+    def request_work(self):
+        """
+        Sends work requests to the master.  This function will send either
+        Map requests or Reduce requests depending on what work remains.
+        """
+        if not self._reduce_called:
+            while self.map_next():
+                pass
+
+        if not self.map_tasks:
+            if not self._reduce_called:
+                self._partition_iter = enumerate(self.im)
+                self._reduce_called = True
+
+            while self.reduce_next():
+                pass
 
 
-    def map_next(self, local=False):
+    def map_next(self):
         """more work for a map task"""
-
         try:
             id, i = self._input_iter.next()
         except StopIteration:
-            # call reduce stage
-            if not self._reduce_called:
-                self._reduce_called = True
-                self.reduce_stage()
-
-            return
+            return False
 
         mapid = 'map%d' % id
         self.map_tasks[mapid] = 1
-
-        logger.debug('   starting maptask: %s' % mapid)
         map_args = {
                     'id': mapid,
                     'input_key': i,
                    }
 
-        if self.sequential:
-            self.maptask._start(args=map_args, callback=self.map_callback,
-                                            callback_args={'mapid': mapid})
-        else:
-            if local: # XXX orginal worker is to run computations as well, or schedule only?
-                logger.debug("mapreduce: running locally %s" % mapid)
-                self.maptask.start(args=map_args, callback=self.map_callback,
-                                    callback_args={'mapid': mapid, 'local': local})
-            else:
-                logger.debug("mapreduce: requesting worker for %s: %s"
-                        % (mapid, self.maptask.get_key()) )
-                self.parent.request_worker(self.maptask.get_key(), map_args, mapid)
+        logger.debug("mapreduce: requesting worker for %s: %s"
+                % (mapid, self.maptask.get_key()) )
+        self.parent.request_worker(self.maptask.get_key(), map_args, mapid)
+
+        return True
 
 
-    def reduce_stage(self):
-        """starting a reduce stage"""
-
-        if self.map_tasks:
-            logger.debug('mapreduce: waiting for map stage to finish')
-            reactor.callLater(1, self.reduce_stage)
-            return
-
-
-        self._partition_iter = enumerate(self.im)
-
-        logger.debug('mapreduce: reduce stage')
-
-        if self._available_workers > 1 and self.sequential is False:
-            for i in range(1, self._available_workers):
-                self.reduce_next(local=False)
-
-        self.reduce_next(local=True)
-
-
-    def reduce_next(self, local=False):
+    def reduce_next(self):
         """more work for reduce task"""
 
         try:
             id, p = self._partition_iter.next()
         except StopIteration:
-            # call task complete (final stage)
-            if not self._complete_called:
-                self._complete_called = True
-                self._complete()
-
-            return
-
+            return False
 
         reduceid = 'reduce%d' % id
         self.reduce_tasks[reduceid] = 1
-
-        logger.debug('   starting reducetask: %s' % reduceid)
         reduce_args = {
                         'partition': p,
                       }
 
-        if self.sequential:
-            self.reducetask._start(args=reduce_args, callback=self.reduce_callback,
-                                callback_args={'reduceid': reduceid})
-        else:
-            if local: # XXX orginal worker is to run computations as well, or schedule only?
-                logger.debug("mapreduce: running locally %s" % reduceid)
-                self.reducetask.start(args=reduce_args, callback=self.reduce_callback,
-                                        callback_args={'reduceid': reduceid, 'local': local})
-            else:
-                logger.debug("mapreduce: requesting worker for %s: %s"
-                        % (reduceid, self.reducetask.get_key()) )
-                self.parent.request_worker(self.reducetask.get_key(), reduce_args, reduceid)
+        logger.debug("mapreduce: requesting worker for %s: %s"
+                % (reduceid, self.reducetask.get_key()) )
+        self.parent.request_worker(self.reducetask.get_key(), reduce_args, \
+                                   reduceid)
+
+        return True
 
 
     def _work_unit_complete(self, result, id):
         """retrieving results form remote task"""
 
         logger.debug("mapreduce: got REMOTE result %s from %s" % (result, id))
+        with self.__lock:
+            # map/reduce specific post processing
+            if id in self.map_tasks:
+                logger.debug('   map result %s: %s' % (id, result))
+                self.im.update_partitions(result)
+                del self.map_tasks[id]
 
-        #check if map or reduce task
-        if id in self.map_tasks:
-            self.map_callback(result, id, local=False)
+            elif id in self.reduce_tasks:
+                logger.debug('   reduce result %s: %s' % (id, result))
+                self.output.update(result)
+                del self.reduce_tasks[id]
 
-        elif id in self.reduce_tasks:
-            self.reduce_callback(result, id, local=False)
+            # call request work to ensure that any additional work gets
+            # requested before the task completion checks
+            self.request_work()
+
+            # XXX figure out how to determine when to release unneeded workers
+            if False:
+                logger.debug('[%s] MapReduceTask - releasing a worker' % \
+                        self.get_worker().worker_key)
+                self.get_worker().request_worker_release()
+
+            if not self.map_tasks and not self.reduce_tasks:
+                # all work is done, call the task specific function to combine
+                # the results
+                self._complete()
+                return
 
 
     def _complete(self):
@@ -431,7 +381,8 @@ class MapReduceTask(Task):
 class MapReduceWrapper():
     """map-reduce wrapper base class.
 
-    It expects to work() to do some special stuff before and after subtask (self.task) real work() method.
+    It expects to work() to do some special stuff before and after subtask
+    (self.task) real work() method.
 
     It stores intermediate results helper (self.im) and overrides:
     * _generate_key() to assure proper subtask identification,
@@ -472,7 +423,8 @@ class MapReduceWrapper():
         return self.task.__repr__()
 
 
-    def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
+    def start(self, args={}, subtask_key=None, callback=None, callback_args={},\
+              errback=None):
         """
         starts the task.  This will spawn the work in a workunit thread.
         """
@@ -482,7 +434,8 @@ class MapReduceWrapper():
             return
 
         logger.debug('MapReduceWrapper - starting task: %s' % args)
-        self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
+        self.work_deferred = threads.deferToThread(self._start, args, callback,\
+                                                    callback_args)
 
         if errback:
             self.work_deferred.addErrback(errback)
@@ -494,9 +447,9 @@ class MapWrapper(MapReduceWrapper):
 
     def _start(self, args={}, callback=None, callback_args={}):
         """
-        Overwrites Task._start() because MapTask needs to provide special input and output
-        dictionaries. And it is necessary to self.im.dump() intermediate results after
-        self.work().
+        Overwrites Task._start() because MapTask needs to provide special input
+        and output dictionaries. And it is necessary to self.im.dump()
+        intermediate results after self.work().
         """
         logger.debug('%s - MapWrapper.work()'  % self.get_worker().worker_key)
 
@@ -516,14 +469,16 @@ class MapWrapper(MapReduceWrapper):
         logger.debug("%s._work() dumping i9e" % id)
         results = self.im.dump(pdict, id) # partitions are our results
 
-        logger.debug('%s - MapWrapper - work complete' % self.get_worker().worker_key)
+        logger.debug('%s - MapWrapper - work complete' % \
+                     self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
             logger.debug('%s - MapWrapper - Making callback' % self)
             callback(results, **callback_args)
         else:
-            logger.warning('%s - MapWrapper - NO CALLBACK TO MAKE: %s' % (self, callback))
+            logger.warning('%s - MapWrapper - NO CALLBACK TO MAKE: %s' % \
+                           (self, callback))
 
         return results
 
@@ -532,10 +487,10 @@ class ReduceWrapper(MapReduceWrapper):
 
     def _start(self, args={}, callback=None, callback_args={}):
         """
-        Overwrites Task._start() beacuse ReduceTask needs to provide special input
-        dictionaries (from self.im).
+        Overwrites Task._start() beacuse ReduceTask needs to provide special
+        input dictionaries (from self.im).
         """
-        logger.debug('%s - ReduceWrapper.work()'  % self.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper.work()' % self.get_worker().worker_key)
 
         args['input'] = self.im.load(args['partition'])
         output = args['output'] = {}
@@ -543,14 +498,16 @@ class ReduceWrapper(MapReduceWrapper):
         self.task._work(**args) # ignoring results
         results = output
 
-        logger.debug('%s - ReduceWrapper - work complete' % self.get_worker().worker_key)
+        logger.debug('%s - ReduceWrapper - work complete' % \
+                     self.get_worker().worker_key)
 
         #make a callback, if any
         if callback:
             logger.debug('%s - ReduceWrapper - Making callback' % self)
             callback(results, **callback_args)
         else:
-            logger.warning('%s - ReduceWrapper - NO CALLBACK TO MAKE: %s' % (self, callback))
+            logger.warning('%s - ReduceWrapper - NO CALLBACK TO MAKE: %s' % \
+                           (self, callback))
 
         return results
 

@@ -23,7 +23,7 @@ from twisted.internet import reactor, threads
 
 from pydra_server.cluster.constants import *
 from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks import ParallelTask
+from pydra_server.cluster.tasks import ParallelTask, MapReduceTask
 from pydra_server.cluster.tasks.task_manager import TaskManager
 from pydra_server.logging import get_task_logger
 
@@ -100,8 +100,8 @@ class WorkerTaskControls(Module):
             # Check to ensure this worker is not already busy.
             # The Master should catch this but lets be defensive.
             if run_local:
-                busy =  not isinstance(self.__task_instance, ParallelTask) \
-                        or self.__local_workunit_key
+                busy =  not isinstance(self.__task_instance, (ParallelTask,
+                        MapReduceTask)) or self.__local_workunit_key
 
             else:
                 busy = (self.__task and self.__task <> key) or self.__workunit_key

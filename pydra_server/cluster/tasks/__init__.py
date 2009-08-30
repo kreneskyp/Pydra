@@ -35,3 +35,4 @@ class TaskNotFoundException(Exception):
 from tasks import Task
 from parallel_task import ParallelTask
 from task_container import TaskContainer
+from mapreduce import MapReduceTask
