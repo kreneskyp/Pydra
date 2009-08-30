@@ -183,10 +183,11 @@ class ParallelTask(Task):
             if self.STOP_FLAG:
                 self.task_complete(None)
 
-            # process any new work requests
+            # process any new work requests.  This moves any data that can be
+            # queued into the queue, and into the in_progress list locally
             self._request_workers()
 
-            # no data left in progress, release 1 worker.  If there is work in
+            # no data left in progress, release 1 worker.  when there is work in
             # the queue the waiting worker will be selected automatically by
             # the scheduler.  Releasing it must be explicit though.
             if not self._data_in_progress:
