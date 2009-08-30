@@ -285,6 +285,11 @@ class TaskScheduler(Module):
                             # safe to remove the task
                             length = len(self._short_term_queue)
                             for i in range(0, length):
+                                # release any unreleased workers
+                                for key in task_instance.waiting_workers:
+                                    avatar = self.workers[key]
+                                    avatar.remote.callRemote('release_worker')
+
                                 if self._short_term_queue[i][1] == job.root_task_id:
                                     del self._short_term_queue[i]
                                     logger.info(
