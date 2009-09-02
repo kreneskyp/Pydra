@@ -17,22 +17,27 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-STATUS_CANCELLED = -2;
-STATUS_FAILED = -1;
-STATUS_STOPPED = 0;
-STATUS_RUNNING = 1;
-STATUS_PAUSED = 2;
-STATUS_COMPLETE = 3;
+from pydra_server.cluster.module import Module
+from pydra_server.cluster.tasks.task_manager import TaskManager
 
-class TaskNotFoundException(Exception):
-    def __init__(self, value):
-        self.parameter = value
+class TaskSyncServer(Module):
 
-    def __str__(self):
-        return repr(self.parameter)
+    def __init__(self, manager):
 
+        self._remotes = [
+            ('NODE', self.sync_task),
+        ]
 
-from tasks import Task
-from parallel_task import ParallelTask
-from task_container import TaskContainer
-from mapreduce import MapReduceTask
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
+
+        Module.__init__(self, manager)
+
+    def sync_task(self, pkg_name, request, phase):
+        """
+        A remote method for TaskSyncClient's to sync task packages
+        """
+        resp = self.task_manager.passive_sync(pkg_name, request, phase)
+        return pkg_name, resp, phase + 1
+

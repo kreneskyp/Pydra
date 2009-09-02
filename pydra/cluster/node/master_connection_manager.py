@@ -44,7 +44,8 @@ class MasterConnectionManager(Module):
     
     _shared = [
         'port',
-        'host'
+        'host',
+        'master'
     ]
 
     def __init__(self, manager):
@@ -62,14 +63,14 @@ class MasterConnectionManager(Module):
         #load crypto keys for authentication
         self.pub_key, self.priv_key = load_crypto('./node.key')
         self.master_pub_key = load_crypto('./node.master.key', create=False, both=False)
-
+        self.master = None
 
 
     def get_service(self, manager):
         """
         Creates a service object that can be used by twistd init code to start the server
         """
-        logger.info('Node - starting server on port %s' % self.port)
+        logger.info('MasterConnectionManager - starting server on port %s' % self.port)
 
         realm = ClusterRealm()
         realm.server = self
@@ -85,3 +86,10 @@ class MasterConnectionManager(Module):
         factory = pb.PBServerFactory(p)
 
         return internet.TCPServer(self.port, factory)
+
+
+    def master_authenticated(self, master_avatar):
+        """
+        callback made by MasterAvatar when it successfully connects
+        """
+        self.master = master_avatar

@@ -30,8 +30,6 @@ from pydra.cluster.module import Module
 from pydra.cluster.tasks import *
 from pydra.cluster.constants import *
 from pydra.models import TaskInstance, WorkUnit
-from pydra.util import deprecated
-
 
 # init logging
 import logging
@@ -101,7 +99,6 @@ class TaskScheduler(Module):
         'workers',
         '_idle_workers',
         '_active_workers',
-        'registry'
     ]    
 
     def __init__(self, manager):
@@ -113,12 +110,16 @@ class TaskScheduler(Module):
         }
 
         self._remotes = [
-            ('REMOTE_WORKER', self.request_worker),
-            ('REMOTE_WORKER', self.send_results),
-            ('REMOTE_WORKER', self.worker_stopped),
-            ('REMOTE_WORKER', self.task_failed),
-            ('REMOTE_WORKER', self.release_worker)
+            ('NODE', self.request_worker),
+            ('NODE', self.send_results),
+            ('NODE', self.worker_stopped),
+            ('NODE', self.task_failed),
+            ('NODE', self.request_worker_release)
         ]
+
+        self._friends = {
+            'task_manager' : TaskManager,
+        }
 
         self._interfaces = [
             self.task_statuses,
@@ -154,6 +155,7 @@ class TaskScheduler(Module):
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
+        self._active_workers = []
         self._worker_mappings = {}  # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
 
@@ -202,49 +204,34 @@ class TaskScheduler(Module):
         return task_instance
 
 
-    def cancel_task_new(self, root_task_id):
+    def cancel_task(self, task_id):
         """
-        Cancels a task either in the ltq or in the stq.
-
-        Returns True if the specified task is found in the queue and is
-        successfully removed, and False otherwise.
-
-        This method does NOT release the workers held by the cancelled task. So
-        BE CAUTIOUS to use this method on a task in the stq because that task
-        may hold unreleased workers. To safely cancel a task in the stq (i.e.,
-        already running), one has to (via the master interface) stop all the
-        workers which are working on the task. Scheduler.add_worker() will
-        handle the rest. So the advice is to only use this method to cancel a
-        running task in case that it does not release workers after being
-        notified to stop.
+        Cancel a task. Used to cancel a task that was scheduled.
+        If the task is in the queue still, remove it.  If it is running then
+        send signals to all workers assigned to it to stop work immediately.
         """
-        try:
-            with self._queue_lock:
-                found = False
-                # find the task in the ltq
-                length = len(self._long_term_queue)
-                for i in range(0, length):
-                    if self._long_term_queue[i][1] == root_task_id:
-                        del self._long_term_queue[i]
+        task_id = int(task_id)
+        with self._queue_lock:
+            found = False
+            # find the task in the ltq
+            for i in range(len(self._long_term_queue)):
+                if self._long_term_queue[i][1] == task_id:
+                    logger.debug('Cancelling Task in LTQ: %s' % task_id)
+                    del self._long_term_queue[i]
+                    found = True
+                    break
+            else:
+                for i in range(len(self._short_term_queue)):
+                    if self._short_term_queue[i][1] == task_id:
+                        logger.debug('Cancelling Task in STQ: %s' % task_id)
+                        del self._short_term_queue[i]
                         found = True
+                        for worker_key in self.get_workers_on_task(task_id):
+                            worker = self.workers[worker_key]
+                            logger.debug('Signalling Stop: %s' % worker_key)
+                            worker.remote.callRemote('stop_task')
                         break
-                else:
-                    length = len(self._long_term_queue)
-                    for i in range(0, length):
-                        if self._long_term_queue[i][1] == root_task_id:
-                            del self._long_term_queue[i]
-                            found = True
-                            # XXX release the workers held by this task?
-                            break
-
-                if found:
-                    task_instance = self._active_tasks.pop(root_task_id)
-                    task_instance.status = STATUS_CANCELLED
-                    task_instance.completed = datetime.now()
-                    task_instance.save()
-                return True
-        except ValueError:
-            return False
+        return 1
 
 
     def add_worker(self, worker_key, task_status=None):
@@ -296,6 +283,11 @@ class TaskScheduler(Module):
                             # safe to remove the task
                             length = len(self._short_term_queue)
                             for i in range(0, length):
+                                # release any unreleased workers
+                                for key in task_instance.waiting_workers:
+                                    avatar = self.workers[key]
+                                    avatar.remote.callRemote('release_worker')
+
                                 if self._short_term_queue[i][1] == job.root_task_id:
                                     del self._short_term_queue[i]
                                     logger.info(
@@ -551,9 +543,10 @@ class TaskScheduler(Module):
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
-            d = worker.remote.callRemote('run_task', task_key, args, \
-                 subtask_key, workunit_key, task_instance.main_worker, \
-                 task_instance.id)
+            pkg = self.task_manager.get_task_package(task_key)
+            d = worker.remote.callRemote('run_task', task_key, pkg.version,
+                    args, subtask_key, workunit_key, task_instance.main_worker,
+                    task_instance.id)
             d.addCallback(self.run_task_successful, worker_key, subtask_key)
             d.addErrback(self.run_task_failed, worker_key)            
 
@@ -653,26 +646,6 @@ class TaskScheduler(Module):
     
 
 
-    def cancel_task(self, task_id):
-        """
-        Cancel a task.  This function is used to cancel a task that was scheduled. 
-        If the task is in the queue still, remove it.  If it is running then
-        send signals to all workers assigned to it to stop work immediately.
-        """
-        logger.info('Cancelling Task: %s' % task_id)
-        task_instance = self.get_task_instance(task_id)
-        if self.cancel_task_new(task_id):
-            #was still in queue
-            logger.debug('Cancelling Task, was in queue: %s' % task_id)
-        else:
-            logger.debug('Cancelling Task, is running: %s' % task_id)
-            #get all the workers to stop
-            for worker_key in self.get_workers_on_task(task_id):
-                worker = self.workers[worker_key]
-                logger.debug('signalling worker to stop: %s' % worker_key)
-                worker.remote.callRemote('stop_task')
- 
-        return 1
 
 
     def run_task_failed(self, results, worker_key):
@@ -691,20 +664,15 @@ class TaskScheduler(Module):
 
         if job and task_instance:
             if subtask_key:
-                print 'WORK_UNIT!'
-                try:
-                    work_unit = WorkUnit()
-                    work_unit.task_instance = task_instance
-                    work_unit.subtask_key = subtask_key
-                    work_unit.workunit_key = job.workunit_key
-                    work_unit.args = simplejson.dumps(job.args)
-                    work_unit.started = datetime.now()
-                    work_unit.worker = worker_key
-                    work_unit.status = STATUS_RUNNING
-                    work_unit.save()
-                    print 'SAVED!!'
-                except Exception, e:
-                    print e
+                work_unit = WorkUnit()
+                work_unit.task_instance = task_instance
+                work_unit.subtask_key = subtask_key
+                work_unit.workunit_key = job.workunit_key
+                work_unit.args = simplejson.dumps(job.args)
+                work_unit.started = datetime.now()
+                work_unit.worker = worker_key
+                work_unit.status = STATUS_RUNNING
+                work_unit.save()
                 job.model = work_unit
 
             else:
@@ -804,7 +772,7 @@ class TaskScheduler(Module):
         self.add_worker(worker_key, STATUS_CANCELLED)
 
 
-    def release_worker(self, worker_key):
+    def request_worker_release(self, worker_key):
         """
         Release a worker held by the worker calling this function.
 
@@ -814,18 +782,20 @@ class TaskScheduler(Module):
 
         # select the best worker to release.  For now just release the first
         # worker in the waiting worker list
-
-        released_worker = None
+        logger.debug('[%s] request worker release' % worker_key)
+        released_worker_key = None
         job = self._worker_mappings.get(worker_key, None)
         if job:
             task_instance = self._active_tasks.get(job.root_task_id, None)
             if task_instance:
-                released_worker = task_instance.waiting_workers.pop()
+                released_worker_key = task_instance.waiting_workers.pop()
 
-        if released_worker:
+        if released_worker_key:
             logger.debug('Task %s - releasing worker: %s' % \
-                    (worker_key, released_worker))
-            self.add_worker(released_worker)
+                    (worker_key, released_worker_key))
+            worker = self.workers[released_worker_key]
+            worker.remote.callRemote('release_worker')
+            self.add_worker(released_worker_key)
 
 
     def worker_connected(self, worker_avatar):
@@ -833,7 +803,7 @@ class TaskScheduler(Module):
         Callback when a worker has been successfully authenticated
         """
         #request status to determine what this worker was doing
-        deferred = worker_avatar.remote.callRemote('status')
+        deferred = worker_avatar.remote.callRemote('worker_status')
         deferred.addCallback(self.worker_status_returned, worker=worker_avatar, worker_key=worker_avatar.name)
 
 

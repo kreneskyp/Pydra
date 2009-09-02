@@ -36,7 +36,7 @@ class MasterAvatar(ModuleAvatar, RSAAvatar):
         self.master_key = server.master_pub_key if server.master_pub_key else None
 
         ModuleAvatar.__init__(self, server.manager._remotes['MASTER'])
-        RSAAvatar.__init__(self, node_key, node_pub_key, self.master_key, save_key=self.save_key)
+        RSAAvatar.__init__(self, node_key, node_pub_key, self.master_key, server.master_authenticated, save_key=self.save_key)
 
         logger.info('Master connected to node')
 

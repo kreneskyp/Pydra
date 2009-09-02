@@ -35,6 +35,7 @@ class MasterClientFactory(pb.PBClientFactory):
     """
     Subclassing of PBClientFactory to add automatic reconnection
     """
+    disconnecting = False
     def __init__(self, reconnect_func, *args, **kwargs):
         pb.PBClientFactory.__init__(self)
         self.reconnect_func = reconnect_func
@@ -42,12 +43,13 @@ class MasterClientFactory(pb.PBClientFactory):
         self.kwargs = kwargs
 
     def clientConnectionLost(self, connector, reason):
-        logger.warning('Lost connection to master.  Reason: %s' % reason)
-        pb.PBClientFactory.clientConnectionLost(self, connector, reason)
-        self.reconnect_func(*(self.args), **(self.kwargs))
+        if not self.disconnecting:
+            logger.warning('Lost connection to Node.  Reason: %s' % reason)
+            pb.PBClientFactory.clientConnectionLost(self, connector, reason)
+            self.reconnect_func(*(self.args), **(self.kwargs))
 
     def clientConnectionFailed(self, connector, reason):
-        logger.warning('Connection to master failed. Reason: %s' % reason)
+        logger.warning('Connection to Node failed. Reason: %s' % reason)
         pb.PBClientFactory.clientConnectionFailed(self, connector, reason)
 
 
@@ -64,7 +66,6 @@ class WorkerConnectionManager(Module):
     _shared = [
         'worker_key',
         'master',
-        'master_host',
         'master_port',
         '_lock_connection'
     ]
@@ -72,18 +73,21 @@ class WorkerConnectionManager(Module):
     def __init__(self, manager):
 
         self._listeners = {
-            'MANAGER_INIT':self.connect
+            'MANAGER_INIT':self.connect,
+            'WORKER_FINISHED':self.disconnect
         }
 
         Module.__init__(self, manager)
 
+
         self._lock_connection = Lock()
         self.reconnect_count = 0
+        self.factory = MasterClientFactory(self.reconnect)
 
         # load crypto for authentication
         # workers use the same keys as their parent Node
         self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', False, both=False)
+        #self.master_pub_key = load_crypto('./node.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
 
 
@@ -93,16 +97,20 @@ class WorkerConnectionManager(Module):
         """
         import fileinput
 
-        logger.info('worker:%s - connecting to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port))
-        factory = MasterClientFactory(self.reconnect)
-        reactor.connectTCP(self.master_host, self.master_port, factory)
+        logger.info('worker:%s - connecting to master @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
+        reactor.connectTCP('localhost', self.master_port, self.factory)
 
         # construct referenceable with remotes for MASTER
         client =  ModuleReferenceable(self.manager._remotes['MASTER'])
 
-        deferred = factory.login(credentials.UsernamePassword(self.worker_key, '1234'), client=client)
+        deferred = self.factory.login(credentials.UsernamePassword(self.worker_key, '1234'), client=client)
         deferred.addCallbacks(self.connected, self.reconnect, errbackArgs=("Failed to Connect"))
 
+
+    def disconnect(self):
+        if self.factory:
+            self.factory.disconnecting = True
+            self.factory.disconnect()
 
     def reconnect(self, *arg, **kw):
         with self._lock_connection:
@@ -123,10 +131,10 @@ class WorkerConnectionManager(Module):
             self.master = result
         self.reconnect_count = 0
 
-        logger.info('worker:%s - connected to master @ %s:%s' % (self.worker_key, self.master_host, self.master_port))
+        logger.info('worker:%s - connected to master @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
 
         # Authenticate with the master
-        self.rsa_client.auth(result, None, self.master_pub_key)
+        self.rsa_client.auth(result, None, self.priv_key)
 
 
     def connect_failed(self, result):

@@ -16,23 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from pydra_server.cluster.module import Module
 
-STATUS_CANCELLED = -2;
-STATUS_FAILED = -1;
-STATUS_STOPPED = 0;
-STATUS_RUNNING = 1;
-STATUS_PAUSED = 2;
-STATUS_COMPLETE = 3;
-
-class TaskNotFoundException(Exception):
-    def __init__(self, value):
-        self.parameter = value
-
-    def __str__(self):
-        return repr(self.parameter)
-
-
-from tasks import Task
-from parallel_task import ParallelTask
-from task_container import TaskContainer
-from mapreduce import MapReduceTask
+# after refactoring master-node relationship, this module will resemble
+# the current worker_task_controls module

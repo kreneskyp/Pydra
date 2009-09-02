@@ -2,8 +2,7 @@
 
 """
     Copyright 2009 Oregon State University
-
-    This file is part of Pydra.
+This file is part of Pydra.
 
     Pydra is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -28,7 +27,6 @@ from pydra.cluster.module import ModuleManager
 from pydra.cluster.tasks.task_manager import TaskManager
 from pydra.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 
-
 # init logging
 import pydra_settings
 from pydra.logging.logger import init_logging
@@ -41,17 +39,15 @@ class Worker(ModuleManager):
             Each Task will be run on a single Worker.  If the Task or any of its subtasks are a ParallelTask 
             the first worker will make requests for work to be distributed to other Nodes
     """
-    def __init__(self, master_host, master_port, node_key, worker_key):
+    def __init__(self, port, worker_key):
 
-        self.master_host = master_host
-        self.master_port = master_port
-        self.node_key = node_key
+        self.master_port = port
         self.worker_key = worker_key
 
         self.modules = [
             TaskManager,
             WorkerConnectionManager,
-            WorkerTaskControls
+            WorkerTaskControls,
         ]
 
         ModuleManager.__init__(self)
@@ -63,10 +59,9 @@ class Worker(ModuleManager):
 if __name__ == "__main__":
     import sys
 
-    master_host = sys.argv[1]
-    master_port = int(sys.argv[2])
-    node_key    = sys.argv[3]
-    worker_key  = sys.argv[4]
 
-    worker = Worker(master_host, master_port, node_key, worker_key)
+    worker_key  = sys.argv[1]
+    port = int(sys.argv[2])
+
+    worker = Worker(port, worker_key)
     reactor.run()

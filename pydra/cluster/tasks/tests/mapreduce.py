@@ -30,6 +30,7 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
         self.task_name = "test_task"
+        self.dir = DatasourceDir(self.tempdir)
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
@@ -38,23 +39,34 @@ class IntermediateResultsFiles_Test(unittest.TestCase):
 
         a = { 'a': 1, 'b': 1, }
 
-        im1 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
-        p1 = im1.flush(a, 'map1')
+        im1 = IntermediateResultsFiles(self.dir) 
+        im1.task_id = self.task_name
+        im1.reducers = 2
+
+        pdict = im1.partition_output(a)
+        p1 = im1.dump(pdict, 'map1')
 
         b = { 'b': 1, 'c': 1, }
 
-        im2 = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
-        p2 = im2.flush(b, 'map2')
+        im2 = IntermediateResultsFiles(self.dir) 
+        im2.task_id = self.task_name
+        im2.reducers = 2
+
+        pdict = im2.partition_output(b)
+        p2 = im2.dump(pdict, 'map2')
 
         # getting results
-        im = IntermediateResultsFiles(self.task_name, 2, self.tempdir) 
+        im = IntermediateResultsFiles(self.dir) 
+        im.task_id = self.task_name
+        im.reducers = 2
+
         im.update_partitions(p1)
         im.update_partitions(p2)
 
         # reduce
         c = { 'a': 0, 'b': 0, 'c': 0 }
         for p in im:
-            for k, v in im._partition_iter(p):
+            for k, v in im.load(p):
                 c[k] += 1
 
         self.assertEqual(c['a'], 1)
@@ -183,11 +195,15 @@ class IdentityReduceTask(Task):
 class NullIM():
     """dummy intermediate results class"""
 
-    def flush(self, output, mapid):
+    def partition_output(self, output):
+        return output
+
+
+    def dump(self, output, mapid):
         return output, mapid
 
 
-    def _partition_iter(self, fs):
+    def load(self, fs):
         return fs.iteritems()
 
 
@@ -209,8 +225,8 @@ class MapReduceWrapper_Test(unittest.TestCase):
         a = { 'a': 1, 'b': 1, }
         id = 'identity_map'
 
-        flush_results = self.maptask._start(args={'input': a.iteritems(), 'id': id})
-        output, mapid = flush_results
+        dump_results = self.maptask._start(args={'input': a.iteritems(), 'id': id})
+        output, mapid = dump_results
 
         self.assertEqual(mapid, id, "mapid differs from id")
 

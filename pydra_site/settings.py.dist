@@ -70,6 +70,7 @@ TEMPLATE_LOADERS = (
 
 #Logging
 import logging
+LOG_DIR = '/tmp/'
 LOG_LEVEL = logging.DEBUG
 LOG_FILENAME_MASTER = '%s/master.log' % DOC_ROOT
 LOG_FILENAME_NODE   = '%s/node.log' % DOC_ROOT

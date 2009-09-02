@@ -16,23 +16,28 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+import settings
+from zope.interface import implements
 
-STATUS_CANCELLED = -2;
-STATUS_FAILED = -1;
-STATUS_STOPPED = 0;
-STATUS_RUNNING = 1;
-STATUS_PAUSED = 2;
-STATUS_COMPLETE = 3;
+from twisted.cred import portal
+from twisted.spread import pb
 
-class TaskNotFoundException(Exception):
-    def __init__(self, value):
-        self.parameter = value
+from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
 
-    def __str__(self):
-        return repr(self.parameter)
+# init logging
+import logging
+logger = logging.getLogger('root')
 
+class NodeRealm:
+    """
+    Realm used by the Master server to assign avatars.
+    """
+    implements(portal.IRealm)
+    def requestAvatar(self, avatarID, mind, *interfaces):
+        assert pb.IPerspective in interfaces
 
-from tasks import Task
-from parallel_task import ParallelTask
-from task_container import TaskContainer
-from mapreduce import MapReduceTask
+        avatar = self.server.workers[avatarID]
+        avatar.attached(mind)
+        logger.info('worker:%s - connected' % avatarID)
+
+        return pb.IPerspective, avatar, lambda a=avatar:a.detached(mind)

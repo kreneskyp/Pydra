@@ -26,17 +26,31 @@ logger = logging.getLogger('root')
 
 class WorkerAvatar(ModuleAvatar, RSAAvatar):
     """
-    Avatar used by Workers connecting to the Master.
+    Class representing Workers for a Node.  This class encapsulates everything
+    about a worker process and task.  It also contains all functions that the
+    Worker is capable of calling
     """
-    def __init__(self, name, server, node):
-        self.name = name
+    popen = None         # popen instance for controlling worker system process
+    key = None           # Key that identifies task
+    version = None       # version of task package containing task
+    args = None          # Task arguments
+    subtask_key = None   # key to subtask worker is assigned to
+    local_subtask = None # key of subtask being run locally on the main worker
+    workunit_key = None  # key to workunit worker is assigned to
+    main_worker = None   # worker_key of mainworker for this task
+    task_id = None       # unique identifier of Task this worker is assigned to
+    run_task_deferred = None # defered set if run_task must be delayed
+    remote = None        # remote referenceable object
+    finished = False     # flag indicating this worker is finished and stopping
+
+    def __init__(self, server, name):
         self.server = server
+        self.name = name
 
-        node_key = node.load_pub_key()
-        node_key = node_key if node_key else None
-        master_key = RSA.construct(server.pub_key) if server.pub_key else None
+        node_key = server.priv_key
+        master_key = server.priv_key
 
-        ModuleAvatar.__init__(self, server.manager._remotes['REMOTE_WORKER'])
+        ModuleAvatar.__init__(self, server.manager._remotes['WORKER'])
         RSAAvatar.__init__(self, master_key, None, node_key, server.worker_authenticated, True)
 
 
@@ -53,5 +67,5 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
         """
         logger.info('worker:%s - disconnected' % self.name)
         if self.authenticated:
-            self.server.worker_disconnected(self.name)
+            self.server.worker_disconnected(self)
         self.remote = None
