@@ -1,5 +1,3 @@
-#! /usr/bin/python
-
 """
     Copyright 2009 Oregon State University
 
@@ -42,7 +40,9 @@ class NodeServer(ModuleManager):
             TaskManager,
             NodeInformation,
             WorkerManager,
+            WorkerConnectionManager,
             MasterConnectionManager,
+            TaskSyncClient,
             NodeZeroConfService
         ]
 

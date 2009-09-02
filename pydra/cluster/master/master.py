@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
     Copyright 2009 Oregon State University
 
@@ -22,7 +20,9 @@
 from pydra.cluster.amf.interface import AMFInterface
 from pydra.cluster.module import ModuleManager
 from pydra.cluster.master import *
+from pydra.cluster.master.task_sync import TaskSyncServer
 from pydra.cluster.tasks.task_manager import TaskManager
+
 import pydra_settings
 
 # init logging
@@ -45,8 +45,8 @@ class Master(ModuleManager):
         self.modules = [
             AutoDiscoveryModule,
             NodeConnectionManager,
-            WorkerConnectionManager,
             TaskManager,
+            TaskSyncServer,
             TaskScheduler,
             AMFInterface,
             NodeManager
