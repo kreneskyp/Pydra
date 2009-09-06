@@ -48,7 +48,7 @@ for dirpath, dirnames, filenames in os.walk(pydra_dir):
 
 # add config, init.d, and other files
 data_files.append(['/etc/pydra', ['config/pydra_settings.py']])
-data_files.append(['/etc/init.d', ['scripts/pydra_master', 'scripts/pydra_node']])
+data_files.append(['/usr/sbin', ['scripts/pydra_master', 'scripts/pydra_node']])
 data_files.append(['/usr/bin', ['scripts/pydra_manage']])
 
 # no files but need to create these directories for use by pydra
