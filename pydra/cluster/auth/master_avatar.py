@@ -17,6 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import pydra_settings
 from rsa_auth import RSAAvatar
 from pydra.cluster.auth.module_avatar import ModuleAvatar
 
@@ -64,7 +65,8 @@ class MasterAvatar(ModuleAvatar, RSAAvatar):
 
             key_file = None
             try:            
-                key_file = file('./node.master.key', 'w')
+                key_file = file('%s/node.master.key' % \
+                        pydra_settings.RUNTIME_FILES_DIR, 'w')
                 logger.info('saving new master key')
                 key_file = key_file.write(json_key)
                 os.chmod('./node.master.key', 0400)                

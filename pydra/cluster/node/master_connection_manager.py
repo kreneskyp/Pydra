@@ -22,6 +22,7 @@ from twisted.cred import portal, checkers
 from twisted.spread import pb
 from zope.interface import implements
 
+import pydra_settings
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.auth.master_avatar import MasterAvatar
 from pydra.cluster.module import Module
@@ -56,13 +57,14 @@ class MasterConnectionManager(Module):
 
         Module.__init__(self, manager)
 
-        self.port = 11890
-        self.host='localhost'
+        self.port = pydra_settings.PORT
         self.node_key = None
 
         #load crypto keys for authentication
-        self.pub_key, self.priv_key = load_crypto('./node.key')
-        self.master_pub_key = load_crypto('./node.master.key', create=False, both=False)
+        self.pub_key, self.priv_key = load_crypto('%s/node.key' % \
+                pydra_settings.RUNTIME_FILES_DIR)
+        self.master_pub_key = load_crypto('%s/node.master.key' % \
+                pydra_settings.RUNTIME_FILES_DIR, create=False, both=False)
         self.master = None
 
 

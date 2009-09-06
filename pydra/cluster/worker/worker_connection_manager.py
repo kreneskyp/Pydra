@@ -23,6 +23,7 @@ from twisted.cred import credentials
 from twisted.internet import reactor
 from twisted.spread import pb
 
+import pydra_settings
 from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
 from pydra.cluster.module import Module, ModuleReferenceable
 
@@ -86,7 +87,8 @@ class WorkerConnectionManager(Module):
 
         # load crypto for authentication
         # workers use the same keys as their parent Node
-        self.pub_key, self.priv_key = load_crypto('./node.key')
+        self.pub_key, self.priv_key = load_crypto('%s/node.key' % \
+                pydra_settings.RUNTIME_FILES_DIR)
         #self.master_pub_key = load_crypto('./node.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
 

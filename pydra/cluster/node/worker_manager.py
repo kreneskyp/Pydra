@@ -24,6 +24,7 @@ from threading import RLock
 from twisted.internet.defer import Deferred
 
 import pydra
+import pydra_settings
 from pydra.cluster.module import Module
 from pydra.cluster.auth.worker_avatar import WorkerAvatar
 from pydra.cluster.constants import *
@@ -223,7 +224,7 @@ class WorkerManager(Module):
                 worker.popen = Popen(['python',
                             '%s/cluster/worker/worker.py' % pydra_root,
                             worker_key,
-                            '18800'])
+                            pydra_settings.WORKER_PORT.__str__()])
                 self.workers[worker_key] = worker
 
             worker.key = key

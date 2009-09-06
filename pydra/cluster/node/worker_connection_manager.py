@@ -87,7 +87,7 @@ class WorkerConnectionManager(Module):
         """
         constructs a twisted service for Workers to connect to 
         """
-        logger.info('WorkerConnectionManager - starting server on port %s' % pydra_settings.PORT)
+        logger.info('WorkerConnectionManager - starting server on port %s' % pydra_settings.WORKER_PORT)
 
         # setup cluster connections
         realm = NodeRealm()
@@ -95,7 +95,7 @@ class WorkerConnectionManager(Module):
 
         p = portal.Portal(realm, [self.worker_checker])
  
-        return internet.TCPServer(pydra_settings.PORT, pb.PBServerFactory(p))
+        return internet.TCPServer(pydra_settings.WORKER_PORT, pb.PBServerFactory(p))
 
 
     def worker_authenticated(self, worker_avatar):

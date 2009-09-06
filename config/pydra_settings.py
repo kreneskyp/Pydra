@@ -64,14 +64,21 @@ LOG_SIZE = 10000000
 LOG_BACKUP = 10
 
 
-# Connection settings for cluster.   HOST is the name that pydra will be exposed
-# to and used as part of an identifier.  PORT is the port that Node will
-# listen on for the Master to connect.  CONTROLLER_PORT is the port controllers
-# can connect to the Master on.
+# Connection settings for cluster.  These settings affect the local node only
+# some settings only apply to a Master or to a Node. 
+#
+#   HOST is the name that pydra will be exposed to and used as part of an
+#        identifier.
+#
+#   PORT is the port that Node will listen on for the Master to connect.
+#
+#   CONTROLLER_PORT is the port Master listens for Controllers on
+# 
+#   WORKER_PORT is the port Node listens for Workers on
 HOST = 'localhost'
-PORT = 18800
+PORT = 11890
 CONTROLLER_PORT = 18801
-
+WORKER_PORT = 18800
 
 # Directory in which to place tasks to deploy to Pydra.  Tasks will be parsed
 # and versioned.  Processed Tasks are stored in TASKS_DIR_INTERNAL.  Modifying
