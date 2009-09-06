@@ -1,21 +1,18 @@
 from __future__ import with_statement
 
-from tasks import Task, TaskNotFoundException, \
-    STATUS_RUNNING, STATUS_COMPLETE
-
-from pydra_server.cluster.tasks.datasource import DatasourceDict, \
-        SequenceSlicer, \
-        FileUnpicleSubslicer, FilePickleOutput, \
-        SQLTableKeyInput, SQLTableOutput
+from threading import Lock
+import cPickle as pickle
+import logging
+import os
 
 from twisted.internet import reactor, threads
 
-from threading import Lock
-
-import cPickle as pickle
-import os, logging
+from tasks import Task, TaskNotFoundException, \
+    STATUS_RUNNING, STATUS_COMPLETE
+from pydra.cluster.tasks.datasource import *
 
 logger = logging.getLogger('root')
+
 
 class AppendableDict(dict):
     """Extended dictionary which can hold multiple values within one key.

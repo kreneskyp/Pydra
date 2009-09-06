@@ -21,11 +21,11 @@ from threading import Lock
 
 from twisted.internet import reactor, threads
 
-from pydra_server.cluster.constants import *
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks import ParallelTask, MapReduceTask
-from pydra_server.cluster.tasks.task_manager import TaskManager
-from pydra_server.logging import get_task_logger
+from pydra.cluster.constants import *
+from pydra.cluster.module import Module
+from pydra.cluster.tasks import ParallelTask, MapReduceTask
+from pydra.cluster.tasks.task_manager import TaskManager
+from pydra.logs import get_task_logger
 
 # init logging
 import logging

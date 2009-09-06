@@ -24,9 +24,8 @@ from twisted.internet import reactor, defer
 from twisted.internet.error import AlreadyCalled
 from twisted.spread import pb
 
-from pydra import config
 from pydra.models import Node
-from pydra.cluster.module import Module
+from pydra.cluster.module import Module, ModuleReferenceable
 from pydra.cluster.amf.interface import authenticated
 from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
 import pydra_settings
@@ -108,7 +107,7 @@ class NodeConnectionManager(Module):
         Module.__init__(self, manager)
 
         #load rsa crypto
-        self.pub_key, self.priv_key = load_crypto('%s/master.key' % config.RUNTIME_FILES_DIR)
+        self.pub_key, self.priv_key = load_crypto('%s/master.key' % pydra_settings.RUNTIME_FILES_DIR)
         self.rsa_client = RSAClient(self.priv_key, self.pub_key, callback=self.init_node)
 
         #cluster management

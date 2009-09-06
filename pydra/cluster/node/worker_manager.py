@@ -25,10 +25,10 @@ from twisted.internet.defer import Deferred
 
 import pydra
 from pydra.cluster.module import Module
-from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
-from pydra_server.cluster.constants import *
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra.cluster.auth.worker_avatar import WorkerAvatar
+from pydra.cluster.constants import *
+from pydra.cluster.module import Module
+from pydra.cluster.tasks.task_manager import TaskManager
 
 import logging
 logger = logging.getLogger('root')

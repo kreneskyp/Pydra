@@ -17,7 +17,7 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.tasks import Task, TaskContainer, ParallelTask
+from pydra.cluster.tasks import Task, TaskContainer, ParallelTask
 import time
 
 import logging

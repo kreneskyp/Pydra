@@ -1,9 +1,9 @@
-from pydra_server.cluster.tasks.tasks import Task
+from pydra.cluster.tasks.tasks import Task
 
-from pydra_server.cluster.tasks.mapreduce import MapReduceTask, \
+from pydra.cluster.tasks.mapreduce import MapReduceTask, \
         IntermediateResultsFiles, IntermediateResultsSQL
 
-from pydra_server.cluster.tasks.datasource import DatasourceDict, \
+from pydra.cluster.tasks.datasource import DatasourceDict, \
         DatasourceDir, DatasourceSQL, SQLTableSlicer
 
 import logging

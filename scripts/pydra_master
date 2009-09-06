@@ -4,9 +4,10 @@ Script for starting Pydra Master.
 """
 import os
 import pydra
-from pydra import config
+from pydra.config import load_settings
 
+pydra_settings = load_settings()
 pydra_root = pydra.__file__[:pydra.__file__.rfind('/')]
 os.system('twistd -ny %s/twisted/master.tac --pidfile=%s/master.pid' \
-                % (pydra_root, config.RUNTIME))
+                % (pydra_root, pydra_settings.RUNTIME))
 

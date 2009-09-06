@@ -29,11 +29,12 @@ from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.template import Context, loader
 from twisted.internet import reactor
 
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks.tasks import *
-from pydra_server.cluster.tasks import packaging
-from pydra_server.models import *
-from pydra_server.util import graph
+import pydra_settings
+from pydra.cluster.module import Module
+from pydra.cluster.tasks.tasks import *
+from pydra.cluster.tasks import packaging
+from pydra.models import *
+from pydra.util import graph
 
 import logging
 logger = logging.getLogger('root')
@@ -74,8 +75,8 @@ class TaskManager(Module):
 
         Module.__init__(self, manager)
 
-        self.tasks_dir = pydraSettings.tasks_dir
-        self.tasks_dir_internal = pydraSettings.tasks_dir_internal
+        self.tasks_dir = pydra_settings.TASKS_DIR
+        self.tasks_dir_internal = pydra_settings.TASKS_DIR_INTERNAL
 
         # full_task_key or pkg_name: pkg_object
         # preserved for both compatibility and efficiency

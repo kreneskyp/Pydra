@@ -28,6 +28,7 @@ from twisted.internet import reactor, threads
 
 from pydra.cluster.module import Module
 from pydra.cluster.tasks import *
+from pydra.cluster.tasks.task_manager import TaskManager
 from pydra.cluster.constants import *
 from pydra.models import TaskInstance, WorkUnit
 

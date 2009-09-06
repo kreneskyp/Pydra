@@ -17,8 +17,8 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pydra_server.cluster.module import Module
-from pydra_server.cluster.tasks.task_manager import TaskManager
+from pydra.cluster.module import Module
+from pydra.cluster.tasks.task_manager import TaskManager
 
 class TaskSyncClient(Module):
 

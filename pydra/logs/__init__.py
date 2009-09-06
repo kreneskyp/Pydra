@@ -16,31 +16,4 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-import platform
-from pydra.cluster.module import Module
-
-class NodeZeroConfService(Module):
-    """
-    Module that publishes the node port using ZeroConfService (avahi)
-    """
-
-    _shared = [
-        'port',
-        'host'
-    ]
-
-    def __init__(self, manager):
-
-        self._listeners = {
-            '':self.start_service
-        }
-
-        Module.__init__(self, manager)
-
-
-    def start_service(self):
-        
-        self.service = ZeroconfService(name=platform.node(), port=self.port,
-            stype="_pydra._tcp")
-        self.service.publish()
+from pydra.logs.logger import init_logging, get_task_logger

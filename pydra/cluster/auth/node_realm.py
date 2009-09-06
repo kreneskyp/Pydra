@@ -16,13 +16,13 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import settings
+
 from zope.interface import implements
 
 from twisted.cred import portal
 from twisted.spread import pb
 
-from pydra_server.cluster.auth.worker_avatar import WorkerAvatar
+from pydra.cluster.auth.worker_avatar import WorkerAvatar
 
 # init logging
 import logging

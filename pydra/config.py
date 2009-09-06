@@ -8,13 +8,10 @@ import os
 import sys
 
 CONFIG_DIR = '/etc/pydra'
-LOGGING_DIR = '/var/log/pydra'
-RUNTIME_FILES_DIR = '/var/lib/pydra'
-RUNTIME = '/var/run/pydra'
 
 def load_settings():
     """
-    Helper function for adding settings to the python path
+    Helper function for adding pydra settings to the python path
     """
     sys.path.append(CONFIG_DIR)
     import pydra_settings

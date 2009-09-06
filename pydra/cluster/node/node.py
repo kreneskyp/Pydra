@@ -22,7 +22,7 @@ from pydra.cluster.tasks.task_manager import TaskManager
 
 # init logging
 import pydra_settings
-from pydra.logging.logger import init_logging
+from pydra.logs.logger import init_logging
 logger = init_logging(pydra_settings.LOG_FILENAME_NODE)
 
 

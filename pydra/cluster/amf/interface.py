@@ -29,7 +29,6 @@ from twisted.internet import reactor
 from twisted.python.randbytes import secureRandom
 from twisted.web import server, resource
 
-from pydra import config
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.module import InterfaceModule
 import pydra_settings
@@ -118,7 +117,7 @@ class AMFInterface(InterfaceModule):
 
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('%s/master.key' % \
-                                        config.RUNTIME_FILES_DIR)
+                                        pydra_settings.RUNTIME_FILES_DIR)
         self.priv_key_encrypt = self.priv_key.encrypt
 
         # setup AMF gateway security.  This just uses a default user/pw
@@ -220,8 +219,8 @@ class AMFInterface(InterfaceModule):
         #setup services
         from twisted.internet.ssl import DefaultOpenSSLContextFactory
         try:
-            key = '%s/ca-key.pem' % config.RUNTIME_FILES_DIR
-            cert = '%s/ca-cert.pem' % config.RUNTIME_FILES_DIR
+            key = '%s/ca-key.pem' % pydra_settings.RUNTIME_FILES_DIR
+            cert = '%s/ca-cert.pem' % pydra_settings.RUNTIME_FILES_DIR
             context = DefaultOpenSSLContextFactory(key, cert)
         except:
             logger.critical('Problem loading certificate required for ControllerInterface from ca-key.pem and ca-cert.pem.  Generate certificate with gen-cert.sh')
