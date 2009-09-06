@@ -56,6 +56,10 @@ data_files.append(['/var/lib/pydra', []])
 data_files.append(['/var/log/pydra', []])
 data_files.append(['/var/run/pydra', []])
 
+# deploy examples to tasks directory
+data_files.append(['/var/lib/pydra/tasks/demo', ['examples/demo/*']])
+data_files.append(['/var/lib/pydra/tasks_internal', []])
+
 setup(name='Pydra',
       version='0.01',
       description='Distributed computing framework',
