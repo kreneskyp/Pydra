@@ -46,6 +46,8 @@ for dirpath, dirnames, filenames in os.walk(pydra_dir):
     elif filenames:
         data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
 
+print packages
+
 # add config, init.d, and other files
 data_files.append(['/etc/pydra', ['config/pydra_settings.py']])
 data_files.append(['/usr/sbin', ['scripts/pydra_master', 'scripts/pydra_node']])
@@ -57,7 +59,7 @@ data_files.append(['/var/log/pydra', []])
 data_files.append(['/var/run/pydra', []])
 
 # deploy examples to tasks directory
-data_files.append(['/var/lib/pydra/tasks/demo', ['examples/demo/*']])
+data_files.append(['/var/lib/pydra/tasks/demo', ['examples/demo/demo_task.py', 'examples/demo/mapreduce.py']])
 data_files.append(['/var/lib/pydra/tasks_internal', []])
 
 setup(name='Pydra',
