@@ -23,6 +23,7 @@ from threading import Lock
 import os
 import shutil
 import tarfile
+import time
 import zlib
 
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
@@ -61,7 +62,7 @@ class TaskManager(Module):
     def __init__(self, manager, scan_interval=10):
 
         self._interfaces = [
-            self.list_tasks,
+            self.list_tasks, 
             self.task_history,
             self.task_history_detail
         ]
@@ -155,7 +156,7 @@ class TaskManager(Module):
         for key in keys:
             try:
                 last_run_instance = TaskInstance.objects.filter(task_key=key).exclude(completed=None).order_by('-completed').values_list('completed','task_key')[0]
-                last_run = last_run_instance[0]
+                last_run = time.mktime(last_run_instance[0].timetuple())
             #no instances
             except (KeyError, IndexError):
                 last_run = None
@@ -169,7 +170,9 @@ class TaskManager(Module):
             else:
                 rendered_form = None
 
-            message[key] = {'description':task.description ,'last_run':last_run, 'form':rendered_form}
+            message[key] = {'description':task.description ,
+                            'last_run':last_run,
+                            'form':rendered_form}
 
         return message
 
@@ -259,11 +262,13 @@ class TaskManager(Module):
             page = paginator.num_pages
             paginated = paginator.page(page)
 
+        instances = [i.json_safe() for i in paginated.object_list]
+
         return {
                 'prev':paginated.has_previous(),
                 'next':paginated.has_next(),
                 'page':page,
-                'instances':[instance for instance in paginated.object_list]
+                'instances':instances
                }
 
 
@@ -282,7 +287,7 @@ class TaskManager(Module):
         task_key = task_instance.task_key
         task = self.registry[task_key, None].tasks[task_key]
         return {
-                    'details':task_instance,
+                    'details':task_instance.json_safe(),
                     'name':task.__name__,
                     'description':task.description,
                     'workunits':workunits

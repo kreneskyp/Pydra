@@ -27,7 +27,9 @@ from django.template import RequestContext
 from django.utils import simplejson
 import settings
 
-from pydra.cluster.amf.controller import AMFController, ControllerException
+
+from pydra.cluster.controller import ControllerException
+from pydra.cluster.controller.web.controller import WebController
 from pydra.forms import NodeForm
 from pydra.models import Node, TaskInstance
 from pydra.config import load_settings
@@ -38,7 +40,8 @@ pydraController is a global variable that stores an instance of a Controller.
 The current controller does not involve much setup so this may not be required
 any longer, but it will improve resource usage slightly
 """
-pydra_controller = AMFController(pydra_settings.HOST , pydra_settings.PORT)
+pydra_controller = WebController(pydra_settings.HOST, \
+                                 pydra_settings.CONTROLLER_PORT)
 
 
 def pydra_processor(request):
@@ -49,7 +52,8 @@ def pydra_processor(request):
     global pydra_controller
 
     if pydra_controller == None:
-        pydra_controller = AMFController(pydra_settings.HOST , pydra_settings.PORT)
+        pydra_controller = WebController(pydra_settings.HOST, \
+                                         pydra_settings.cONTROLLER_PORT)
 
     return {'controller':pydra_controller}
 
@@ -73,7 +77,7 @@ def nodes(request):
     c = RequestContext(request, processors=[pydra_processor, settings_processor])
 
     try:
-        nodes, pages = pydra_controller.remote_node_list()
+        nodes, pages = pydra_controller.node_list()
     except ControllerException, e:
         response = e.code
         nodes = None
@@ -98,13 +102,13 @@ def node_edit(request, id=None):
         if form.is_valid():
             if id:
                 form.cleaned_data['id'] = id
-            pydra_controller.remote_node_edit(form.cleaned_data)
+            pydra_controller.node_edit(form.cleaned_data)
 
             return HttpResponseRedirect('%s/nodes' % settings.SITE_ROOT) # Redirect after POST
 
     else:
         if id:
-            node = pydra_controller.remote_node_detail(id)
+            node = pydra_controller.node_detail(id)
             form = NodeForm(node)
         else:
             # An unbound form
@@ -132,8 +136,8 @@ def discover(request):
                 Node.objects.create(host=host, port=port)
                 reconnect = True
         if reconnect:
-            pydra_controller.remote_connect()
-    return render_to_response('discover.html', {'known_nodes': pydra_controller.remote_list_known_nodes()})
+            pydra_controller.connect()
+    return render_to_response('discover.html', {'known_nodes': pydra_controller.list_known_nodes()})
 
 
 def node_status(request):
@@ -145,7 +149,7 @@ def node_status(request):
     }, [pydra_processor])
 
     try:
-        response = simplejson.dumps(pydra_controller.remote_node_status())
+        response = simplejson.dumps(pydra_controller.node_status())
     except ControllerException, e:
         response = e.code
 
@@ -159,19 +163,19 @@ def jobs(request):
     error = None
 
     try:
-        tasks = pydra_controller.remote_list_tasks()
+        tasks = pydra_controller.list_tasks()
     except ControllerException, e:
         tasks = None
         error = e.code
 
     try:
-        queue = pydra_controller.remote_list_queue()
+        queue = pydra_controller.list_queue()
     except ControllerException, e:
         queue = None
         error = e.code
 
     try:
-        running = pydra_controller.remote_list_running()
+        running = pydra_controller.list_running()
     except ControllerException, e:
         running = None
         error = e.code
@@ -196,7 +200,7 @@ def task_history(request):
 
     error = None
     try:
-        history = pydra_controller.remote_task_history(request.GET['key'], page)
+        history = pydra_controller.task_history(request.GET['key'], page)
     except ControllerException, e:
         history = None
         error = e.code
@@ -216,9 +220,9 @@ def task_history_detail(request):
     error = None
     id = request.GET['id']
     try:
-        detail = pydra_controller.remote_task_history_detail(id)
+        detail = pydra_controller.task_history_detail(id)
     except ControllerException, e:
-        history = None
+        detail = None
         error = e.code
 
     return render_to_response('task_history_detail.html', {
@@ -235,7 +239,7 @@ def task_progress(request):
     }, [pydra_processor])
 
     try:
-        data = simplejson.dumps(pydra_controller.remote_task_statuses())
+        data = simplejson.dumps(pydra_controller.task_statuses())
     except ControllerException, e:
         data = e.code
 
@@ -259,7 +263,7 @@ def run_task(request):
     }, [pydra_processor])
 
     try:
-        response = simplejson.dumps(pydra_controller.remote_queue_task(key, args))
+        response = simplejson.dumps(pydra_controller.queue_task(key, args))
     except ControllerException, e:
         response = e.code
 
@@ -277,7 +281,7 @@ def cancel_task(request):
     }, [pydra_processor])
 
     try:
-        response = pydra_controller.remote_cancel_task(id)
+        response = pydra_controller.cancel_task(id)
     except ControllerException, e:
         response = e.code
 

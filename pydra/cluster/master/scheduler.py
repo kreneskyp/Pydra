@@ -126,8 +126,8 @@ class TaskScheduler(Module):
             self.task_statuses,
             self.cancel_task,
             self.queue_task,
-            (self.get_queued_tasks,'list_queue'),
-            (self.get_running_tasks,'list_running')
+            (self.get_queued_tasks, {'name':'list_queue'}),
+            (self.get_running_tasks, {'name':'list_running'})
         ]
 
 

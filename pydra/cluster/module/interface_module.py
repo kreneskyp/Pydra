@@ -17,6 +17,11 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import datetime
+import hashlib
+
+from twisted.internet import reactor
+from twisted.python.randbytes import secureRandom
 
 from pydra.cluster.module.module import Module
 from pydra.cluster.module.attribute_wrapper import AttributeWrapper
@@ -39,8 +44,17 @@ class InterfaceModule(Module):
         self._registered_interfaces = {}   
         Module.__init__(self, manager)
 
+        self.register_interface(self, self.authenticate, {'auth':False, \
+                                                          'include_user':True})
+        self.register_interface(self, self.challenge_response, {'auth':False, \
+                                                        'include_user':True})
 
-    def register_interface(self, module, interface):
+        # sessions - temporary sessions for all authenticated controllers
+        self.sessions = {}
+        self.session_cleanup = reactor.callLater(20, self.__clean_sessions)
+
+
+    def register_interface(self, module, interface, params={}):
         """
         Registers an interface with this class.  The functions passed in are
         added to a dictionary that is searched when __getattribute__ is called.
@@ -53,12 +67,14 @@ class InterfaceModule(Module):
                           be a tuple or list of function/property and the name
                           to bind it as.
         """
+        name = None
 
         # unpack interface if it is a tuple of values
         if isinstance(interface, (tuple, list)):
-            interface, name = interface
-        else:
-            name = None
+            interface, params = interface
+            if 'name' in params:
+                name = params['name']
+                del params['name']
 
         if isinstance(interface, (str,)):
             name = name if name else interface
@@ -67,10 +83,60 @@ class InterfaceModule(Module):
             name = name if name else interface.__name__
 
         if name in self._registered_interfaces:
-            logger.debug('Binding over existing interface mapped: %s - to %s' % (name, self._registered_interfaces[name]))
+            logger.debug('Binding over existing interface mapped: %s - to %s' \
+                        % (name, self._registered_interfaces[name]))
 
-        self._registered_interfaces[name] = self.wrap_interface(interface)
+        self._registered_interfaces[name] = self.wrap_interface(interface, params)
         logger.debug('Exposing Interface: %s - %s.%s' % (name, module, interface))
+
+
+    def __clean_sessions(self):
+        """
+        Remove session that have expired.
+        """
+        sessions = self.sessions
+        now = datetime.datetime.now()
+        for k,v in sessions.items():
+            if v['expire'] <= now:
+                del sessions[k]
+
+        self.session_cleanup = reactor.callLater(20, self.__clean_sessions)
+
+
+    def authenticate(self, user):
+        """
+        Starts the authentication process by generating a challenge string
+        """
+        # create a random challenge.  The plaintext string must be hashed
+        # so that it is safe to be sent over the AMF service.
+        challenge = hashlib.sha512(secureRandom(self.key_size/16)).hexdigest()
+
+        # now encode and hash the challenge string so it is not stored 
+        # plaintext.  It will be received in this same form so it will be 
+        # easier to compare
+        challenge_enc = self.priv_key_encrypt(challenge, None)
+        challenge_hash = hashlib.sha512(challenge_enc[0]).hexdigest()
+
+        self.sessions[user]['challenge'] = challenge_hash
+        print 'authenticate', user, challenge_hash
+        return challenge
+
+
+    def challenge_response(self, user, response):
+        """
+        Verify a response to a challenge.  A matching response allows
+        this instance access to other functions that can manipulate the 
+        cluster
+        """
+        print 'challenge_response', user, response
+        challenge = self.sessions[user]['challenge']
+        if challenge and challenge == response:
+            self.sessions[user]['auth'] = True
+
+        # destroy challenge, each challenge is one use only.
+        self.sessions[user]['challenge'] = None
+
+        return self.sessions[user]['auth']
 
 
     def wrap_interface(self, interface):

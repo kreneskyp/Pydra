@@ -30,10 +30,10 @@ def available_cores(node):
     """
     Filter that returns the the number of available cores on a node
     """
-    if node.cores_available:
-        return node.cores_available
+    if node['cores_available']:
+        return node['cores_available']
     else:
-        return node.cores
+        return node['cores']
 register.filter('available_cores',available_cores)
 
 
@@ -42,11 +42,11 @@ def node_range(node):
     """
     Filter that creates a range equal to the number of cores available on a node
     """
-    if node.cores_available:
+    if node['cores_available']:
         return range(0,node['cores_available'])
 
     #default to all cores
-    if node.cores:
+    if node['cores']:
         return range(0,node['cores'])
 
     #node hasn't been initialized, we don't know how many cores it has

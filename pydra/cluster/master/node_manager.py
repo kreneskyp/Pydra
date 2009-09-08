@@ -41,7 +41,7 @@ class NodeManager(Module):
         Returns details for a single node
         """
         node = Node.objects.get(id=id)
-        return node
+        return node.json_safe()
         
 
     def node_edit(self, values):
@@ -93,13 +93,14 @@ class NodeManager(Module):
         except (EmptyPage, InvalidPage):
             page = paginator.num_pages
             paginatedNodes = paginator.page(page)
+        instances = [node.json_safe() for node in paginatedNodes.object_list]
 
         #generate a list of pages to display in the pagination bar
         pages = ([i for i in range(1, 11 if page < 8 else 3)],
                 [i for i in range(page-5,page+5)] if page > 7 and page < paginator.num_pages-6 else None,
                 [i for i in range(paginator.num_pages-(1 if page < paginator.num_pages-6 else 9), paginator.num_pages+1)])
     
-        return paginatedNodes.object_list, pages
+        return instances, pages
 
 
     def node_status(self):

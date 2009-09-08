@@ -23,6 +23,9 @@ from django.conf.urls.defaults import *
 from views import *
 from django.contrib.auth.views import login, logout
 
+from pydra.config import load_settings
+load_settings()
+
 urlpatterns = patterns('',
     #default
     (r'^$', jobs),

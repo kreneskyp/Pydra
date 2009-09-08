@@ -18,8 +18,10 @@
 """
 from __future__ import with_statement
 
-from django.db import models
 from threading import Lock
+import time
+
+from django.db import models
 
 """ ================================
 Models
@@ -63,6 +65,9 @@ class Node(models.Model):
         permissions = (
             ("can_edit_nodes", "Can create and edit nodes"),
         )
+
+    def json_safe(self):
+        return self.__dict__
 
     def load_pub_key(self):
         """
@@ -157,6 +162,23 @@ class TaskInstance(models.Model):
            have a relatively higher score.
         """
         return self.priority 
+
+    def json_safe(self):
+        """
+        return object as a dictionary of json safe values.  This is needed
+        because some complex types like Datetime will cause an exception if
+        you attempt to serialize them with simplejson
+        """
+        return {
+            'id':self.id,
+            'status':self.status,
+            'queued':self.queued.strftime('%Y-%m-%d %H:%m:%S') \
+                                                    if self.queued else None,
+            'started':self.started.strftime('%Y-%m-%d %H:%m:%S') \
+                                                    if self.started else None,
+            'completed':self.completed.strftime('%Y-%m-%d %H:%m:%S') \
+                                                    if self.completed else None
+        }
 
     def queue_worker_request(self, request):
         """

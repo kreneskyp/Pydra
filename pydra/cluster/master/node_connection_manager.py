@@ -26,7 +26,6 @@ from twisted.spread import pb
 
 from pydra.models import Node
 from pydra.cluster.module import Module, ModuleReferenceable
-from pydra.cluster.amf.interface import authenticated
 from pydra.cluster.auth.rsa_auth import RSAClient, load_crypto
 import pydra_settings
 
@@ -101,7 +100,7 @@ class NodeConnectionManager(Module):
         }
 
         self._interfaces = [
-            authenticated(self.connect)
+            self.connect
         ]
 
         Module.__init__(self, manager)
