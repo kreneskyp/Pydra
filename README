@@ -1,0 +1,6 @@
+Pydra is python framework for writing parallel and distributed programs.  It seeks to abstract the ideas of parallization simplifying the programing work required for distributed programs
+
+For more documentation on how to use and develop applications for Pydra please see:  http://Pydra-project.osuosl.org
+
+== Installation ==
+See INSTALL in the same directory as this file

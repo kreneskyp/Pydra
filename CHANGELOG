@@ -1,0 +1,30 @@
+Pydra 0.5 (beta)
+
+    The initial release of Pydra.  This is a beta release, and in the true sense of the word some things are incomplete, broken, or missing entirely.  The core parts of the application are functional, but you milage may vary.
+
+Working Features:
+   
+    * Task API with:
+         * basic building blocks which can be combined to build complex, reusable Tasks.  Base classes include a basic task and containers for sequential work, parallel work, and MapReduce.
+         * Datasource API for managing connections and input efficiently.
+         * Forms for defining, processing, and validating data.
+         * Task Packaging system for packaging tasks, supporting files, and libraries
+
+         For more information see the wiki: http://pydra-project.osuosl.org/wiki/tasks
+    
+    * Synchronization system for deploying Tasks Packages. Task code deployed to the TASKS_DIR and will be synchronized automatically to all Nodes in the cluster.  The synchronization method tracks and handles different versions of the code automatically.
+    * Queuing system will track and run tasks.
+    * Task history is recorded, in any database supported by Django, for use debugging and by future profiling components.
+    * Web based frontend for managing and running tasks.
+    * REST API for controlling pydra from within other programs.  This includes a client object to simplify dealing with pydra's strict authentication system.
+    * All connections within the cluster are secured with RSA key-pair authentication.
+    * Cluster components are modular, allowing features to be optional and pluggable in the future.
+
+
+Major Known Bugs:
+    * (#123) ParallelTask can only be cancelled once.  Subsequent attempts to run and cancel a ParallelTask result in a catostrophic failure.
+    * (#122) Exceptions thrown by subtasks of MapReduce and ParallelTask are not handled properly and cause a catostrophic failure
+    * Various errors with the user interface, especially when dealing with multiple users
+ 
+    Please report bugs at: http://pydra-project.osuosl.org/newticket
+
