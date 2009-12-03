@@ -73,6 +73,11 @@ class WebControllerFunction():
         Authenticate with server and then recall this WebControllerFunction
         if successful
         """
+
+        # If priv_key is None, then master.key didn't get loaded correctly.
+        if self.controller.priv_key is None:
+            raise ControllerException(CONTROLLER_ERROR_NO_RSA_KEY)
+
         challenge_func = WebControllerFunction(self.controller, 'authenticate')
         challenge = challenge_func().__str__()
 
