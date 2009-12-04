@@ -64,12 +64,13 @@ class MasterAvatar(ModuleAvatar, RSAAvatar):
             self.server.master_pub_key = rsa_key
 
             key_file = None
-            try:            
-                key_file = file('%s/node.master.key' % \
-                        pydra_settings.RUNTIME_FILES_DIR, 'w')
+            try:           
+                key_path = '%s/node.master.key' % \
+                        pydra_settings.RUNTIME_FILES_DIR 
+                key_file = file(key_path, 'w')
                 logger.info('saving new master key')
                 key_file = key_file.write(json_key)
-                os.chmod('./node.master.key', 0400)                
+                os.chmod(key_path, 0400)                
             finally:
                 if key_file:
                     key_file.close()
