@@ -30,6 +30,7 @@ class NodeManager(Module):
             self.node_list,
             self.node_detail,
             self.node_edit,
+            self.node_delete,
             self.node_status
         ]
 
@@ -62,13 +63,22 @@ class NodeManager(Module):
             node.__dict__[k] = v
         node.save()
 
-
         #emit signals
         if new:
             self.emit('NODE_CREATED', node)
 
         else:            
             self.emit('NODE_UPDATED', node)
+
+
+    def node_delete(self, id):
+        """
+        deletes a node with the id passed in.
+        """
+        node = Node.objects.get(id=id)
+        node.deleted = True
+        node.save()
+        self.emit('NODE_DELETED', node)
 
 
     def node_list(self, page=1):

@@ -90,6 +90,31 @@ def nodes(request):
 
 
 @user_passes_test(lambda u: u.has_perm('pydra.web.can_edit_nodes'))
+def node_delete(request, id=None):
+    """
+    Handler for deleting nodes
+    """
+    c = RequestContext(request, processors=[pydra_processor, settings_processor])
+
+    if id: 
+        pydra_controller.node_delete(id)
+        return HttpResponseRedirect('%s/nodes' % settings.SITE_ROOT) # Redirect after POST
+
+    else:
+        if id:
+            node = pydra_controller.node_detail(id)
+            form = NodeForm(node)
+        else:
+            # An unbound form
+            form = NodeForm() 
+
+    return render_to_response('node_edit.html', {
+        'form': form,
+        'id':id,
+    }, context_instance=c)
+
+
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_edit_nodes'))
 def node_edit(request, id=None):
     """
     Handler for creating and editing nodes
@@ -117,7 +142,7 @@ def node_edit(request, id=None):
     return render_to_response('node_edit.html', {
         'form': form,
         'id':id,
-    }, context_instance=RequestContext(request, processors=[settings_processor]))
+    }, context_instance=c)
 
 
 @user_passes_test(lambda u: u.has_perm('pydra.web.can_edit_nodes'))

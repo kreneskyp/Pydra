@@ -1,5 +1,57 @@
 {% extends "base.html" %}
 
+{% block head %}
+    {{ block.super }}
+    
+    <style>
+        table {
+            padding:5px;
+        }
+    
+        #content {
+            width:800px;
+        }
+    
+        #auto {
+            background-color:#FFFFE5;
+            border: 1px solid ;
+            margin-top:20px;
+            margin-bottom:20px;
+            -moz-border-radius: 5px;
+            -webkit-border-radius: 5px;
+        }
+        
+        .delete, .save {float:left;}
+        .delete {margin-left:30px;}
+        
+        #buttons {
+            margin:20px auto 0 auto;
+            width: 184px;
+        }
+    </style>
+    
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $('.save').not('.icon').click(function(){
+                f = $('#node')
+                    .attr('action','{{SITE_ROOT}}/nodes/edit/{{id}}')
+                    .submit();
+                console.log(f);
+            });
+
+            $('.delete').not('.icon').click(function(){
+                if(confirm('Are you sure?  This action cannot be undone.')){
+                    $('#node')
+                        .attr('action','{{SITE_ROOT}}/nodes/delete/{{id}}')
+                        .submit();
+                }
+            });
+        });
+        
+        
+    </script>
+{% endblock %}
+
 {% block content %}
     {% if form.errors %}
         <div id="errors">
@@ -13,8 +65,8 @@
     {% endif %}
 
     <div id="formContainer">
-        <form name="node" method="POST" action="{{SITE_ROOT}}/nodes/edit/{{id}}">
-            <table id="protein">
+        <form id="node" name="node" method="POST" action="{{SITE_ROOT}}/nodes/edit/{{id}}">
+            <table>
             <tbody>
             <tr>
                 <td class="label">{{form.host.label}}</td>
@@ -28,29 +80,32 @@
                 <td class="label">{{form.cores_available.label}}</td>
                 <td>{{form.cores_available}}</td>
             </tr>
-            
-            
-            <tr>
-                <td colspan="100%">These fields will be autodetected by the node and reported back.  You may update them if you like.   At some point these fields will be used to pick automatically set node priority</td>
-            </td>
-            <tr>
-                <td class="label">{{form.cores.label}}</td>
-                <td>{{form.cores}}</td>
-            </tr>
-            <tr>
-                <td class="label">{{form.cpu_speed.label}}</td>
-                <td>{{form.cpu_speed}}</td>
-            </tr>
-            <tr>
-                <td class="label">{{form.memory.label}}</td>
-                <td>{{form.memory}}</td>
-            </tr>          
-
-
-            <tr class="spacer"/>
-            <tr class="submit"><td class="submit" colspan="100%"><input class="submit" type="submit" value="Submit"></td></tr>
             </tbody>
             </table>
+            
+            <table id="auto">
+                <tr >
+                    <td colspan="100%"><b>These fields will be autodetected by the node and reported back.  You may update them if you like.   At some point these fields will be used to intelligently select nodes for work requests</b></td>
+                </td>
+                <tr>
+                    <td class="label">{{form.cores.label}}</td>
+                    <td>{{form.cores}}</td>
+                </tr>
+                <tr>
+                    <td class="label">{{form.cpu_speed.label}}</td>
+                    <td>{{form.cpu_speed}}</td>
+                </tr>
+                <tr>
+                    <td class="label">{{form.memory.label}}</td>
+                    <td>{{form.memory}}</td>
+                </tr>          
+            </table>
+
+            <div id="buttons">
+                <div class="save">Save <div class="icon save"></div></div>
+                <div class="delete">Delete <div class="icon delete"></div></div>
+            </div>
+            
             </div>
 
         </form>

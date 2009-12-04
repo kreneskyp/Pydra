@@ -135,8 +135,40 @@
                 text-decoration:none; 
             }
 
+            input {
+                border: 1px solid #888888;
+                padding:2px 3px 2px 3px;
+                -moz-border-radius: 3px;
+                -webkit-border-radius: 3px;
+            }
+
+
+            .save {
+                background-color:#c2e192;
+                border: 1px solid #124612;
+                color:#124612;
+                cursor:pointer;
+                font-weight:bold;
+                width:75px;
+                -moz-border-radius: 3px;
+                -webkit-border-radius: 3px;
+            }
+
+            .delete {
+                background-color:#ee9c98;
+                border: 1px solid #550000;
+                color:#550000;
+                cursor:pointer;
+                font-weight:bold;
+                width:75px;
+                -moz-border-radius: 3px;
+                -webkit-border-radius: 3px;
+            }
+
             .icon, .button {
+                background-color:transparent;
                 background-repeat:no-repeat;
+                border:0;
                 float:left;
                 height:16px;
                 margin-right:5px;
@@ -157,7 +189,14 @@
             .icon.task_status_stopped   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
             .icon.task_status_running   { background-image:url({{MEDIA}}/images/icons/cog_go.png); }
             .icon.task_status_complete  { background-image:url({{MEDIA}}/images/icons/accept.png); }
+            .icon.save  { background-image:url({{MEDIA}}/images/icons/accept.png); margin-top:4px; margin-left:3px;}
+            .icon.delete { background-image:url({{MEDIA}}/images/icons/delete.png); margin-top:4px; margin-left:3px;}
 
+            td.label {
+                width:100px;
+            }
+
+            
         </style>
     {% endblock %}
 
