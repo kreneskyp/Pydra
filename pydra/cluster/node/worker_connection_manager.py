@@ -60,7 +60,8 @@ class WorkerConnectionManager(Module):
         self._lock = Lock() #general lock, use when multiple shared resources are touched
 
         #load rsa crypto
-        self.pub_key, self.priv_key = load_crypto('./node.key')
+        self.pub_key, self.priv_key = load_crypto('%s/node.key' % \
+                pydra_settings.RUNTIME_FILES_DIR)
 
         #cluster management
         self.workers = {}
