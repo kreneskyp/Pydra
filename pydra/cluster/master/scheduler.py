@@ -114,7 +114,6 @@ class TaskScheduler(Module):
             ('NODE', self.request_worker),
             ('NODE', self.send_results),
             ('NODE', self.worker_stopped),
-            ('NODE', self.task_failed),
             ('NODE', self.request_worker_release)
         ]
 
@@ -681,7 +680,7 @@ class TaskScheduler(Module):
                 task_instance.save()
 
 
-    def send_results(self, worker_key, results, workunit_key):
+    def send_results(self, worker_key, results, workunit_key, failed=False):
         """
         Called by workers when they have completed their task.
 
@@ -689,12 +688,16 @@ class TaskScheduler(Module):
         """
         logger.debug('Worker:%s - sent results: w=%s results=%s' % \
             (worker_key, workunit_key, results))
+        status = STATUS_FAILED if failed else STATUS_COMPLETE
+        status_msg = 'failed' if failed else 'completed'
         # TODO: this lock does not appear to be sufficient because all of the
         # other functions use specific locks, might need to obtain both locks
         with self._lock:
             job = self.get_worker_job(worker_key)
-            logger.info('Worker:%s - completed: %s:%s (%s)' %  \
-                (worker_key, job.task_key, job.subtask_key, job.workunit_key))
+            
+            logger.info('Worker:%s - %s: %s:%s (%s)' %  \
+                (status_msg, worker_key, job.task_key, job.subtask_key, \
+                 job.workunit_key))
 
             # check to make sure the task was still in the queue.  Its possible
             # this call was made at the same time a task was being canceled.  
@@ -732,7 +735,7 @@ class TaskScheduler(Module):
                 # save information about this workunit to the database
                 work_unit = job.model
                 work_unit.completed = datetime.now()
-                work_unit.status = STATUS_COMPLETE
+                work_unit.status = status
                 work_unit.save()
 
             else:
@@ -740,29 +743,7 @@ class TaskScheduler(Module):
                 # idle pool
                 logger.info("Root task:%s completed by worker:%s" %
                         (job.task_key, worker_key))
-                self.add_worker(worker_key)
-
-
-
-    def task_failed(self, worker_key, results, workunit_key):
-        """
-        Called by workers when the task they were running throws an exception
-        """
-        with self._lock:
-            job = self.get_worker_job(worker_key)
-            if job is not None:
-                logger.info('Worker:%s - failed: %s:%s (%s)' % (worker_key,
-                        job.task_key, job.subtask_key, job.workunit_key))
-            self.add_worker(worker_key, STATUS_FAILED)
-
-            # cancel the task and send notice to all other workers to stop
-            # working on this task.  This may be partially recoverable but that
-            # is not included for now.
-            for other_worker_key in self.get_workers_on_task(job.root_task_id):
-                if other_worker_key != worker_key:
-                    worker = self.workers[other_worker_key]
-                    logger.debug('signalling worker to stop: %s' % worker_key)
-                    worker.remote.callRemote('stop_task')
+                self.add_worker(worker_key, status)
 
 
     def worker_stopped(self, worker_key):

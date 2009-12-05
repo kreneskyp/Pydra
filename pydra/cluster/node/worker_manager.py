@@ -58,7 +58,6 @@ class WorkerManager(Module):
             ('WORKER', self.send_results),
             ('WORKER', self.request_worker),
             ('WORKER', self.worker_stopped),
-            ('WORKER', self.task_failed),
             ('WORKER', self.request_worker_release)
 
         ]
@@ -310,10 +309,6 @@ class WorkerManager(Module):
 
     def stop_task(self, master, worker_id):
         return self.proxy_to_worker('stop_task', worker_id)
-
-
-    def task_failed(self, *args, **kwargs):
-        return self.proxy_to_master('task_failed', *args, **kwargs)
 
 
     def task_status(self, master, worker_id):

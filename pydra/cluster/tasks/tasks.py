@@ -81,7 +81,8 @@ class Task(object):
         self._status = STATUS_STOPPED
         self._reset()
 
-    def start(self, args={}, subtask_key=None, callback=None, callback_args={}, errback=None):
+    def start(self, args={}, subtask_key=None, callback=None, callback_args={},
+              errback=None, errback_args={}):
         """
         starts the task.  This will spawn the work in a workunit thread.
         """
@@ -105,8 +106,7 @@ class Task(object):
             self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
         if errback:
-            self.work_deferred.addErrback(errback)
-
+            self.work_deferred.addErrback(errback, **errback_args)
 
         return 1
 

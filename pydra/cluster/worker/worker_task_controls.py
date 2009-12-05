@@ -137,7 +137,8 @@ class WorkerTaskControls(Module):
             self.__local_task_instance.logger = get_task_logger( \
                 self.worker_key, task_id, subtask_key, workunit_key)
             return self.__local_task_instance.start(clean_args, subtask_key, \
-                self.work_complete, {'local':True}, errback=self.work_failed)
+                self.work_complete, {'local':True}, self.work_complete, \
+                {'local':True, 'failed':True})
 
         else:
             #create an instance of the requested task
@@ -147,7 +148,7 @@ class WorkerTaskControls(Module):
             self.__task_instance.logger = get_task_logger(self.worker_key, \
                 task_id)
             return self.__task_instance.start(clean_args, subtask_key, \
-                self.work_complete, errback=self.work_failed)
+                self.work_complete, {}, self.work_complete, {'failed':True})
 
 
     def stop_task(self):
@@ -176,10 +177,22 @@ class WorkerTaskControls(Module):
         return (WORKER_STATUS_IDLE,)
 
 
-    def work_complete(self, results, local=False):
+    def work_complete(self, results, local=False, failed=False):
         """
-        Callback that is called when a job is run in non_blocking mode.
+        Callback that is called when a job is run in non_blocking mode and has
+        finished.  This callback handles both successful tasks and failures
+        caused by exceptions in the users task.
+        
+        @param results - results from task, or a twisted failure object
+        @param local - is this workunit being processed locally by the main
+                        worker
+        @param failed - was there an exception thrown in the task
         """
+        
+        # create traceback if its an error
+        if failed:
+            results = results.__str__()
+        
         if local:
             workunit_key = self.__local_workunit_key
             task_instance = self.__local_task_instance
@@ -206,31 +219,15 @@ class WorkerTaskControls(Module):
             # if the master is still there send the results
             with self._lock_connection:
                 if self.master:
-                    deferred = self.master.callRemote("send_results", results, workunit_key)
+                    deferred = self.master.callRemote("send_results", results, \
+                                                      workunit_key, failed)
                     deferred.addCallback(self.send_successful)
-                    deferred.addErrback(self.send_results_failed, results, workunit_key)
+                    deferred.addErrback(self.send_results_failed, results, \
+                                        workunit_key)
 
                 # master disapeared, hold results until it requests them
                 else:
                     self.__results = results
-
-
-    def work_failed(self, results):
-        """
-        Callback that there was an exception thrown by the task
-        """
-        self.__task = None
-
-        with self._lock_connection:
-            if self.master:
-                deferred = self.master.callRemote("task_failed", results, self.__workunit_key)
-                logger.error('Worker - Task Failed: %s' % results)
-                #deferred.addErrback(self.send_failed_failed, results, self.__workunit_key)
-
-            # master disapeared, hold failure until it comes back online and requests it
-            else:
-                #TODO implement me
-                pass
 
 
     def send_results_failed(self, results, task_results, workunit_key):
