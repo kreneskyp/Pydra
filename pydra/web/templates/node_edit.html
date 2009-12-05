@@ -13,8 +13,8 @@
         }
     
         #auto {
-            background-color:#FFFFE5;
-            border: 1px solid ;
+            background-color:#eeeeee;
+            border: 1px solid #888888;
             margin-top:20px;
             margin-bottom:20px;
             -moz-border-radius: 5px;
@@ -30,6 +30,7 @@
         }
     </style>
     
+    <script src="{{MEDIA}}/js/jquery.qtip-1.0.0-rc3.min.js" type="text/javascript" charset="utf-8"></script>
     <script type="text/javascript">
         $(document).ready(function() {
             $('.save').not('.icon').click(function(){
@@ -46,9 +47,39 @@
                         .submit();
                 }
             });
+
+            $('input')
+                .each(function(){
+                $this = $(this);    
+                title = $(this.parentNode).attr('title');
+                $(this).qtip({
+                    content: title,
+                    position: {
+                        corner: {
+                            tooltip: 'leftMiddle',
+                            target: 'rightMiddle'
+                        }
+                    },
+                    show: {
+                        when: {event:'focus'},// show on focus
+                    },
+                    hide: false, // Don't hide on mouseout
+                    style: {
+                        border: {
+                            width: 2,
+                            radius: 5
+                        },
+                        padding: 10, 
+                        textAlign: 'center',
+                        tip: true, // Give it a speech bubble tip with automatic corner detection
+                        name: 'blue' // Style it according to the preset 'blue' style
+                    }
+                })
+                //standard blur event handler since qtip one is broken.
+                .blur(function(){$(this).qtip('hide')});
+            
+            });
         });
-        
-        
     </script>
 {% endblock %}
 
@@ -70,15 +101,15 @@
             <tbody>
             <tr>
                 <td class="label">{{form.host.label}}</td>
-                <td>{{form.host}}</td>
+                <td title="Host or IP address of the Node.">{{form.host}}</td>
             </tr>
             <tr>
                 <td class="label">{{form.port.label}}</td>
-                <td>{{form.port}}</td>
+                <td title="Port to connect to the Node on.">{{form.port}}</td>
             </tr>
             <tr>
                 <td class="label">{{form.cores_available.label}}</td>
-                <td>{{form.cores_available}}</td>
+                <td title="Number of cores available for use on this Node.  This restricts pydra from fully utilizing all cores on a machine. Default is all cores">{{form.cores_available}}</td>
             </tr>
             </tbody>
             </table>
@@ -89,15 +120,15 @@
                 </td>
                 <tr>
                     <td class="label">{{form.cores.label}}</td>
-                    <td>{{form.cores}}</td>
+                    <td title="Physical number of cores in the Node">{{form.cores}}</td>
                 </tr>
                 <tr>
                     <td class="label">{{form.cpu_speed.label}}</td>
-                    <td>{{form.cpu_speed}}</td>
+                    <td title="CPU Speed in MHZ.  ie 2GHZ = 2000">{{form.cpu_speed}}</td>
                 </tr>
                 <tr>
                     <td class="label">{{form.memory.label}}</td>
-                    <td>{{form.memory}}</td>
+                    <td title="Memory in MB,  ie. 2GB = 2000">{{form.memory}}</td>
                 </tr>          
             </table>
 
