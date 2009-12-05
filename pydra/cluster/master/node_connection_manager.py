@@ -159,7 +159,7 @@ class NodeConnectionManager(Module):
             self.connecting=True
 
             # make sure the various states are in sync
-            for i in Node.objects.all():
+            for i in Node.objects.exclude(deleted=True):
                 if i.id not in self.nodes:
                     self.nodes[i.id] = i
                 if (i.host, i.port) in self.known_nodes:
