@@ -96,7 +96,8 @@ class TaskManager(Module):
 
 
     def processTask(self, task, tasklist=None, parent=False):
-        """ Iterates through a task and its children to build an array display information
+        """ Iterates through a task and its children to build an array display
+        information
 
         @param task: Task to process
         @param tasklist: Array to append data onto.  Uused for recursion.
@@ -121,7 +122,8 @@ class TaskManager(Module):
 
 
     def processTaskProgress(self, task, tasklist=None):
-        """ Iterates through a task and its children to build an array of status information
+        """ Iterates through a task and its children to build an array of
+        status information
         @param task: Task to process
         @param tasklist: Array to append data onto.  Uused for recursion.
         """
@@ -130,7 +132,9 @@ class TaskManager(Module):
             tasklist = []
 
         #turn the task into a tuple
-        processedTask = {'id':task.id, 'status':task.status(), 'progress':task.progress(), 'msg':task.progressMessage()}
+        processedTask = {'id':task.id, 'status':task.status(), \
+                         'progress':task.progress(), \
+        'msg':task.progressMessage()}
 
         #add that task to the list
         tasklist.append(processedTask)
@@ -282,8 +286,8 @@ class TaskManager(Module):
         except TaskInstance.DoesNotExist:
             return None
 
-        workunits = [workunit for workunit in task_instance.workunits.all() \
-            .order_by('id')]
+        workunits = [workunit.json_safe() for workunit in
+                     task_instance.workunits.all().order_by('id')]
         task_key = task_instance.task_key
         task = self.registry[task_key, None].tasks[task_key]
         return {

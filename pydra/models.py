@@ -245,3 +245,16 @@ class WorkUnit(models.Model):
     status          = models.IntegerField(null=True)
     log_retrieved   = models.BooleanField(default=False)
 
+    def json_safe(self):
+        return {
+            'subtask_key':self.subtask_key,
+            'workunit_key':self.workunit_key,
+            'args':self.args,
+            'started':self.started.strftime('%Y-%m-%d %H:%m:%S') \
+                                                    if self.started else None,
+            'completed':self.completed.strftime('%Y-%m-%d %H:%m:%S') \
+                                                if self.completed else None,
+            'worker':self.worker,
+            'status':self.status,
+            'log_retrieved':self.log_retrieved
+        }
