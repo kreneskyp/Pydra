@@ -86,7 +86,7 @@ class NodeManager(Module):
         Lists Nodes saved in the database
         """
         # get nodes
-        nodes = Node.objects.all()
+        nodes = Node.objects.exclude(deleted=True)
 
         # paginate
         paginator = Paginator(nodes, 25) # Show 25 nodes per page

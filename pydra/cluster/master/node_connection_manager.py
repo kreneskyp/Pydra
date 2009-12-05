@@ -129,7 +129,7 @@ class NodeConnectionManager(Module):
         Load node configuration from the database
         """
         logger.info('loading nodes')
-        nodes = Node.objects.all()
+        nodes = Node.objects.exclude(deleted=True)
         node_dict = {}
         for node in nodes:
             node_dict[node.id] = node
@@ -341,4 +341,3 @@ class NodeConnectionManager(Module):
         Called when a call to initialize a Node is successful
         """
         logger.info('node:%s - ready' % node)
-

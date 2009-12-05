@@ -48,6 +48,7 @@ class Node(models.Model):
     cpu_speed       = models.IntegerField(null=True)
     memory          = models.IntegerField(null=True)
     seen            = models.IntegerField(default=False)
+    deleted         = models.BooleanField(default=False)
 
     # non-model fields
     ref             = None
