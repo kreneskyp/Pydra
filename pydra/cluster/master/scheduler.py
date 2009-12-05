@@ -155,8 +155,7 @@ class TaskScheduler(Module):
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
-        self._active_workers = []
-        self._worker_mappings = {}  # worker-job mappings
+        self._active_workers = {}  # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
 
         # a set containing all main workers
@@ -251,7 +250,7 @@ class TaskScheduler(Module):
                         worker_key)
                 return
 
-        job = self._worker_mappings.get(worker_key, None)
+        job = self._active_workers.get(worker_key, None)
         if job:
             task_instance = self._active_tasks[job.root_task_id]
             if worker_key in self._main_workers:
@@ -272,7 +271,7 @@ class TaskScheduler(Module):
                     with self._worker_lock:
                         self._main_workers.remove(worker_key)
                         self._idle_workers.append(worker_key)
-                        del self._worker_mappings[worker_key]
+                        del self._active_workers[worker_key]
                     status = STATUS_COMPLETE if task_status is None else task_status
                     task_instance.status = status
                     task_instance.completed = datetime.now()
@@ -302,7 +301,7 @@ class TaskScheduler(Module):
                 if job.subtask_key is not None:
                     # just double-check to make sure
                     with self._worker_lock:
-                        del self._worker_mappings[worker_key]
+                        del self._active_workers[worker_key]
                         task_instance.running_workers.remove(worker_key) 
                         self._idle_workers.append(worker_key)
         else:
@@ -357,13 +356,13 @@ class TaskScheduler(Module):
         with self._worker_lock:
             if worker_key not in self._main_workers:
                 # we don't need to retain a main worker
-                job = self._worker_mappings.get(worker_key, None)
+                job = self._active_workers.get(worker_key, None)
                 if job:
                     task_instance = self._active_tasks.get(job.root_task_id, None)
                     if task_instance and worker_key <> task_instance.main_worker:
                         task_instance.running_workers.remove(worker_key)
                         task_instance.waiting_workers.append(worker_key)
-                        del self._worker_mappings[worker_key]
+                        del self._active_workers[worker_key]
 
 
 
@@ -397,7 +396,7 @@ class TaskScheduler(Module):
         """
         Returns a WorkerJob object or None if the worker is idle.
         """
-        return self._worker_mappings.get(worker_key, None)
+        return self._active_workers.get(worker_key, None)
 
 
     def get_workers_on_task(self, root_task_id):
@@ -491,7 +490,7 @@ class TaskScheduler(Module):
                                     (worker_key, subtask_key, workunit_key))
                             task_instance.running_workers.append(worker_key)
 
-                        elif subtask_key and not self._worker_mappings[requester].workunit_key:
+                        elif subtask_key and not self._active_workers[requester].workunit_key:
                             # the main worker can do a local execution
                             task_instance.pop_worker_request()
                             logger.info('Main worker:%s assigned to task %s:%s' %
@@ -539,7 +538,7 @@ class TaskScheduler(Module):
         if worker_key:
             job = WorkerJob(root_task_id, task_key, args, subtask_key, \
                 workunit_key, on_main_worker)
-            self._worker_mappings[worker_key] = job
+            self._active_workers[worker_key] = job
 
             # notify remote worker to start     
             worker = self.workers[worker_key]
@@ -766,7 +765,7 @@ class TaskScheduler(Module):
         # worker in the waiting worker list
         logger.debug('[%s] request worker release' % worker_key)
         released_worker_key = None
-        job = self._worker_mappings.get(worker_key, None)
+        job = self._active_workers.get(worker_key, None)
         if job:
             task_instance = self._active_tasks.get(job.root_task_id, None)
             if task_instance:
