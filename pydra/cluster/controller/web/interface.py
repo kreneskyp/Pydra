@@ -84,7 +84,6 @@ class FunctionResource(resource.Resource):
         self.requires_auth = params['auth'] if 'auth' in params else True
         self.include_user = params['include_user'] if 'include_user' in \
                                                             params else False
-        print interface, self.requires_auth
 
     def render(self, req):
         user = req.getSession().uid
