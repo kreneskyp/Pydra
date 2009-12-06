@@ -50,7 +50,6 @@ class WorkerManager(Module):
             ('MASTER', self.worker_status),
             ('MASTER', self.task_status),
             ('MASTER', self.receive_results),
-            ('MASTER', self.receive_results),
             ('MASTER', self.release_worker),
 
             # master proxy - functions exposed to the workers that are passed
@@ -162,8 +161,9 @@ class WorkerManager(Module):
         return self.proxy_to_worker('receive_results', *args, **kwargs)
 
 
-    def release_worker(self, master, *args, **kwargs):
-        return self.proxy_to_worker('release_worker', *args, **kwargs)
+    def release_worker(self, master, worker_id, *args, **kwargs):
+        self.workers[worker_id].finished = True
+        return self.proxy_to_worker('release_worker', worker_id, *args, **kwargs)
 
 
     def request_worker(self, *args, **kwargs):
@@ -270,6 +270,7 @@ class WorkerManager(Module):
             if worker.main_worker == worker_key and not worker.local_subtask:
                 del self.workers[worker_key]
                 worker.finished = True
+
             else:
                 # worker may be reused to clear all args to avoid confusion
                 worker.subtask_key = None
