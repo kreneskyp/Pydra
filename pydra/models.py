@@ -133,20 +133,20 @@ class TaskInstance(models.Model):
 
     objects = TaskInstanceManager()
 
-    ######################
-    # non-model attributes
-    ######################
+    def __init__(self, *args, **kwargs):
+        super(TaskInstance, self).__init__(*args, **kwargs) 
+        
+        # scheduling-related
+        self.priority         = 5
+        self.running_workers  = [] # running workers keys (excluding the main worker)
+        self.waiting_workers  = [] # workers waiting for more workunits
+        self.last_succ_time   = None # when this task last time gets a worker
+        self._worker_requests = [] # (args, subtask_key, workunit_key)
+    
+        # others
+        self.main_worker  = None
+        self._request_lock = Lock()
 
-    # scheduling-related
-    priority         = 5
-    running_workers  = [] # running workers keys (excluding the main worker)
-    waiting_workers  = [] # workers waiting for more workunits
-    last_succ_time   = None # when this task last time gets a worker
-    _worker_requests = [] # (args, subtask_key, workunit_key)
-
-    # others
-    main_worker  = None
-    _request_lock = Lock()
 
     def compute_score(self):
         """
@@ -211,6 +211,12 @@ class TaskInstance(models.Model):
                 return self._worker_requests[0]
             except IndexError:
                 return None
+
+    def __str__(self):
+        return '%s' % self.json_safe()
+        
+    def __repr__(self):
+        return self.__str__()
 
     class Meta:
         permissions = (
