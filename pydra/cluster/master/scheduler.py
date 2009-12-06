@@ -155,7 +155,7 @@ class TaskScheduler(Module):
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
-        self._active_workers = {}  # worker-job mappings
+        self._active_workers = {}   # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
 
         # a set containing all main workers
@@ -419,11 +419,17 @@ class TaskScheduler(Module):
                                            is None else task_instance
 
 
-    def get_queued_tasks(self):
+    def get_queued_tasks(self, json_safe=True):
+        if json_safe:
+            return [self._active_tasks[x[1]].json_safe() \
+                for x in self._long_term_queue]
         return [self._active_tasks[x[1]] for x in self._long_term_queue]
 
 
-    def get_running_tasks(self):
+    def get_running_tasks(self, json_safe=True):
+        if json_safe:
+            return [self._active_tasks[x[1]].json_safe() \
+                for x in self._short_term_queue]
         return [self._active_tasks[x[1]] for x in self._short_term_queue]
 
 
@@ -643,9 +649,6 @@ class TaskScheduler(Module):
                 'time':time.mktime(task_instance.queued.timetuple())
                }
     
-
-
-
 
     def run_task_failed(self, results, worker_key):
         # return the worker to the pool
@@ -871,10 +874,10 @@ class TaskScheduler(Module):
         self.fetch_task_status()
 
         statuses = {}
-        for instance in self.get_queued_tasks():
+        for instance in self.get_queued_tasks(False):
             statuses[instance.id] = {'s':STATUS_STOPPED}
 
-        for instance in self.get_running_tasks():
+        for instance in self.get_running_tasks(False):
             start = time.mktime(instance.started.timetuple())
 
             # call worker to get status update

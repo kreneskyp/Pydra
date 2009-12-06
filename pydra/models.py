@@ -172,6 +172,7 @@ class TaskInstance(models.Model):
         """
         return {
             'id':self.id,
+            'task_key':self.task_key,
             'status':self.status,
             'queued':self.queued.strftime('%Y-%m-%d %H:%m:%S') \
                                                     if self.queued else None,

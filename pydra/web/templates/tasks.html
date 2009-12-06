@@ -480,13 +480,13 @@
                 <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_key">{{task.task_key}}</td>
-                    <td class="description">{{tasks|task_description:task.task_key}}</td>
+                    <td class="description"></td>
                     <td class="progress" style="display:none"><div class="bar"></div></td>
-                    <td class="queue_time">{{task.queued|date:"Y-m-d h:i:s"}}</td>
+                    <td class="queue_time">{{task.queued}}</td>
                     <td class="buttons">
                         {% if perms.pydra_server.can_manage_queue %}
-                            <input type="button" value="Up"/>
-                            <input type="button" value="Down"/>
+                            <div class="button_priority_up button" title="Priority Up"></div>
+                            <div class="button_priority_down button" title="Priority Down"></div>
                         {% endif %}
                         {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel button" title="cancel"></div>{% endif %}
                     </td>
@@ -512,9 +512,13 @@
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_name">{{task.task_key}}</td>
                     <td class="progress"><div class="bar"></div></td>
-                    <td class="queue_time">{{task.queued|date:"Y-m-d h:i:s"}}</td>
-                    <td class="start_time">{{task.started|date:"Y-m-d h:i:s"}}</td>
+                    <td class="queue_time">{{task.queued}}</td>
+                    <td class="start_time">{{task.started}}</td>
                     <td class="buttons">
+                        {% if perms.pydra_server.can_manage_queue %}
+                            <div class="button_priority_up button" title="Priority Up"></div>
+                            <div class="button_priority_down button" title="Priority Down"></div>
+                        {% endif %}
                         {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel button" title="cancel"></div>{% endif %}
                     </td>
                 </tr>
