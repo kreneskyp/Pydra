@@ -270,6 +270,10 @@ class TaskScheduler(Module):
                         self._main_workers.remove(worker_key)
                         self._idle_workers.append(worker_key)
                         del self._active_workers[worker_key]
+                        
+                    with self._queue_lock:
+                        del self._active_tasks[job.root_task_id]
+                        
                     status = STATUS_COMPLETE if task_status is None else task_status
                     task_instance.status = status
                     task_instance.completed = datetime.now()
