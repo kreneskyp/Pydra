@@ -1,4 +1,21 @@
-Pydra 0.5 (beta)
+Pydra 0.5.1 (beta) ===========================================================
+
+    Bug fix release.  Fixes many problems with the backend and interface.
+
+	#123 Defect  - Scoping Issue with TaskInstanceModel properties
+	#136 Defect  - Node - saving/loading RSA key to wrong directory
+	#139 Defect  - Details of ParallelTasks are not displayed in web front end
+	#122 Defect  - ParallelTasks that fail (raise exceptions) are not handled properly
+	#137 Defect  - Worker - saving/loading RSA key to wrong directory
+	#143 Defect  - Memory Leak in scheduler
+	#103 Defect  - Nodes View - No way to delete a node
+	#140 Defect  - Node Statuses are not reported when node is running a task
+	#141 Defect  - Jobs View - already queued and running tasks are not displayed
+	#142 Defect  - Node - released worker (subtask) are leaving defunct processes
+	#144 Defect  - Canceled Workunits are not recorded as cancelled
+
+
+Pydra 0.5 (beta) =============================================================
 
     The initial release of Pydra.  This is a beta release, and in the true sense of the word some things are incomplete, broken, or missing entirely.  The core parts of the application are functional, but you milage may vary.
 
