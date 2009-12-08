@@ -314,9 +314,10 @@ class NodeConnectionManager(Module):
         a list of workers.  The master will then connect to all Workers.
         """
         # save node's information in the database
+        node.total_memory = info['total_memory']
+        node.avail_memory = info['avail_memory']
         node.cores = info['cores']
-        node.cpu_speed = info['cpu']
-        node.memory = info['memory']
+        node.stones = info['stones']
         node.save()
 
         #node key to be used by node and its workers

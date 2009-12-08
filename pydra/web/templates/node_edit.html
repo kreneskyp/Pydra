@@ -123,13 +123,17 @@
                     <td title="Physical number of cores in the Node">{{form.cores}}</td>
                 </tr>
                 <tr>
-                    <td class="label">{{form.cpu_speed.label}}</td>
-                    <td title="CPU Speed in MHZ.  ie 2GHZ = 2000">{{form.cpu_speed}}</td>
+                    <td class="label">{{form.stones.label}}</td>
+                    <td title="Pystone speed rating; bigger is better">{{form.stones}}</td>
                 </tr>
                 <tr>
-                    <td class="label">{{form.memory.label}}</td>
-                    <td title="Memory in MB,  ie. 2GB = 2000">{{form.memory}}</td>
-                </tr>          
+                    <td class="label">{{form.total_memory.label}}</td>
+                    <td title="Total system memory in MB">{{form.total_memory}}</td>
+                </tr>
+                <tr>
+                    <td class="label">{{form.avail_memory.label}}</td>
+                    <td title="Available system memory in MB">{{form.avail_memory}}</td>
+                </tr>
             </table>
 
             <div id="buttons">

@@ -16,13 +16,27 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import os
+import multiprocessing
+import test.pystone
 
 from pydra.cluster.module import Module
 
 import logging
 logger = logging.getLogger('root')
 
+def get_total_memory():
+    """
+    Report, in kibibytes, the total system memory.
+    """
+
+    return 3000
+
+def get_available_memory():
+    """
+    Report, in kibibytes, the available system memory.
+    """
+
+    return 0
 
 class NodeInformation(Module):
 
@@ -41,34 +55,17 @@ class NodeInformation(Module):
         """
         Builds a dictionary of useful information about this Node
         """
-        cores = self.detect_cores()
+
+        total_mem = get_total_memory()
+        avail_mem = get_available_memory()
+        cores = multiprocessing.cpu_count()
+        stones = test.pystone.pystones()[1]
 
         self.info = {
-            'cpu':2600,             # CPU MHZ per core
-            'memory':3000,          # Memory allocated to the node
-            'cores':cores           # Number of Cores
+            'total_memory': total_mem, # Total memory
+            'avail_memory': avail_mem, # Available memory
+            'cores':cores,             # Number of cores
+            'stones':stones            # Pystone rating (higher is better)
         }
-        print 'INFO!', self.info
 
-
-    def detect_cores(self):
-        """
-        Detect the number of core's on this Node
-        """
-        # Linux, Unix and MacOS:
-        if hasattr(os, "sysconf"):
-            if os.sysconf_names.has_key("SC_NPROCESSORS_ONLN"):
-                # Linux & Unix:
-                ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
-                if isinstance(ncpus, int) and ncpus > 0:
-                    return ncpus
-            else: # OSX:
-                return int(os.popen2("sysctl -n hw.ncpu")[1].read())
-        # Windows:
-        if os.environ.has_key("NUMBER_OF_PROCESSORS"):
-                ncpus = int(os.environ["NUMBER_OF_PROCESSORS"]);
-                if ncpus > 0:
-                    return ncpus
-        return 1 # Default
-
-
+        print 'System information', self.info
