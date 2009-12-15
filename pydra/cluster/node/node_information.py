@@ -29,14 +29,30 @@ def get_total_memory():
     Report, in kibibytes, the total system memory.
     """
 
-    return 3000
+    total = 0
+
+    for line in open("/proc/meminfo"):
+        if line.startswith("MemTotal"):
+            chaff, total, chaff = line.split()
+            break
+    return int(total)
 
 def get_available_memory():
     """
     Report, in kibibytes, the available system memory.
     """
 
-    return 0
+    free, buffered, cached = 0, 0, 0
+
+    for line in open("/proc/meminfo"):
+        if line.startswith("MemFree"):
+            chaff, free, chaff = line.split()
+        elif line.startswith("Buffers"):
+            chaff, buffered, chaff = line.split()
+        elif line.startswith("Cached"):
+            chaff, cached, chaff = line.split()
+
+    return int(free) + int(buffered) + int(cached)
 
 class NodeInformation(Module):
 
@@ -56,8 +72,8 @@ class NodeInformation(Module):
         Builds a dictionary of useful information about this Node
         """
 
-        total_mem = get_total_memory()
-        avail_mem = get_available_memory()
+        total_mem = get_total_memory() / 1024
+        avail_mem = get_available_memory() / 1024
         cores = multiprocessing.cpu_count()
         stones = test.pystone.pystones()[1]
 
