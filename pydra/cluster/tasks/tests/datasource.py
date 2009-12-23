@@ -2,10 +2,10 @@ from __future__ import with_statement
 
 import unittest
 
-from pydra_server.cluster.tasks.datasource import *
+from pydra.cluster.tasks.datasource import *
 import tempfile, shutil
 
-in_dict = { 
+in_dict = {
             "k1": ['one', 'two', 'four', 'two', 'four', 'seven'],
             "k2": ['seven', 'four', 'seven', 'seven'],
             "k3": ['seven', 'four', 'seven', 'seven'],
@@ -136,4 +136,5 @@ class DatasourceDir_Test(unittest.TestCase):
                 self.assertEqual(val, expected,
                         "failed on key %s: %s == %s" % (str(key), str(val), str(expected)) )
 
-
+if __name__ == "__main__":
+    unittest.main()
