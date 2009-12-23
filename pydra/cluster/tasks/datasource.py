@@ -3,7 +3,9 @@ from __future__ import with_statement
 from threading import Lock
 
 import cPickle as pickle
-import os, logging
+import UserDict
+import logging
+import os
 
 import MySQLdb
 
@@ -22,7 +24,7 @@ def chain_subslicer(obj, ss_list):
 ############
 # sources
 
-class Datasource(object):
+class Datasource(object, UserDict.DictMixin):
 
     def __init__(self):
         self.subslicer = None
@@ -32,7 +34,6 @@ class Datasource(object):
 
     def close(self):
         pass
-
 
     def __iter__(self):
         # implement this
@@ -53,9 +54,9 @@ class Datasource(object):
 
 class DatasourceDict(Datasource):
 
-    def __init__(self, dict):
+    def __init__(self, dictionary):
         super(DatasourceDict, self).__init__()
-        self.store = dict
+        self.store = dictionary
 
 
     def __iter__(self):
@@ -71,14 +72,14 @@ class DatasourceDict(Datasource):
 
 class DatasourceDir(Datasource):
 
-    def __init__(self, dir):
+    def __init__(self, directory):
         super(DatasourceDir, self).__init__()
-        self.dir = dir
+        self.directory = directory
 
 
     def __iter__(self):
         """generate key for input files"""
-        files = os.walk(self.dir).__iter__().next()[2]
+        files = iter(os.walk(self.directory)).next()[2]
 
         for filename in files:
             yield filename,
@@ -86,7 +87,7 @@ class DatasourceDir(Datasource):
     def _load(self, key, mode="r"):
         """open particular input file"""
         filename = key[-1]
-        path = os.path.join(self.dir, filename)
+        path = os.path.join(self.directory, filename)
         return open(path, mode)
 
 
@@ -98,7 +99,7 @@ class DatasourceSQL(Datasource):
         self.db = None
 
     def connect(self):
-        self.db = MySQLdb.connect(**self.kwargs) 
+        self.db = MySQLdb.connect(**self.kwargs)
         logger.debug("datasource: connecting to DB")
 
     def close(self):
