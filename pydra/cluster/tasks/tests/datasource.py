@@ -3,6 +3,7 @@ from __future__ import with_statement
 import unittest
 
 from pydra.cluster.tasks.datasource import *
+from pydra.cluster.tasks.slicer import *
 import tempfile, shutil
 
 in_dict = {
