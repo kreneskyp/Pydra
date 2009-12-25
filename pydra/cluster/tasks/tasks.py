@@ -49,6 +49,32 @@ class Task(object):
     msg = None
     description = 'Default description about Task baseclass.'
 
+
+    def __eq__(self, val):
+        return self.__repr__() == val.__repr__()
+
+
+    def __init__(self, msg=None):
+        self.msg = msg
+        self.id = 1
+        self.work_deferred = False
+
+
+    def _complete(self, results):
+        """
+        Called by task when after _work() completes
+        
+        @param results - return value from work(...)
+        """
+        self._status = STATUS_COMPLETE
+
+        if self.__callback:
+            logger.debug('[%s] %s - Task._work() -Making callback' % (self.get_worker().worker_key, self))
+            self.__callback(results, **self._callback_args)
+        else:
+            logger.warning('[%s] %s - Task._work() - NO CALLBACK TO MAKE: %s' % (self.get_worker().worker_key, self, self.__callback))
+
+
     def _generate_key(self):
         """
         Generate the key for this task using a recursive algorithm.
@@ -57,59 +83,8 @@ class Task(object):
         base = self.parent.get_key()
         if base:
             key = '%s.%s' % (base, key)
-
         return key
-
-
-    def __init__(self, msg=None):
-        self.msg = msg
-
-        # TODO ticket #55 - replace with zope interface
-        #_work = AbstractMethod('_work')
-        #progress = AbstractMethod('progress')
-        #progressMessage = AbstractMethod('progressMessage')
-        #_reset = AbstractMethod('_reset')
-
-        self.id = 1
-        self.work_deferred = False
-
-    def reset(self):
-        """
-        Resets the task, including setting the flags properly,  delegates implementation
-        specific work to _reset()
-        """
-        self._status = STATUS_STOPPED
-        self._reset()
-
-    def start(self, args={}, subtask_key=None, callback=None, callback_args={},
-              errback=None, errback_args={}):
-        """
-        starts the task.  This will spawn the work in a workunit thread.
-        """
-
-        # only start if not already running
-        if self._status == STATUS_RUNNING:
-            return
-
-        #if this was subtask find it and execute just that subtask
-        if subtask_key:
-            logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
-            split = subtask_key.split('.')
-            subtask = self.get_subtask(split)
-            subtask.logger = self.logger
-            logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
-            self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
-
-        #else this is a normal task just execute it
-        else:
-            logger.debug('[%s] Task - starting task: %s' % (self.get_worker().worker_key,self))
-            self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
-
-        if errback:
-            self.work_deferred.addErrback(errback, **errback_args)
-
-        return 1
-
+    
 
     def _stop(self):
         """
@@ -158,49 +133,6 @@ class Task(object):
         self._complete(results)
 
 
-    def work(self, **kwargs):
-        """
-        Function to be overrided by users to perform the real work
-        """
-        pass
-
-
-    def _complete(self, results):
-        self._status = STATUS_COMPLETE
-
-        if self.__callback:
-            logger.debug('[%s] %s - Task._work() -Making callback' % (self.get_worker().worker_key, self))
-            self.__callback(results, **self._callback_args)
-        else:
-            logger.warning('[%s] %s - Task._work() - NO CALLBACK TO MAKE: %s' % (self.get_worker().worker_key, self, self.__callback))
-
-
-
-    def status(self):
-        """
-        Returns the status of this task.  Used as a function rather than member variable so this
-        function can be overridden
-        """
-        return self._status
-
-
-    def request_worker(self, *args, **kwargs):
-        """
-        Requests a worker for a subtask from the tasks parent.  calling this on any task will
-        cause requests to bubble up to the root task whose parent will be the worker
-        running the task.
-        """
-        return self.parent.request_worker(*args, **kwargs)
-
-
-    def get_worker(self):
-        """
-        Retrieves the worker running this task.  This function is recursive and bubbles
-        up through the task tree till the worker is reached
-        """
-        return self.parent.get_worker()
-
-
     def get_key(self):
         """
         Get the key that represents this task instance.  This key will give
@@ -223,5 +155,63 @@ class Task(object):
             raise TaskNotFoundException("Task not found: %s" % task_path)
 
 
-    def __eq__(self, val):
-        return self.__repr__() == val.__repr__()
+    def get_worker(self):
+        """
+        Retrieves the worker running this task.  This function is recursive and bubbles
+        up through the task tree till the worker is reached
+        """
+        return self.parent.get_worker()
+
+
+    def request_worker(self, *args, **kwargs):
+        """
+        Requests a worker for a subtask from the tasks parent.  calling this on any task will
+        cause requests to bubble up to the root task whose parent will be the worker
+        running the task.
+        """
+        return self.parent.request_worker(*args, **kwargs)
+
+
+    def start(self, args={}, subtask_key=None, callback=None, callback_args={},
+              errback=None, errback_args={}):
+        """
+        starts the task.  This will spawn the work in a workunit thread.
+        """
+
+        # only start if not already running
+        if self._status == STATUS_RUNNING:
+            return
+
+        #if this was subtask find it and execute just that subtask
+        if subtask_key:
+            logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
+            split = subtask_key.split('.')
+            subtask = self.get_subtask(split)
+            subtask.logger = self.logger
+            logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
+            self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
+
+        #else this is a normal task just execute it
+        else:
+            logger.debug('[%s] Task - starting task: %s' % (self.get_worker().worker_key,self))
+            self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
+
+        if errback:
+            self.work_deferred.addErrback(errback, **errback_args)
+
+        return 1
+
+
+    def status(self):
+        """
+        Returns the status of this task.  Used as a function rather than member variable so this
+        function can be overridden
+        """
+        return self._status
+
+
+    def work(self, **kwargs):
+        """
+        Function to be overrided by users to perform the real work
+        """
+        pass
