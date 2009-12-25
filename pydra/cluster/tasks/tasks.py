@@ -86,6 +86,29 @@ class Task(object):
         return key
     
 
+    def _get_subtask(self, task_path, clean=False):
+        """
+        Task baseclass specific logic for retrieving a subtask.  The key might
+        correspond to this class instead of it's children.  The default
+        implementation of this function only checks self.
+        
+        If the task does not match a TaskNotFoundException should be raised
+        
+        @param task_path - list of strings that correspond to a task's location
+                           within a task heirarchy
+        @param clean - a new (clean) instance of the task is requested.
+        
+        @returns a tuple containing the consumed portion of the task path and
+                    the task matches the request.
+        """
+        #A Task can't have children,  if this is the last entry in the path
+        # then this is the right task
+        if len(task_path) == 1 and task_path[0] == self.__class__.__name__:
+            return task_path, self
+        else:
+            raise TaskNotFoundException("Task not found: %s" % task_path)
+
+
     def _stop(self):
         """
         Stop the task.  This consists of just setting the STOP_FLAG.  The Task implementation
@@ -153,6 +176,34 @@ class Task(object):
             return self
         else:
             raise TaskNotFoundException("Task not found: %s" % task_path)
+
+
+    def get_subtask(self, task_path, clean=False):
+        """
+        Returns a subtask from a task_path.  This function drills down through
+        a task heirarchy to retrieve the requested task.  This method calls
+        Task._get_subtask(...) to
+        
+        @param task_path - list of strings that correspond to a task's location
+                           within a task heirarchy
+        @param clean - returns a clean instance of the requested subtask.  This
+            does nothing for a Task, which has no subtasks.  In this scenario it
+            is easier to construct a new instance of by calling the constructor.
+            
+            This also only affects the task to be returned.  Other tasks in the
+            heirarchy are only instantiated as needed to recurse to the
+            requested task.
+
+        @returns requested task, or TaskNotFoundException
+        """
+        subtask = self
+        while task_path:
+            task = subtask
+            consumed_path, subtask = task._get_subtask(task_path)
+            task_path = task_path[len(consumed_path):]
+        if clean and not subtask._status == STATUS_STOPPED:
+            task_path, subtask = task._get_subtask(consumed_path, clean=True)
+        return subtask
 
 
     def get_worker(self):

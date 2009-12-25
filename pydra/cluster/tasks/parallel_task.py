@@ -32,23 +32,62 @@ class ParallelTask(Task):
     ParallelTask - is a task that can be broken into discrete work units
     """
     _lock = None                # general lock
-    #_available_workers = 1      # number of workers available to this task
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
     _workunit_total = 0
     _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
-    subtask = None              # subtask that is parallelized
     subtask_key = None          # cached key from subtask
 
     def __init__(self, msg=None):
         Task.__init__(self, msg)
         self._lock = RLock()
+        self.subtask = None              # subtask that is parallelized
+        self.__subtask_class = None      # class of subtask
+        self.__subtask_args = None       # args for initializing subtask
+        self.__subtask_kwargs = None     # kwargs for initializing subtask
+
+
+    def __getattribute__(self, key):
+        """
+        Overridden to lazy instantiate subtask when requested
+        """
+        if key == 'subtask':
+            if not self.__dict__['subtask']:
+                subtask = self.__subtask_class(self.__subtask_args, \
+                                                        self.__subtask_kwargs)
+                self.subtask = subtask
+            return self.__dict__['subtask']
+        return Task.__getattribute__(self, key)
+
 
     def __setattr__(self, key, value):
         Task.__setattr__(self, key, value)
         if key == 'subtask':
             value.parent = self
+
+
+    def _get_subtask(self, task_path, clean=False):
+        """
+        Returns the subtask specified by the path.  Overridden to search subtask
+        of this class.  This function lazily loads the subtask if it is not
+        already instantiated.
+        
+        @param task_path - list of strings that correspond to a task's location
+                           within a task heirarchy
+        @param clean - a new (clean) instance of the task is requested.
+        
+        @returns a tuple containing the consumed portion of the task path and
+                    the task matches the request.
+        """
+        if len(task_path) == 1:
+            if task_path[0] == self.__class__.__name__:
+                return task_path, self
+            else:
+                raise TaskNotFoundException("Task not found: %s" % task_path)
+        #recurse down into the child
+        consumed, subtask = self.subtask._get_subtask(task_path[1:])
+        return task_path[:2], subtask
 
 
     def _request_workers(self):
@@ -195,6 +234,16 @@ class ParallelTask(Task):
             len(self._data_in_progress)
 
         return 100 * self._workunit_completed  / total
+
+
+    def set_subtask(self, class_, *args, **kwargs):
+        """
+        Sets the subtask for this paralleltask.  The class, args, and kwargs
+        are stored so that they may be lazily instantiated when needed.
+        """
+        self.__subtask_class = class_
+        self.__subtask_args = args
+        self.__subtask_kwargs = kwargs
 
 
     def work_complete(self):
