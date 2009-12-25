@@ -50,76 +50,6 @@ class ParallelTask(Task):
         if key == 'subtask':
             value.parent = self
 
-    def work_complete(self):
-        """
-        Method stub for method called to post process completion of task.  This
-        must be overridden by users for their task specific work
-        """
-        pass
-
-
-    def work_unit_complete(self, workunit, results):
-        """
-        Method stub for method called to post process results.  This
-        is implemented by users that want to include automatic post-processing
-
-        @param workunit - key and other args sent when assigning the workunit
-        @param results - results sent by the completed subtask
-        """
-        pass
-
-
-    def progress(self):
-        """
-        progress - returns the progress as a number 0-100.
-
-        A parallel task's progress is a derivitive of its workunits:
-           COMPLETE_WORKUNITS / TOTAL_WORKUNITS
-        """
-        total = self._workunit_completed + len(self._data) + \
-            len(self._data_in_progress)
-
-        return 100 * self._workunit_completed  / total
-
-
-    def _stop(self):
-        """
-        Overridden to call stop on all children
-        """
-        Task._stop(self)
-        self.subtask._stop()
-
-
-    def _work(self, **kwargs):
-        """
-        Work function overridden to delegate workunits to other Workers.
-        """
-
-        # save data, if any
-        if kwargs and kwargs.has_key('data'):
-            self._data = kwargs['data']
-            self._workunit_total = len(data)
-            logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
-
-        # request initial workers
-        self._request_workers()
-
-        logger.debug('[%s] Paralleltask - initial work assigned' % self.get_worker().worker_key)
-
-
-    def get_subtask(self, task_path):
-        if len(task_path) == 1:
-            if task_path[0] == self.__class__.__name__:
-                return self
-            else:
-                raise TaskNotFoundException("Task not found: %s" % task_path)
-
-        #pop this class off the list
-        task_path.pop(0)
-
-        #recurse down into the child
-        return self.subtask.get_subtask(task_path)
-
 
     def _request_workers(self):
         """
@@ -137,31 +67,26 @@ class ParallelTask(Task):
             data, index = self.get_work_unit()
 
 
-    def get_work_unit(self):
+    def _stop(self):
         """
-        Get the next work unit, by default a ParallelTask expects a list of values/tuples.
-        When a arg is retrieved its removed from the list and placed in the in progress list.
-        The arg is saved so that if the node fails the args can be re-run on another node
-
-        This method *MUST* lock while it is altering the lists of data
+        Overridden to call stop on all children
         """
-        logger.debug('[%s] Paralleltask - getting a workunit' % self.get_worker().worker_key)
-        data = None
-        with self._lock:
+        Task._stop(self)
+        self.subtask._stop()
 
-            #grab from the beginning of the list
-            if len(self._data) != 0:
-                data = self._data.pop(0)
-            else:
-                return None, None
 
-            self._workunit_count += 1
-
-            #remove from _data and add to in_progress
-            self._data_in_progress[self._workunit_count] = data
-        logger.debug('[%s] Paralleltask - got a workunit: %s %s' % (self.get_worker().worker_key, data, self._workunit_count))
-
-        return data, self._workunit_count;
+    def _work(self, **kwargs):
+        """
+        Work function overridden to delegate workunits to other Workers.
+        """
+        # save data, if any
+        if kwargs and kwargs.has_key('data'):
+            self._data = kwargs['data']
+            self._workunit_total = len(data)
+            logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
+        # request initial workers
+        self._request_workers()
+        logger.debug('[%s] Paralleltask - initial work assigned' % self.get_worker().worker_key)
 
 
     def _work_unit_complete(self, results, index):
@@ -211,10 +136,81 @@ class ParallelTask(Task):
         """
         logger.warning('[%s] Paralleltask - Worker failure during workunit' % self.get_worker().worker_key)
         with self._lock:
-
             #remove data from in progress
             data = self._data_in_progress[index]
             del self._data_in_progress[index]
-
             #add data to the end of the list
             self._data.append(data)
+
+
+    def get_subtask(self, task_path):
+        if len(task_path) == 1:
+            if task_path[0] == self.__class__.__name__:
+                return self
+            else:
+                raise TaskNotFoundException("Task not found: %s" % task_path)
+
+        #pop this class off the list
+        task_path.pop(0)
+
+        #recurse down into the child
+        return self.subtask.get_subtask(task_path)
+
+
+    def get_work_unit(self):
+        """
+        Get the next work unit, by default a ParallelTask expects a list of values/tuples.
+        When a arg is retrieved its removed from the list and placed in the in progress list.
+        The arg is saved so that if the node fails the args can be re-run on another node
+
+        This method *MUST* lock while it is altering the lists of data
+        """
+        logger.debug('[%s] Paralleltask - getting a workunit' % self.get_worker().worker_key)
+        data = None
+        with self._lock:
+
+            #grab from the beginning of the list
+            if len(self._data) != 0:
+                data = self._data.pop(0)
+            else:
+                return None, None
+
+            self._workunit_count += 1
+
+            #remove from _data and add to in_progress
+            self._data_in_progress[self._workunit_count] = data
+        logger.debug('[%s] Paralleltask - got a workunit: %s %s' % (self.get_worker().worker_key, data, self._workunit_count))
+
+        return data, self._workunit_count;
+
+
+    def progress(self):
+        """
+        progress - returns the progress as a number 0-100.
+
+        A parallel task's progress is a derivitive of its workunits:
+           COMPLETE_WORKUNITS / TOTAL_WORKUNITS
+        """
+        total = self._workunit_completed + len(self._data) + \
+            len(self._data_in_progress)
+
+        return 100 * self._workunit_completed  / total
+
+
+    def work_complete(self):
+        """
+        Method stub for method called to post process completion of task.  This
+        must be overridden by users for their task specific work
+        """
+        pass
+
+
+    def work_unit_complete(self, workunit, results):
+        """
+        Method stub for method called to post process results.  This
+        is implemented by users that want to include automatic post-processing
+
+        @param workunit - key and other args sent when assigning the workunit
+        @param results - results sent by the completed subtask
+        """
+        pass
