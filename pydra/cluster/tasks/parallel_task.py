@@ -63,7 +63,7 @@ class ParallelTask(Task):
 
     def __setattr__(self, key, value):
         Task.__setattr__(self, key, value)
-        if key == 'subtask':
+        if key == 'subtask' and value:
             value.parent = self
 
 
