@@ -182,20 +182,6 @@ class ParallelTask(Task):
             self._data.append(data)
 
 
-    def get_subtask(self, task_path):
-        if len(task_path) == 1:
-            if task_path[0] == self.__class__.__name__:
-                return self
-            else:
-                raise TaskNotFoundException("Task not found: %s" % task_path)
-
-        #pop this class off the list
-        task_path.pop(0)
-
-        #recurse down into the child
-        return self.subtask.get_subtask(task_path)
-
-
     def get_work_unit(self):
         """
         Get the next work unit, by default a ParallelTask expects a list of values/tuples.

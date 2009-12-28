@@ -111,13 +111,18 @@ class Task(object):
 
     def _stop(self):
         """
-        Stop the task.  This consists of just setting the STOP_FLAG.  The Task implementation
-        will only stop if it honors the STOP_FLAG.  There is no safe way to kill the thread 
-        running the work function.  This is because the Task might have implementation specific
-        code for shutting down the task to enable a restart.  If we were to just kill the thread
-        (which would be hard in twisted) it would end all processing and might stop in a wierd
-        state.  Using the STOP_FLAG means you may have bad programs introduced to your cluster
-        but for the time being it is the only choice
+        Stop the task.  This consists of just setting the STOP_FLAG.
+        The Task implementation will only stop if it honors the STOP_FLAG. There
+        is no safe way to kill the thread running the work function.  This is
+        because the Task might have implementation specific code for shutting
+        down the task to enable a restart.  If we were to just kill the thread
+        (which would be hard in twisted) it would end all processing and might
+        stop in a wierd state.  Using the STOP_FLAG means you may have bad
+        programs introduced to your cluster but for the time being it is the
+        only choice
+        
+        this method should be overridden to stop subtasks if a descendent of
+        this class contains them
         """
         self.STOP_FLAG=True
 
@@ -220,7 +225,7 @@ class Task(object):
         if subtask_key:
             logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
             split = subtask_key.split('.')
-            subtask = self.get_subtask(split)
+            subtask = self.get_subtask(split, True)
             subtask.logger = self.logger
             logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
             self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
