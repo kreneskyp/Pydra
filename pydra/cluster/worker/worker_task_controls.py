@@ -65,8 +65,6 @@ class WorkerTaskControls(Module):
         self.__stop_flag = None
         self.__subtask = None
         self.__workunit_key = None
-        self.__local_workunit_key = None
-        self.__local_task_instance = None
 
         # shutdown tracking
         self.__pending_releases = 0
@@ -80,13 +78,23 @@ class WorkerTaskControls(Module):
 
 
     def _run_task(self, key, version, task_class, module_search_path, args={},
-            subtask_key=None, workunit_key=None, main_worker=None, task_id=None):
+            subtask_key=None, workunit=None, main_worker=None, task_id=None):
         """
         Runs a task on this worker
+        
+        @param key - key identifying task to run
+        @param version - version of task to run.
+        @param task_class - class instance of the task
+        @param module_search_path - ????????????????
+        @param args - kwargs that will be passed to the Task.start()
+        @param subtask_key - key identifying subtask to run
+        @param workunit - key to data, or data to processed
+        @param main_worker - key for the main worker of this task
+        @param task_id - ID of the task instance
         """
         logger.info(task_class)
         logger.info('[%s] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
-            % (self.worker_key, key, args, subtask_key, workunit_key, \
+            % (self.worker_key, key, args, subtask_key, workunit, \
             main_worker))
 
         # Register task with worker
@@ -94,6 +102,9 @@ class WorkerTaskControls(Module):
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
+            '''
+            TODO: Push busy logic down into task
+            
             # is this task being run locally for the mainworker?
             run_local = subtask_key and self.worker_key == main_worker
 
@@ -112,7 +123,6 @@ class WorkerTaskControls(Module):
                     run_local, self.__local_workunit_key))
                 return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
 
-
             # not busy.  set variables that mark this worker as busy.
             self.__task = key
             self.__subtask = subtask_key
@@ -121,34 +131,32 @@ class WorkerTaskControls(Module):
                 self.__local_workunit_key = workunit_key
             else:
                 self.__workunit_key = workunit_key
+            '''
 
-
-        # process args to make sure they are no longer unicode
+        # process args to make sure they are no longer unicode.  This is an
+        # issue with the args coming through the django frontend.
         clean_args = {}
         if args:
             for arg_key, arg_value in args.items():
                 clean_args[arg_key.__str__()] = arg_value
 
-        # Create task instance and start it
-        if run_local:
-            self.__local_task_instance = object.__new__(task_class)
-            self.__local_task_instance.__init__()
-            self.__local_task_instance.parent = self
-            self.__local_task_instance.logger = get_task_logger( \
-                self.worker_key, task_id, subtask_key, workunit_key)
-            return self.__local_task_instance.start(clean_args, subtask_key, \
-                self.work_complete, {'local':True}, self.work_complete, \
-                {'local':True, 'failed':True})
 
-        else:
-            #create an instance of the requested task
-            self.__task_instance = object.__new__(task_class)
-            self.__task_instance.__init__()
+        
+        # only create a new task instance if this is the root task.  Otherwise
+        # subtasks will be created within the structure of the task.
+        if not self.__task_instance:
+            self.__task_instance = task_class()
             self.__task_instance.parent = self
             self.__task_instance.logger = get_task_logger(self.worker_key, \
                 task_id)
-            return self.__task_instance.start(clean_args, subtask_key, \
-                self.work_complete, {}, self.work_complete, {'failed':True})
+
+        # start the task.  If this is actually a subtask, then the task is
+        # responsible for starting the subtask instead of the main task
+        return self.__task_instance.start(clean_args, subtask_key, \
+                        callback=self.work_complete,
+                        callback_args = {'workunit':workunit},
+                        errback=self.work_complete,
+                        errback_args={'workunit':workunit, 'failed':True}) 
 
 
     def stop_task(self):
@@ -158,9 +166,11 @@ class WorkerTaskControls(Module):
         logger.info('%s - Received STOP command' % self.worker_key)
         if self.__task_instance:
             self.__task_instance._stop()
+            '''
+            TODO: push down into task code
             if self.__local_task_instance:
                 self.__local_task_instance._stop()
-
+            '''
 
     def status(self):
         """
@@ -177,7 +187,7 @@ class WorkerTaskControls(Module):
         return (WORKER_STATUS_IDLE,)
 
 
-    def work_complete(self, results, local=False, failed=False):
+    def work_complete(self, results, workunit=None, failed=False):
         """
         Callback that is called when a job is run in non_blocking mode and has
         finished.  This callback handles both successful tasks and failures
@@ -192,7 +202,9 @@ class WorkerTaskControls(Module):
         # create traceback if its an error
         if failed:
             results = results.__str__()
-        
+
+        '''
+        TODO: push down into task class
         if local:
             workunit_key = self.__local_workunit_key
             task_instance = self.__local_task_instance
@@ -201,8 +213,9 @@ class WorkerTaskControls(Module):
             workunit_key = self.__workunit_key
             task_instance = self.__task_instance
             self.__workunit_key = None
+        '''
 
-        if task_instance.STOP_FLAG:
+        if self.__task_instance.STOP_FLAG:
             # If stop flag is set for either the main task or local task
             # then ignore any results and stop the task
             with self._lock_connection:
@@ -220,10 +233,10 @@ class WorkerTaskControls(Module):
             with self._lock_connection:
                 if self.master:
                     deferred = self.master.callRemote("send_results", results, \
-                                                      workunit_key, failed)
+                                                      workunit, failed)
                     deferred.addCallback(self.send_successful)
                     deferred.addErrback(self.send_results_failed, results, \
-                                        workunit_key)
+                                        workunit)
 
                 # master disapeared, hold results until it requests them
                 else:

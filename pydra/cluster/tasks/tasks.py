@@ -165,19 +165,6 @@ class Task(object):
         return self._generate_key()
 
 
-    def get_subtask(self, task_path):
-        """
-        Retrieves a subtask via task_path.  Task_path is the task_key
-        split into a list for easier iteration
-        """
-        #A Task can't have children,  if this is the last entry in the path
-        # then this is the right task
-        if len(task_path) == 1 and task_path[0] == self.__class__.__name__:
-            return self
-        else:
-            raise TaskNotFoundException("Task not found: %s" % task_path)
-
-
     def get_subtask(self, task_path, clean=False):
         """
         Returns a subtask from a task_path.  This function drills down through
@@ -229,10 +216,6 @@ class Task(object):
         starts the task.  This will spawn the work in a workunit thread.
         """
 
-        # only start if not already running
-        if self._status == STATUS_RUNNING:
-            return
-
         #if this was subtask find it and execute just that subtask
         if subtask_key:
             logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
@@ -242,8 +225,12 @@ class Task(object):
             logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
             self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
 
-        #else this is a normal task just execute it
+        elif self._status == STATUS_RUNNING:
+            # only start root task if not already running
+            return
+        
         else:
+            #else this is a normal task just execute it
             logger.debug('[%s] Task - starting task: %s' % (self.get_worker().worker_key,self))
             self.work_deferred = threads.deferToThread(self._start, args, callback, callback_args)
 
