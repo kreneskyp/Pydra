@@ -38,20 +38,12 @@ class ParallelTask(Task):
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
     _workunit_total = 0
     _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
-    subtask_class = Task        # subtask class
-    subtask_args = tuple()      # subtask args
-    subtask_kwargs = {}         # subtask kwargs
+    subtask = None              # subtask that is parallelized
     subtask_key = None          # cached key from subtask
 
     def __init__(self, msg=None):
         Task.__init__(self, msg)
         self._lock = RLock()
-
-    def __getattr__(self, key):
-        # Lazy-init subtask, if needed
-        if key == "subtask":
-            retval = self.subtask = self.subtask_class(*self.subtask_args, **self.subtask_kwargs)
-            return retval
 
     def __setattr__(self, key, value):
         Task.__setattr__(self, key, value)
@@ -226,16 +218,3 @@ class ParallelTask(Task):
 
             #add data to the end of the list
             self._data.append(data)
-
-    @staticmethod
-    def from_subtask(cls, *args, **kwargs):
-        """
-        Creates a new ParallelTask with the specified class, args, and
-        kwargs as its subtask.
-        """
-
-        pt = ParallelTask()
-        pt.subtask_class = cls
-        pt.subtask_args = args
-        pt.subtask_kwargs = kwargs
-        return pt
