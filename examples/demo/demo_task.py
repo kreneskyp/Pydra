@@ -18,6 +18,7 @@
 """
 
 from pydra.cluster.tasks import Task, TaskContainer, ParallelTask
+from pydra.cluster.tasks.datasource import DatasourceList
 import time
 
 from django import forms
@@ -43,7 +44,7 @@ class TestTask(Task):
     description = 'A Demo task that counts to 5, taking a nap after each number'
     form = TestTaskInput
 
-    def __init__(self, msg='Demo Task'):
+    def __init__(self, msg='Demo Task', *args, **kwargs):
         Task.__init__(self, msg)
 
     def work(self, **kwargs):
@@ -122,8 +123,8 @@ class TestParallelTask(ParallelTask):
 
     def __init__(self):
         ParallelTask.__init__(self)
-        self.subtask = TestTask('subtask')
-        #assign data in init otherwise it could be consumed
+        self.set_subtask(TestTask, 'subtask')
+        #self.input = DatasourceList(range(10), kwargs_key='start')
         self._data = range(10)
         self._finished = []
 

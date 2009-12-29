@@ -64,7 +64,7 @@ class WorkerTaskControls(Module):
         self.__results = None
         self.__stop_flag = None
         self.__subtask = None
-        self.__workunit_key = None
+        self.__workunit = None
 
         # shutdown tracking
         self.__pending_releases = 0
@@ -102,36 +102,9 @@ class WorkerTaskControls(Module):
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
 
-            '''
-            TODO: Push busy logic down into task
-            
-            # is this task being run locally for the mainworker?
-            run_local = subtask_key and self.worker_key == main_worker
-
-            # Check to ensure this worker is not already busy.
-            # The Master should catch this but lets be defensive.
-            if run_local:
-                busy =  not isinstance(self.__task_instance, (ParallelTask,
-                        MapReduceTask)) or self.__local_workunit_key
-
-            else:
-                busy = (self.__task and self.__task <> key) or self.__workunit_key
-                
-            if busy:
-                logger.warn('Worker:%s - worker busy:  task=%s, instance=%s, local=%s:%s' \
-                    % (self.worker_key, self.__task, self.__task_instance, \
-                    run_local, self.__local_workunit_key))
-                return "FAILURE THIS WORKER IS ALREADY RUNNING A TASK"
-
-            # not busy.  set variables that mark this worker as busy.
+            # save what worker is running
             self.__task = key
             self.__subtask = subtask_key
-            if run_local:
-                logger.debug('[%s] RunTask: The master wants to exec a local work' % self.worker_key)
-                self.__local_workunit_key = workunit_key
-            else:
-                self.__workunit_key = workunit_key
-            '''
 
         # process args to make sure they are no longer unicode.  This is an
         # issue with the args coming through the django frontend.
@@ -141,7 +114,6 @@ class WorkerTaskControls(Module):
                 clean_args[arg_key.__str__()] = arg_value
 
 
-        
         # only create a new task instance if this is the root task.  Otherwise
         # subtasks will be created within the structure of the task.
         if not self.__task_instance:
@@ -161,16 +133,12 @@ class WorkerTaskControls(Module):
 
     def stop_task(self):
         """
-        Stops the current task and any local workunits
+        Stops the current task.
         """
         logger.info('%s - Received STOP command' % self.worker_key)
         if self.__task_instance:
             self.__task_instance._stop()
-            '''
-            TODO: push down into task code
-            if self.__local_task_instance:
-                self.__local_task_instance._stop()
-            '''
+            
 
     def status(self):
         """
@@ -203,18 +171,6 @@ class WorkerTaskControls(Module):
         if failed:
             results = results.__str__()
 
-        '''
-        TODO: push down into task class
-        if local:
-            workunit_key = self.__local_workunit_key
-            task_instance = self.__local_task_instance
-            self.__local_workunit_key = None
-        else:            
-            workunit_key = self.__workunit_key
-            task_instance = self.__task_instance
-            self.__workunit_key = None
-        '''
-
         if self.__task_instance.STOP_FLAG:
             # If stop flag is set for either the main task or local task
             # then ignore any results and stop the task
@@ -243,7 +199,7 @@ class WorkerTaskControls(Module):
                     self.__results = results
 
 
-    def send_results_failed(self, results, task_results, workunit_key):
+    def send_results_failed(self, results, task_results, workunit):
         """
         Errback called when sending results to the master fails.  resend when
         master reconnects
@@ -263,7 +219,7 @@ class WorkerTaskControls(Module):
                 #nope really isn't connected.  set flag.  even if connection is in progress
                 #this thread has the lock and reconnection cant finish till we release it
                 self.__results = task_results
-                self.__workunit_key = workunit_key
+                self.__workunit = workunit
 
 
     def send_stopped_failed(self, results):
