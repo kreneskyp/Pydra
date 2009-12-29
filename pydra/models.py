@@ -45,8 +45,9 @@ class Node(models.Model):
     # is passed to the Node the first time it sees it.
     pub_key         = models.TextField(null=True)
 
-    cpu_speed       = models.IntegerField(null=True)
-    memory          = models.IntegerField(null=True)
+    stones          = models.IntegerField(null=True)
+    total_memory    = models.IntegerField(null=True)
+    avail_memory    = models.IntegerField(null=True)
     seen            = models.IntegerField(default=False)
     deleted         = models.BooleanField(default=False)
 

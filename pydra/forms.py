@@ -32,5 +32,6 @@ class NodeForm(ModelForm):
 
     cores_available = forms.IntegerField(required=False)
     cores           = forms.IntegerField(required=False)
-    cpu_speed       = forms.IntegerField(required=False)
-    memory          = forms.IntegerField(required=False)
+    stones          = forms.IntegerField(required=False)
+    total_memory    = forms.IntegerField(required=False)
+    avail_memory    = forms.IntegerField(required=False)
