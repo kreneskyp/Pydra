@@ -1,5 +1,5 @@
 # Django settings for pydra project.
-VERSION = '0.0.1'
+VERSION = '0.5.1'
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
