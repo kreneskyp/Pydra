@@ -182,6 +182,17 @@ class ParallelTask(Task):
             self._data.append(data)
 
 
+    @staticmethod
+    def from_subtask(cls, *args, **kwargs):
+        """
+        Creates a new ParallelTask with the specified class, args, and
+        kwargs as its subtask.
+        """
+        pt = ParallelTask()
+        pt.set_subtask(cls, *args, **kwargs)
+        return pt
+
+
     def get_work_unit(self):
         """
         Get the next work unit, by default a ParallelTask expects a list of values/tuples.
