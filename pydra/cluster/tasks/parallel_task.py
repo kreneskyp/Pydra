@@ -232,6 +232,19 @@ class ParallelTask(Task):
         self.__subtask_kwargs = kwargs
 
 
+    def start_subtask(self, task, subtask_key, workunit, kwargs, callback, \
+                      callback_args):
+        """
+        Overridden to retrieve input arguments from datastore self.input.  These
+        values are added to kwargs and passed to the subtask.  values in the
+        workunit take preference over values in kwargs
+        """
+        # TODO: code after datasource update
+        #args, kwargs = self.input.unpack(workunit, (), kwargs)
+        #task._start(args, kwargs, callback, callback_args)
+        task._start(workunit, callback, callback_args)
+
+
     def work_complete(self):
         """
         Method stub for method called to post process completion of task.  This
