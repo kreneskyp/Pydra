@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from pydra.logs.log_aggregator import NodeLogAggregator
 from pydra.cluster.module import ModuleManager
 from pydra.cluster.node import *
 from pydra.cluster.tasks.task_manager import TaskManager
@@ -37,7 +38,7 @@ class NodeServer(ModuleManager):
         logger.info('===== Node - Starting =====')
 
         self.modules = [
-            TaskManager,
+            TaskManager(None),
             NodeInformation,
             WorkerManager,
             WorkerConnectionManager,
