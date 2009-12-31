@@ -72,39 +72,59 @@ def init_logging(filename):
     return logger
 
 
-def get_task_logger(worker_id, task_id, subtask_key=None, \
-    workunit_id=None):
+def task_log_path(task, subtask=None, workunit=None, worker=None):
+    """
+    Generates the full path to the logfile for a task.
+    
+    @param task - id of task
+    @param subtask - task path to subtask, default = None
+    @param workunut - workunit key, default = None
+    @param worker - worker the log is stored on.  default=None.  If no worker is
+                    supplied it is assumed to be the path to the log archive
+                    which stores all task logs together.  where on a node the
+                    logs are stored by worker.
+    """
+    log_dir = settings.LOG_DIR[:-1] if settings.LOG_DIR.endswith('/') else \
+        settings.LOG_DIR
+    if worker:    
+        dir = '%s/worker.%s' % (log_dir, worker)
+    else:
+        dir = pydra_settings.LOG_ARCHIVE
+    
+    if workunit:
+        return \
+            '%s/task.%s/' % (dir, task), \
+            '%s/task.%s/workunit.%s.%s.log' % (dir, task, subtask, workunit)
+    else:    
+        return \
+            '%s/task.%s/' % (dir, task), \
+            '%s/task.%s/task.log' % (dir, task)
+
+
+def get_task_logger(worker, task, subtask=None, workunit=None):
     """
     Initializes a logger for tasks and subtasks.  Logs for tasks are stored as
     in separate files and aggregated.  This allow workunits to be viewed in a
     single log.  Otherwise a combined log could contain messages from many 
     different workunits making it much harder to grok.
 
-    @param worker_id: there may be more than one Worker per Node.  Logs are
+    @param worker: there may be more than one Worker per Node.  Logs are
                       stored per worker.
-
-    @param task_instance_id: ID of the instance.  Each task instance receives 
+    @param task: ID of the task instance.  Each task instance receives 
                              its own log.
-
-    @param subtask_key: (optional) subtask_key.  see workunit_id
-
-    @param workunit_id: (optional) ID of workunit.  workunits receive their
+    @param subtask: (optional) subtask_key.  see workunit_id
+    @param workunit: (optional) ID of workunit.  workunits receive their
                          own log file so that the log can be read separately.
                          This is separate from the task instance log.
-    """
-
-    log_dir = settings.LOG_DIR[:-1] if settings.LOG_DIR.endswith('/') else \
-        settings.LOG_DIR
-    task_dir = '%s/worker.%s/task.%s' % (log_dir, worker_id, task_id)
-    init_dir(task_dir)
+    """   
+    directory, filename = task_log_path(task, subtask, workunit, worker)    
+    init_dir(directory)
 
     if workunit_id:
-        logger_name = 'workunit.%s.%s' % (task_id, workunit_id)
-        filename = '%s/workunit.%s.%s.log' % \
-            (task_dir, subtask_key, workunit_id)
+        logger_name = 'workunit.%s.%s' % (task, workunit)
+
     else:
-        logger_name = 'task.%s' % task_id
-        filename = '%s/task.log' % task_dir
+        logger_name = 'task.%s' % task
 
     logger = logging.getLogger(logger_name)
     handler = FileHandler(filename)
