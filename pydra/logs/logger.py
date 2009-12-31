@@ -120,7 +120,7 @@ def get_task_logger(worker, task, subtask=None, workunit=None):
     directory, filename = task_log_path(task, subtask, workunit, worker)    
     init_dir(directory)
 
-    if workunit_id:
+    if workunit:
         logger_name = 'workunit.%s.%s' % (task, workunit)
 
     else:

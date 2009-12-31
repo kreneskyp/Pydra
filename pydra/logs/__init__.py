@@ -16,3 +16,4 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+from pydra.logs.logger import init_logging, get_task_logger
