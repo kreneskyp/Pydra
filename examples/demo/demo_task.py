@@ -18,7 +18,7 @@
 """
 
 from pydra.cluster.tasks import Task, TaskContainer, ParallelTask
-from pydra.cluster.tasks.datasource import DatasourceList
+#from pydra.cluster.tasks.datasource import DatasourceList
 import time
 
 from django import forms
