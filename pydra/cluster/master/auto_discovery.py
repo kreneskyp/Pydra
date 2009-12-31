@@ -39,14 +39,13 @@ class AutoDiscoveryModule(Module):
     ]
 
 
-    def __init__(self, manager):
-
+    def __init__(self):
         self._interfaces = [self.list_known_nodes]
+        self.listeners = {'MANAGER_INIT':self.autodiscovery}    
 
-        Module.__init__(self, manager)
-
+    def _register(self, manager):
+        Module._register(self, manager)
         self.known_nodes = set()
-        self.autodiscovery()
 
 
     def autodiscovery(self, callback=None):

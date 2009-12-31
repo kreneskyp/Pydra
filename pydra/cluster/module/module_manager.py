@@ -81,34 +81,42 @@ class ModuleManager(object):
         # list of methods that each return a service object
         self._services = []
 
-        
         # append any user modules onto this one
         self.modules + modules
-        
 
-        for module_class in self.modules:
-            logger.info('Loading Module: %s' % module_class)
+        for module in self.modules:
+            try:
+                if module.__class__.__name__ == 'type':
+                    module = module()
 
-            module = module_class(self)
-            self._modules.append(module)
+                logger.info('Loading Module: %s' % module.__class__.__name__)
+                module._register(self)
+                self._modules.append(module)
 
-            for signal in module._signals:
-                self.register_signal(signal, module)
+                for signal in module._signals:
+                    self.register_signal(signal, module)
+    
+                for signal, function in module._listeners.items():
+                    self.register_listener(signal, function)
 
-            for signal, function in module._listeners.items():
-                self.register_listener(signal, function)
+                for remote in module._remotes:
+                    self.register_remote(module, *remote)
 
-            for remote in module._remotes:
-                self.register_remote(module, *remote)
+                for interface in module._interfaces:
+                    self.register_interface(module, interface)
 
-            for interface in module._interfaces:
-                self.register_interface(module, interface)
+                for service in module._services: 
+                    self.register_service(service)
 
-            for service in module._services: 
-                self.register_service(service)
-
-            if isinstance(module,(InterfaceModule,)):
-                self.register_interface_module(module)          
+                if isinstance(module,(InterfaceModule,)):
+                    self.register_interface_module(module)
+                    
+            except Exception, e:
+                logger.error('Error Loading Module: %s' % module)
+                import traceback, sys
+                print e
+                type, value, traceback_ = sys.exc_info()
+                traceback.print_tb(traceback_, limit=10, file=sys.stdout)
 
         # adding friends
         for module in self._modules:

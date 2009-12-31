@@ -156,11 +156,10 @@ class TwistedWebInterface(InterfaceModule):
     Twisted.web2.  Functions are mapped to urls using twisted web.
     """
 
-    def __init__(self, manager):
+    def _register(self, manager):
+        InterfaceModule._register(self, manager)
         self._services = [self.get_controller_service]
-
-        InterfaceModule.__init__(self, manager)
-
+        
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('%s/master.key' % \
                                         pydra_settings.RUNTIME_FILES_DIR)
@@ -175,7 +174,6 @@ class TwistedWebInterface(InterfaceModule):
         # it can use the same key.  Theres no way with the AMF interface to
         # restrict access to localhost connections only.
         self.key_size=4096
-
 
     def auth(self, user, password):
         """

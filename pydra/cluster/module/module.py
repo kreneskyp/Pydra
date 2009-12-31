@@ -56,21 +56,21 @@ class Module(object):
     # list of properties this module shares
     _shared = []
 
-    def __init__(self, manager):
+    def __init__(self):
         """
-        Initializes the module.  All of the functionality provided by this
-        module is registered with the ModuleManager
+        Creates an instance of the module.  This function should not register
+        anything as it may not be ready for modules to register yet.
+        Module registration should take place in Module.register(...)
         """
-        self.manager = manager
-    
+        pass
+
 
     def __getattribute__(self, key):
         """
         Overridden to pass shared properties through to the manager
         """
         if key not in ('__dict__', '_shared') and key in self._shared:
-            val =  self.manager.get_shared(key)
-            #print 'GETTING: ', key, val
+            val =  self.manager.get_shared(key)            
             return val
         return object.__getattribute__(self, key)
 
@@ -80,10 +80,17 @@ class Module(object):
         Overridden to pass shared property lookups through to the manager
         """
         if key not in ('__dict__', '_shared') and key in self._shared:
-            #print ' SETTING: ', key, value
             self.manager.set_shared(key, value)
 
         self.__dict__[key] = value
+
+
+    def _register(self, manager, *args, **kwargs):
+        """
+        Initializes the module.  All of the functionality provided by this
+        module is registered with the ModuleManager
+        """
+        self.manager = manager
 
 
     def emit(self, signal, *args, **kwargs):
@@ -92,3 +99,5 @@ class Module(object):
         """
         self.manager.emit_signal(signal, *args, **kwargs)
 
+
+    

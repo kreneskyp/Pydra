@@ -88,7 +88,7 @@ class NodeConnectionManager(Module):
     ]
 
 
-    def __init__(self, manager):
+    def __init__(self):
 
         #locks
         self._lock = Lock() #general lock, use when multiple shared resources are touched
@@ -103,25 +103,25 @@ class NodeConnectionManager(Module):
             self.connect
         ]
 
-        Module.__init__(self, manager)
-
         #load rsa crypto
         self.pub_key, self.priv_key = load_crypto('%s/master.key' \
                 % pydra_settings.RUNTIME_FILES_DIR)
         self.rsa_client = RSAClient(self.priv_key, self.pub_key, \
                 callback=self.init_node)
 
-        #cluster management
-        self.nodes = self.load_nodes()
-        self.workers = {}
-
         #connection management
         self.connecting = True
         self.reconnect_count = 0
         self.attempts = None
         self.reconnect_call_ID = None
-
         self.host = 'localhost'
+
+
+    def _register(self, manager):
+        Module._register(self, manager)
+        #cluster management
+        self.nodes = self.load_nodes()
+        self.workers = {}
 
 
     def load_nodes(self):

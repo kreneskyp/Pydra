@@ -58,14 +58,15 @@ class NodeInformation(Module):
 
     _shared = ['info','authenticated']
     
-    def __init__(self, manager):
-        
+    def __init__(self):        
         self._remotes = [
             ('MASTER', 'info')
         ]
 
-        Module.__init__(self, manager)
+    def _register(self, manager):
+        Module._register(self, manager)
         self.determine_info()
+
 
     def determine_info(self):
         """

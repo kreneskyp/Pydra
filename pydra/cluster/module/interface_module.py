@@ -31,19 +31,17 @@ logger = logging.getLogger('root')
 
 
 class InterfaceModule(Module):
-
-    _registered_interfaces = {}
-
     """
     A Module that provides an Interface for Controllers.  There may be multiple
     Implementations of interfaces.  This class provides a place to stick
     common code.
     """
 
-    def __init__(self, manager):
-        self._registered_interfaces = {}   
-        Module.__init__(self, manager)
+    _registered_interfaces = {}
 
+    def _register(self, manager):
+        Module._register(self, manager)
+        self._registered_interfaces = {}   
         self.register_interface(self, self.authenticate, {'auth':False, \
                                                           'include_user':True})
         self.register_interface(self, self.challenge_response, {'auth':False, \

@@ -49,12 +49,9 @@ class WorkerConnectionManager(Module):
         'worker_connection_manager'
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
         self._services = [self.get_worker_service]
         self._listeners = {'NODE_INITIALIZED':self.enable_workers}
-        Module.__init__(self, manager)
-
-        self.worker_connection_manager = self
 
         #locks
         self._lock = Lock() #general lock, use when multiple shared resources are touched
@@ -63,15 +60,16 @@ class WorkerConnectionManager(Module):
         self.pub_key, self.priv_key = load_crypto('%s/node.key' % \
                 pydra_settings.RUNTIME_FILES_DIR)
 
-        #cluster management
-        self.workers = {}
-
         # setup worker security - using this checker just because we need
         # _something_ that returns an avatarID.  Its extremely vulnerable
         # but thats ok because the real authentication takes place after
         # the worker has connected
         self.worker_checker = checkers.InMemoryUsernamePasswordDatabaseDontUse()
 
+    def _register(self, manager):
+        Module._register(self, manager)
+        self.worker_connection_manager = self
+        self.workers = {}
 
 
     def enable_workers(self, node_key):

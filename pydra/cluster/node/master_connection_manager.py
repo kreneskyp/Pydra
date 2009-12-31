@@ -49,17 +49,17 @@ class MasterConnectionManager(Module):
         'master'
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._services = [
             self.get_service
         ]
 
-        Module.__init__(self, manager)
 
+    def _register(self, manager):
+        Module._register(self, manager)        
         self.port = pydra_settings.PORT
         self.node_key = None
-
         #load crypto keys for authentication
         self.pub_key, self.priv_key = load_crypto('%s/node.key' % \
                 pydra_settings.RUNTIME_FILES_DIR)

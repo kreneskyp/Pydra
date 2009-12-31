@@ -111,7 +111,7 @@ class TaskScheduler(Module):
         '_active_workers',
     ]    
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._listeners = {
             'WORKER_DISCONNECTED':self.remove_worker,
@@ -138,48 +138,33 @@ class TaskScheduler(Module):
             (self.get_running_tasks, {'name':'list_running'})
         ]
 
-
-        Module.__init__(self, manager)
-
         # locks
         self._lock = Lock()         # general lock        
         self._worker_lock = Lock()  # lock for worker only transactions
         self._queue_lock = Lock()   # lock for queue only transactions
 
-        # load tasks queue
-        #self._running = list(TaskInstance.objects.running())
-        #self._running_workers = {}
-        #self._queue = list(TaskInstance.objects.queued())
-
         # task statuses
         self._task_statuses = {}
         self._next_task_status_update = datetime.now()
 
-        # workers
-        # self._workers_idle = []
-        # self._workers_working = {}
+        # a set containing all main workers
+        self._main_workers = set()
+
+        self.update_interval = 5 # seconds
 
 
+    def _register(self, manager):
+        Module._register(self, manager)
+        
         self._long_term_queue = []
         self._short_term_queue = []
         self._active_tasks = {}     # caching uncompleted task instances
         self._idle_workers = []     # all workers are seen equal
         self._active_workers = {}   # worker-job mappings
         self._waiting_workers = {}  # task-worker mappings
-
-        # a set containing all main workers
-        self._main_workers = set()
-
-        self.update_interval = 5 # seconds
-        #self._listeners = []
-
-        #if listener:
-        #    self.attach_listener(listener)
-
+        
         self._init_queue()
-
         reactor.callLater(self.update_interval, self._update_queue)
-
 
     def _queue_task(self, task_key, args={}, priority=5):
         """
@@ -538,7 +523,7 @@ class TaskScheduler(Module):
                         self._main_workers.add(worker_key)
                         logger.info('Task %d has been moved from ltq to stq' %
                                 root_task_id)
-            
+
 
         if worker_key:
             job = WorkerJob(root_task_id, task_key, args, subtask_key, \

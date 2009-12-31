@@ -31,17 +31,17 @@ class NodeZeroConfService(Module):
         'host'
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._listeners = {
-            '':self.start_service
+            'MANAGER_INIT':self.start_service
         }
-
-        Module.__init__(self, manager)
 
 
     def start_service(self):
-        
-        self.service = ZeroconfService(name=platform.node(), port=self.port,
+        """
+        Starts the zeroconfservice
+        """
+        self.service = ZeroConfService(name=platform.node(), port=self.port,
             stype="_pydra._tcp")
         self.service.publish()

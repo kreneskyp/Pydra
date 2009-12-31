@@ -24,8 +24,7 @@ class NodeManager(Module):
         'nodes'
     ]
 
-    def __init__(self, manager):
-
+    def __init__(self):
         self._interfaces = [
             self.node_list,
             self.node_detail,
@@ -33,8 +32,6 @@ class NodeManager(Module):
             self.node_delete,
             self.node_status
         ]
-
-        Module.__init__(self, manager)
 
 
     def node_detail(self, id):

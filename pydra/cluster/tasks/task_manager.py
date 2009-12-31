@@ -59,7 +59,7 @@ class TaskManager(Module):
         'get_task',
     ]    
 
-    def __init__(self, manager, scan_interval=10):
+    def __init__(self, scan_interval=60):
 
         self._interfaces = [
             self.list_tasks, 
@@ -73,8 +73,6 @@ class TaskManager(Module):
             'TASK_STARTED':self._task_started,
             'TASK_STARTED':self._task_stopped,
         }
-
-        Module.__init__(self, manager)
 
         self.tasks_dir = pydra_settings.TASKS_DIR
         self.tasks_dir_internal = pydra_settings.TASKS_DIR_INTERNAL
@@ -91,7 +89,7 @@ class TaskManager(Module):
 
         self.__initialized = False
 
-        # in seconds; currently no way to customize this value
+        # in seconds; currently no way to customize this value        
         self.scan_interval = scan_interval
 
 
@@ -245,8 +243,9 @@ class TaskManager(Module):
 
         for pkg_name in old_packages:
             self.emit('TASK_REMOVED', pkg_name)
-
-        reactor.callLater(self.scan_interval, self.autodiscover)
+        
+        if self.scan_interval:
+            reactor.callLater(self.scan_interval, self.autodiscover)
 
 
     def task_history(self, key, page):

@@ -26,7 +26,7 @@ logger = logging.getLogger('root')
 from django.db.models import Q
 
 import pydra_settings
-from __init__ import task_log_path
+from logger import task_log_path
 from pydra.models import TaskInstance, WorkUnit
 from pydra.cluster.module import Module
 from pydra.cluster.tasks import STATUS_CANCELLED, STATUS_FAILED, STATUS_COMPLETE
@@ -45,7 +45,7 @@ class MasterLogAggregator(Module):
         'nodes'
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._interfaces = [
             self.aggregate_task_logs
@@ -54,9 +54,7 @@ class MasterLogAggregator(Module):
         self._listeners = {
             #'CLUSTER_IDLE':self.aggregate_logs
         }
-        
-        Module.__init__(self, manager)
-        
+
         self.transfer_lock = Lock()
         self.transfers = []
 
@@ -164,14 +162,11 @@ class NodeLogAggregator(Module):
 
     _shared = ['worker_key']
 
-    def __init__(self, manager):
-
+    def __init__(self):
         self._remotes = [
             ('MASTER', self.send_log),
             ('MASTER', self.delete_log)
         ]
-
-        Module.__init__(self, manager)
 
 
     def send_log(self, master, worker, task, subtask=None, workunit=None):

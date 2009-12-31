@@ -39,7 +39,7 @@ class WorkerManager(Module):
 
     _shared = ['master', 'workers', 'worker_connection_manager']
 
-    def __init__(self, manager):
+    def __init__(self):
         self._remotes = [
             ('MASTER',self.init_node),
 
@@ -70,12 +70,14 @@ class WorkerManager(Module):
             'WORKER_DISCONNECTED':self.clean_up_finished_worker
         }
 
-        Module.__init__(self, manager)
-
         self.__lock = RLock()
-        self.workers = {}
         self.workers_finishing = []
         self.initialized = False
+
+
+    def _register(self, manager):
+        Module._register(self, manager)
+        self.workers = {}
 
 
     def clean_up_finished_worker(self, worker):

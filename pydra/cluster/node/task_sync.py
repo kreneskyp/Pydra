@@ -30,8 +30,7 @@ class TaskSyncClient(Module):
         'master',
     ]
 
-    def __init__(self, manager):
-
+    def __init__(self):
         self._listeners = {
             'TASK_OUTDATED' : self.request_sync,
         }
@@ -39,8 +38,6 @@ class TaskSyncClient(Module):
         self._friends = {
             'task_manager' : TaskManager,
         }
-
-        Module.__init__(self, manager)
 
 
     def request_sync(self, pkg_name):

@@ -71,17 +71,13 @@ class WorkerConnectionManager(Module):
         '_lock_connection'
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._listeners = {
             'MANAGER_INIT':self.connect,
             'WORKER_FINISHED':self.disconnect
         }
 
-        Module.__init__(self, manager)
-
-
-        self._lock_connection = Lock()
         self.reconnect_count = 0
         self.factory = MasterClientFactory(self.reconnect)
 
@@ -91,6 +87,11 @@ class WorkerConnectionManager(Module):
                 pydra_settings.RUNTIME_FILES_DIR)
         #self.master_pub_key = load_crypto('./node.key', False, both=False)
         self.rsa_client = RSAClient(self.priv_key)
+
+
+    def _register(self, manager):
+        Module._register(self, manager)
+        self._lock_connection = Lock()
 
 
     def connect(self):

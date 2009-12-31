@@ -22,7 +22,7 @@ from pydra.cluster.tasks.task_manager import TaskManager
 
 class TaskSyncServer(Module):
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._remotes = [
             ('NODE', self.sync_task),
@@ -32,7 +32,6 @@ class TaskSyncServer(Module):
             'task_manager' : TaskManager,
         }
 
-        Module.__init__(self, manager)
 
     def sync_task(self, pkg_name, request, phase):
         """

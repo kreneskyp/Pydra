@@ -40,7 +40,7 @@ class WorkerTaskControls(Module):
         '_lock_connection',
     ]
 
-    def __init__(self, manager):
+    def __init__(self):
 
         self._remotes = [
             ('MASTER', self.run_task),
@@ -55,8 +55,6 @@ class WorkerTaskControls(Module):
         self._friends = {
             'task_manager' : TaskManager,
         }
-
-        Module.__init__(self, manager)
 
         self._lock = Lock()
         self.__task = None
