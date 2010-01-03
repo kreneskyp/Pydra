@@ -45,7 +45,7 @@ class Worker(ModuleManager):
         self.worker_key = worker_key
 
         self.modules = [
-            TaskManager,
+            TaskManager(None),
             WorkerConnectionManager,
             WorkerTaskControls,
         ]
