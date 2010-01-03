@@ -30,6 +30,7 @@
 
         <script>
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
+            var can_manage_queue = {% if perms.pydra_server.can_manage_queue %}true{%else%}false{%endif%};
 
             $(document).ready(function() {
 
@@ -182,21 +183,24 @@
                 time = new Date(parseInt(data['time'])*1000);
                 formated_time = dateFormat(time, "yyyy-mm-dd HH:MM:ss")
 
-
                 // construct html
                 html =  '<tr id="instance_'+ task_instance +'">';
                 html += '<td class="task_id">'+task_instance+'</td>';
                 html += '<td class="task_name">'+ task_name +'</td>';
-                html += '<td class="description">'+task_description+'</td>';
-                html += '<td class="progress" style="display:none;"><div class="bar"></div></td>';
+                html += '<td class="progress"><div class="bar" style="display:none;"></div></td>';
                 html += '<td class="queue_time">' + formated_time +'</td>';
+                html += '<td class="start_time">--</td>';
 
-                if (can_run_tasks) {
-                    html += '<td class="buttons"><div class="button_cancel icon" title="cancel"></div></td>'
-                } else {
-                    html += '<td></td>'
+
+                html +='<td class=buttons>';
+                if (can_manage_queue) {
+                    html += '<div class="button_priority_up button" title="Priority Up"></div>';
+                    html += '<div class="button_priority_down button" title="Priority Down"></div>';
                 }
-                html += '</tr>'
+                if (can_run_tasks) {
+                    html += '<div class="button_cancel icon" title="cancel"></div>';
+                }
+                html += '</td></tr>'
 
                 $('#queue').append(html);
                 repaint_zebra_stripes('#queue');
@@ -226,32 +230,31 @@
                     return;
                 }
 
-                $('#queue tr:gt(1), #running tr:gt(1)').each(function(row){
+                $('#queue tr:gt(1)').each(function(row){
                     id = this.id.slice(9);
                     status = data[id];
 
                     if (status == undefined) {
+                        // item in the gui did not have a matching item in the
+                        // update.  it must no longer be running
                         $(this).remove();
                     } else if (status['s'] == STATUS_RUNNING) {
+                        // if the start_time isn't listed yet it's a job that
+                        // was just started.  update it accordingly
                         $this = $(this);
-                        if (this.parentNode.parentNode.id == 'queue') {
-
-                            // move row to running table
-                            $('#running').append(this);
-
-                            //swap description with progress bar
-                            $this.children('.description').remove();
-                            $this.children('.progress').show();
+                        $start = $this.children('.start_time')
+                        if ($start.html() == '--') {
                             $this.children('.progress').children('.bar')
+                                .show()
                                 .progressBar({width:300,
                                               barImage:'{{MEDIA}}/images/progressbg_yellow_300.gif',
                                               boxImage:'{{MEDIA}}/images/progressbar_300.gif'
                                 });
 
-                            // insert time started element
+                            // update time started element
                             started = new Date(parseInt(status['t'])*1000);
                             started = dateFormat(started, "yyyy-mm-dd HH:MM:ss")
-                            $this.children('.queue_time').after('<td class="start_time">'+ started +'</td>')
+                            $start.html(started);
 
                         } else {
                             $this.children('.progress').children('.bar').progressBar(status['p']);
@@ -259,12 +262,9 @@
                     }
 
                     //updatebars(data);
-
                 });
 
                 repaint_zebra_stripes('#queue');
-                repaint_zebra_stripes('#running');
-
             }
 
 
@@ -321,7 +321,7 @@
                 padding-right:5px;
             }
 
-            #tasks, #queue, #running {
+            #tasks, #queue {
                 border: 0px solid black;
                 border-spacing:0;
                 border-collapse:collapse;
@@ -466,36 +466,6 @@
 
         <table id="queue">
             <thead>
-                <tr><th colspan="100%" class="title">Queued Jobs</th></tr>
-                <tr>
-                    <th class="task_id">ID</th>
-                    <th class="task_name">Name</th>
-                    <th class="description">Description</th>
-                    <th class="queue_time">Time Queued</th>
-                    <th class="buttons"></th>
-                </tr>
-            </thead>
-
-            {% for task in queue %}
-                <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
-                    <td class="task_id">{{task.id}}</td>
-                    <td class="task_key">{{task.task_key}}</td>
-                    <td class="description"></td>
-                    <td class="progress" style="display:none"><div class="bar"></div></td>
-                    <td class="queue_time">{{task.queued}}</td>
-                    <td class="buttons">
-                        {% if perms.pydra_server.can_manage_queue %}
-                            <div class="button_priority_up button" title="Priority Up"></div>
-                            <div class="button_priority_down button" title="Priority Down"></div>
-                        {% endif %}
-                        {% if perms.pydra_server.can_run_tasks %}<div class="button_cancel button" title="cancel"></div>{% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </table>
-
-        <table id="running">
-            <thead>
                 <tr><th id="title" colspan="100%" class="title">Running Jobs</th></tr>
                 <tr>
                     <th class="task_id">ID</th>
@@ -507,13 +477,13 @@
                 </tr>
             </thead>
 
-            {% for task in running %}
+            {% for task in queue %}
                 <tr id="instance_{{task.id}}" class="{% cycle '' 'stripe' %}">
                     <td class="task_id">{{task.id}}</td>
                     <td class="task_name">{{task.task_key}}</td>
                     <td class="progress"><div class="bar"></div></td>
                     <td class="queue_time">{{task.queued}}</td>
-                    <td class="start_time">{{task.started}}</td>
+                    <td class="start_time">{{task.started|default:'--'}}</td>
                     <td class="buttons">
                         {% if perms.pydra_server.can_manage_queue %}
                             <div class="button_priority_up button" title="Priority Up"></div>
