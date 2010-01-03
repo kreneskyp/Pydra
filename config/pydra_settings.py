@@ -62,6 +62,7 @@ LOG_FILENAME_MASTER = '%s/master.log' % LOG_DIR
 LOG_FILENAME_NODE   = '%s/node.log' % LOG_DIR
 LOG_SIZE = 10000000
 LOG_BACKUP = 10
+LOG_ARCHIVE = '%s/archive' % LOG_DIR
 
 
 # Connection settings for cluster.  These settings affect the local node only
