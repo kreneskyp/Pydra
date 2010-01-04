@@ -196,7 +196,7 @@ class MapReduceTask(Task):
         self.reducetask = ReduceWrapper(self.reduce('ReduceTask'), self.im,self)
 
         for src in self.datasources.itervalues():
-            src.connect()
+            src.open()
 
 
     def _start(self, args, callback, callback_args={}):
