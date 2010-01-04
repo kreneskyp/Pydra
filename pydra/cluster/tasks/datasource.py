@@ -114,6 +114,17 @@ class DatasourceDir(Datasource):
 
 
 class DatasourceSQL(Datasource):
+    """
+    Generic SQL datasource.
+    """
+
+    pass
+
+
+class DatasourceMySQL(DatasourceSQL):
+    """
+    SQL datasource for MySQL.
+    """
 
     def __init__(self, **kwargs):
         super(DatasourceSQL, self).__init__()
