@@ -63,6 +63,22 @@ class Datasource(object, UserDict.DictMixin):
         raise NotImplementedError
 
 
+class DatasourceList(Datasource):
+    """
+    A simple datasource that wraps a list.
+    """
+
+    def __init__(self, l):
+        super(DatasourceList, self).__init__()
+        self.list = l
+
+    def __iter__(self):
+        return ((index,) for index in xrange(len(self.list)))
+
+    def load(self, key):
+        return self.list[key[-1]]
+
+
 class DatasourceDict(Datasource):
     """
     A simple datasource that wraps a dict.
