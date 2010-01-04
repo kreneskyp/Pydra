@@ -111,7 +111,8 @@ class WorkerConnectionManager(Module):
         Callback from worker_avatar when it is disconnected
         """
         with self._lock:
-            if worker.name in self.workers:
+            if not worker.finished and worker.name in self.workers:
+                logger.debug('Removing worker from pool: %s' % worker.name)
                 del self.workers[worker.name]
         self.emit('WORKER_DISCONNECTED', worker)
         
