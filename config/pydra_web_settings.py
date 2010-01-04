@@ -1,8 +1,14 @@
-# Django settings for pydra project.
+"""
+ Django settings for pydra web front end
+ 
+ All settings from pydra_settings are also imported, as it is assumed that
+ Pydra is installed along with the front end.  This file configures additional
+ django components that are not needed by the cluster.
+"""
+from pydra_settings import *
 
-VERSION = '0.01'
 
-DEBUG = False
+DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -11,21 +17,15 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
-DATABASE_ENGINE = ''           # 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-DATABASE_NAME = ''             # Or path to database file if using sqlite3.
-DATABASE_USER = ''             # Not used with sqlite3.
-DATABASE_PASSWORD = ''         # Not used with sqlite3.
-DATABASE_HOST = ''             # Set to empty string for localhost. Not used with sqlite3.
-DATABASE_PORT = ''             # Set to empty string for default. Not used with sqlite3.
-
 
 # prefix used for the site.  ie. http://myhost.com/<SITE_ROOT>/
-# for the django standalone server this should be /
-# for apache this is the url the site is mapped to, probably /pgd
+# for the django standalone server this should be ""
+# for apache this is the url the site is mapped to, probably /pydra
 SITE_ROOT = ''
 
-# absolute path to the docroot of this site
-DOC_ROOT = ''
+# absolute path to the docroot of this site.  Detect automatically.
+import pydra.web as pydra_web
+DOC_ROOT = pydra_web.__file__[:pydra_web.__file__.rfind('/')]
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -65,17 +65,7 @@ SECRET_KEY = 'dk#^frv&4y_&7a90#bn62@t-1jyc@q9*!69y7zq&@&8)g#szu4'
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.load_template_source',
     'django.template.loaders.app_directories.load_template_source',
-#     'django.template.loaders.eggs.load_template_source',
 )
-
-#Logging
-import logging
-LOG_DIR = '/tmp/'
-LOG_LEVEL = logging.DEBUG
-LOG_FILENAME_MASTER = '%s/master.log' % DOC_ROOT
-LOG_FILENAME_NODE   = '%s/node.log' % DOC_ROOT
-LOG_SIZE = 10000000
-LOG_BACKUP = 10
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
@@ -83,13 +73,7 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 )
 
-ROOT_URLCONF = 'urls'
-
-TEMPLATE_DIRS = (
-    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
-)
+ROOT_URLCONF = 'pydra.web.urls'
 
 INSTALLED_APPS = (
     'django.contrib.admin',
@@ -97,9 +81,6 @@ INSTALLED_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.sites',
-    'dbsettings',
     'pydra',
     'pydra.web'
 )
-
-

@@ -25,7 +25,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils import simplejson
-import settings
+import pydra_web_settings as settings
 
 
 from pydra.cluster.controller import ControllerException
@@ -33,15 +33,16 @@ from pydra.cluster.controller.web.controller import WebController
 from pydra.forms import NodeForm
 from pydra.models import Node, TaskInstance
 from pydra.config import load_settings
-pydra_settings = load_settings()
 
 """
 pydraController is a global variable that stores an instance of a Controller.
 The current controller does not involve much setup so this may not be required
 any longer, but it will improve resource usage slightly
 """
-pydra_controller = WebController(pydra_settings.HOST, \
-                                 pydra_settings.CONTROLLER_PORT)
+pydra_controller = WebController(settings.HOST, \
+                            settings.CONTROLLER_PORT,
+                                key='%s/master.key' % settings.RUNTIME_FILES_DIR
+)
 
 
 def pydra_processor(request):
@@ -50,11 +51,6 @@ def pydra_processor(request):
     over the master server
     """
     global pydra_controller
-
-    if pydra_controller == None:
-        pydra_controller = WebController(pydra_settings.HOST, \
-                                         pydra_settings.cONTROLLER_PORT)
-
     return {'controller':pydra_controller}
 
 

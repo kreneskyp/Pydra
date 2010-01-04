@@ -46,12 +46,10 @@ for dirpath, dirnames, filenames in os.walk(pydra_dir):
     elif filenames:
         data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
 
-print packages
-
 # add config, init.d, and other files
-data_files.append(['/etc/pydra', ['config/pydra_settings.py']])
+data_files.append(['/etc/pydra', ['config/pydra_settings.py', 'config/pydra_web_settings.py']])
 data_files.append(['/usr/sbin', ['scripts/pydra_master', 'scripts/pydra_node']])
-data_files.append(['/usr/bin', ['scripts/pydra_manage']])
+data_files.append(['/usr/bin', ['scripts/pydra_manage','scripts/pydra_web_manage']])
 
 # no files but need to create these directories for use by pydra
 data_files.append(['/var/lib/pydra', []])
@@ -63,7 +61,7 @@ data_files.append(['/var/lib/pydra/tasks/demo', ['examples/demo/demo_task.py', '
 data_files.append(['/var/lib/pydra/tasks_internal', []])
 
 setup(name='Pydra',
-      version='0.01',
+      version='0.5.1',
       description='Distributed computing framework',
       long_description = 'Pydra is a framework for distributing and parallizing work to a cluster of computers.',
       maintainer='Peter Krenesky',
@@ -71,8 +69,8 @@ setup(name='Pydra',
       url='http://pydra-project.osuosl.org',
       packages=packages,
       data_files=data_files,
-      requires = ['twisted','django','pyamf','simplejson'],
-      provides = ['pydra.web'],
+      requires = ['twisted','django','simplejson'],
+      provides = ['pydra','pydra.web'],
       license='GPLv3'
      )
 

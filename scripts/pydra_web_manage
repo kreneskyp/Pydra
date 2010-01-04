@@ -9,22 +9,10 @@ to locate the pydra_settings file.
 from django.core.management import execute_manager, ManagementUtility
 
 from pydra.config import configure_django_settings
-configure_django_settings()
+configure_django_settings('pydra_web_settings')
 import pydra_web_settings as settings
 
 if __name__ == "__main__":
-    
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == 'runserver':
-        print '**************************************************'
-        print ' pydra_manage cannot be used to start the django'
-        print ' front end or sync the database for the web front'
-        print ' end.'
-        print ''
-        print ' use pydra_web_manage instead.'
-        print '**************************************************'
-        sys.exit()
-    
     # call the ManagementUtility without setting up the environment because
     # this script assumes that pydra is already on the sys.path.
     utility = ManagementUtility(None)
