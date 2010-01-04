@@ -17,7 +17,7 @@ class DatasourceDict_Test(unittest.TestCase):
 
     def setUp(self):
         self.source = DatasourceDict(in_dict)
-        self.source.connect()
+        self.source.open()
 
     def tearDown(self):
         self.source.close()
@@ -94,7 +94,7 @@ class DatasourceDir_Test(unittest.TestCase):
 
         # set source
         self.source = DatasourceDir(self.tempdir)
-        self.source.connect()
+        self.source.open()
 
     def tearDown(self):
         self.source.close()
