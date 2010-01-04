@@ -199,7 +199,7 @@ class WorkerManager(Module):
         decisions here dilutes the ability of the Master to control the
         cluster
         """
-        logger.info('[Node] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
+        logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
             % (key, args, subtask_key, workunit_key, \
             main_worker))
         worker = None
@@ -207,7 +207,7 @@ class WorkerManager(Module):
         with self.__lock:
             if worker_key in self.workers:
                 # worker exists.  reuse it.
-                logger.debug('RunTask - Using worker %s' % worker_key)
+                logger.debug('RunTask - Using existing worker %s' % worker_key)
                 worker = self.workers[worker_key]
                 worker.run_task_deferred = worker.remote.callRemote('run_task',\
                         key, version, args, subtask_key, workunit_key, \

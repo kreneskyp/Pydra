@@ -90,10 +90,8 @@ class WorkerTaskControls(Module):
         @param main_worker - key for the main worker of this task
         @param task_id - ID of the task instance
         """
-        logger.info(task_class)
-        logger.info('[%s] RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
-            % (self.worker_key, key, args, subtask_key, workunit, \
-            main_worker))
+        logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
+            % (key, args, subtask_key, workunit, main_worker))
 
         # Register task with worker
         with self._lock:
@@ -133,7 +131,7 @@ class WorkerTaskControls(Module):
         """
         Stops the current task.
         """
-        logger.info('%s - Received STOP command' % self.worker_key)
+        logger.info('Received STOP command')
         if self.__task_instance:
             self.__task_instance._stop()
             
@@ -209,7 +207,7 @@ class WorkerTaskControls(Module):
             if self.master:
                 # reconnected, just resend the call.  The call is recursive from this point
                 # if by some odd chance it disconnects again while sending
-                logger.error('[%s] results failed to send but Node is still here' % self.worker_key)
+                logger.error('results failed to send but Node is still here')
                 #deferred = self.master.callRemote("send_results", task_results, task_results)
                 #deferred.addErrback(self.send_results_failed, task_results, task_results)
 
@@ -264,8 +262,7 @@ class WorkerTaskControls(Module):
         another worker.  This call is ignored if STOP flag is already set.
         """
         if not self.__task_instance.STOP_FLAG:
-            logger.info('Worker:%s - received REMOTE results for: %s' % \
-                                            (self.worker_key, subtask_key))
+            logger.info('received REMOTE results for: %s' % subtask_key)
             subtask = self.__task_instance.get_subtask(subtask_key.split('.'))
             subtask.parent._work_unit_complete(results, workunit_key)
 
@@ -284,7 +281,7 @@ class WorkerTaskControls(Module):
                 self.__pending_shutdown = True
                 return
 
-        logger.debug('[%s] Released, shutting down' % self.worker_key)
+        logger.debug('Released, shutting down')
         self.emit('WORKER_FINISHED')
         reactor.stop()
 
@@ -293,7 +290,7 @@ class WorkerTaskControls(Module):
         """
         Requests a work unit be handled by another worker in the cluster
         """
-        logger.info('Worker:%s - requesting worker for: %s' % (self.worker_key, subtask_key))
+        logger.info('requesting worker for: %s' % subtask_key)
         deferred = self.master.callRemote('request_worker', subtask_key, args, workunit_key)
 
 

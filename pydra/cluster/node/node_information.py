@@ -85,4 +85,4 @@ class NodeInformation(Module):
             'stones':stones            # Pystone rating (higher is better)
         }
 
-        print 'System information', self.info
+        logger.info('System information: %s' % self.info)

@@ -24,7 +24,7 @@ from pydra.cluster.tasks.task_manager import TaskManager
 # init logging
 import pydra_settings
 from pydra.logs.logger import init_logging
-logger = init_logging(pydra_settings.LOG_FILENAME_NODE)
+logger = init_logging(pydra_settings.LOG_FILENAME_NODE, '[Node]')
 
 
 class NodeServer(ModuleManager):

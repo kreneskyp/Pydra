@@ -27,12 +27,12 @@ from threading import Lock
 import pydra_settings as settings
 from pydra.util import init_dir
 
-LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+LOG_FORMAT = "%%(asctime)s [%%(levelname)s] %s %%(message)s"
 
 INITED_FILES = []
 INIT_LOCK = Lock()
 
-def init_logging(filename):
+def init_logging(filename, component=''):
     """
     Utility function that configures the root logger so classes that require
     logging do not have to implement all this code.  After executing this
@@ -41,6 +41,10 @@ def init_logging(filename):
 
     This function records initialized loggers so that they are not initalized
     more than once, which would result in duplicate log messages
+    
+    @param filename - filename to open
+    @param component - an additional string to prepend to all messages.  useful
+                    for Node and Worker that log to the same file
     """
 
     global INITED_FILES
@@ -63,7 +67,7 @@ def init_logging(filename):
                  backupCount = settings.LOG_BACKUP)
         handler.setLevel(settings.LOG_LEVEL)
 
-        formatter = logging.Formatter(LOG_FORMAT)
+        formatter = logging.Formatter(LOG_FORMAT % component)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 

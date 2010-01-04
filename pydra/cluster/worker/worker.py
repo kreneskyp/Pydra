@@ -30,8 +30,7 @@ from pydra.cluster.worker import WorkerTaskControls, WorkerConnectionManager
 # init logging
 import pydra_settings
 from pydra.logs.logger import init_logging
-logger = init_logging(pydra_settings.LOG_FILENAME_NODE)
-
+logger = None
 
 class Worker(ModuleManager):
     """
@@ -43,6 +42,7 @@ class Worker(ModuleManager):
 
         self.master_port = port
         self.worker_key = worker_key
+        logger = init_logging(pydra_settings.LOG_FILENAME_NODE, '[%s]' % worker_key)
 
         self.modules = [
             TaskManager(None),
