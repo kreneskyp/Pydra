@@ -118,7 +118,6 @@ class InterfaceModule(Module):
         challenge_hash = hashlib.sha512(challenge_enc[0]).hexdigest()
 
         self.sessions[user]['challenge'] = challenge_hash
-        print 'authenticate', user, challenge_hash
         return challenge
 
 
@@ -128,7 +127,6 @@ class InterfaceModule(Module):
         this instance access to other functions that can manipulate the 
         cluster
         """
-        print 'challenge_response', user, response
         challenge = self.sessions[user]['challenge']
         if challenge and challenge == response:
             self.sessions[user]['auth'] = True
