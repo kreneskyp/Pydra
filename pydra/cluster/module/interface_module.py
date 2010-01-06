@@ -85,7 +85,9 @@ class InterfaceModule(Module):
                         % (name, self._registered_interfaces[name]))
 
         self._registered_interfaces[name] = self.wrap_interface(interface, params)
-        logger.debug('Exposing Interface: %s - %s.%s' % (name, module, interface))
+        logger.debug('Exposing Interface: %s => %s.%s' % (name, \
+                                                    module.__class__.__name__, \
+                                                    interface.__name__))
 
 
     def __clean_sessions(self):
