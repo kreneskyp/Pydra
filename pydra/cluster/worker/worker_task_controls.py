@@ -98,7 +98,6 @@ class WorkerTaskControls(Module):
         with self._lock:
             if not key:
                 return "FAILURE: NO TASK KEY SPECIFIED"
-
             # save what worker is running
             self.__task = key
             self.__subtask = subtask_key
@@ -122,7 +121,8 @@ class WorkerTaskControls(Module):
 
         # start the task.  If this is actually a subtask, then the task is
         # responsible for starting the subtask instead of the main task
-        return self.__task_instance.start(clean_args, subtask_key, \
+        return self.__task_instance.start(clean_args, subtask_key, workunit,
+                        task_id, \
                         callback=self.work_complete,
                         callback_args = {'workunit':workunit},
                         errback=self.work_complete,

@@ -24,6 +24,7 @@ from pydra.cluster.tasks import TaskNotFoundException,\
     STATUS_PAUSED,STATUS_COMPLETE
 
 import logging
+from pydra.logs.logger import get_task_logger
 logger = logging.getLogger('root')
 
 
@@ -215,10 +216,19 @@ class Task(object):
         return self.parent.request_worker(*args, **kwargs)
 
 
-    def start(self, args={}, subtask_key=None, callback=None, callback_args={},
-              errback=None, errback_args={}):
+    def start(self, args={}, subtask_key=None, workunit=None, task_id=-1, \
+              callback=None, callback_args={}, errback=None, errback_args={}):
         """
-        starts the task.  This will spawn the work in a workunit thread.
+        starts the task.  This will spawn the work in a separate thread.
+        
+        @param args - arguments to pass to task
+        @param subtask_key - subtask to run
+        @param workunit - key of workunit or data of workunit
+        @param task_id - id of task being run
+        @param callback - callback to execute after task is complete
+        @param callback_args - args to pass to callback
+        @param errback - call back to execute if there is an exception
+        @param errback_args - arguments to pass to errback
         """
 
         #if this was subtask find it and execute just that subtask
@@ -226,9 +236,12 @@ class Task(object):
             logger.debug('[%s] Task - starting subtask %s' % (self.get_worker().worker_key,subtask_key))
             split = subtask_key.split('.')
             subtask = self.get_subtask(split, True)
-            subtask.logger = self.logger
+            subtask.logger = get_task_logger(self.get_worker().worker_key, \
+                                             task_id, \
+                                             subtask_key, workunit)
             logger.debug('[%s] Task - got subtask'%self.get_worker().worker_key)
-            self.work_deferred = threads.deferToThread(subtask._start, args, callback, callback_args)
+            self.work_deferred = threads.deferToThread(subtask._start, args, \
+                                            callback, callback_args)
 
         elif self._status == STATUS_RUNNING:
             # only start root task if not already running
@@ -243,6 +256,27 @@ class Task(object):
             self.work_deferred.addErrback(errback, **errback_args)
 
         return 1
+
+
+    def start_subtask(self, subtask, args, workunit, task_id, callback, \
+                      callback_args):
+        """
+        Starts a subtask.  This functions sets additional parameters needed by
+        a subtask such as workunit selection.
+        
+        This method should be overridden by subclasses of Task that wish to
+        include workunits or other subtask specific functionality.  This method
+        sets up logging for the subtask so any overridden function should likely
+        call super as well.
+        
+        @param args - arguments to pass to task
+        @param subtask - key of subtask to run
+        @param workunit - key of workunit or data of workunit
+        @param task_id - id of task being run
+        @param callback - callback to execute after task is complete
+        @param callback_args - args to pass to callback
+        """
+        pass
 
 
     def status(self):

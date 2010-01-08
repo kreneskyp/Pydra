@@ -98,12 +98,12 @@ def task_log_path(task, subtask=None, workunit=None, worker=None):
     
     if workunit:
         return \
-            '%s/task.%s/' % (dir, task), \
-            '%s/task.%s/workunit.%s.%s.log' % (dir, task, subtask, workunit)
+            '%s/%s/' % (dir, task), \
+            '%s/%s/workunit.%s.%s.log' % (dir, task, subtask, workunit)
     else:    
         return \
-            '%s/task.%s/' % (dir, task), \
-            '%s/task.%s/task.log' % (dir, task)
+            '%s/%s/' % (dir, task), \
+            '%s/%s/task.log' % (dir, task)
 
 
 def get_task_logger(worker, task, subtask=None, workunit=None):
@@ -121,7 +121,7 @@ def get_task_logger(worker, task, subtask=None, workunit=None):
     @param workunit: (optional) ID of workunit.  workunits receive their
                          own log file so that the log can be read separately.
                          This is separate from the task instance log.
-    """   
+    """
     directory, filename = task_log_path(task, subtask, workunit, worker)    
     init_dir(directory)
 
