@@ -275,7 +275,7 @@ class WorkUnit(AbstractJob):
     def json_safe(self):
         return {
             'subtask_key':self.subtask_key,
-            'workunit_key':self.workunit_key,
+            'workunit_key':self.workunit,
             'args':self.args,
             'started':self.started.strftime('%Y-%m-%d %H:%m:%S') \
                                                     if self.started else None,
