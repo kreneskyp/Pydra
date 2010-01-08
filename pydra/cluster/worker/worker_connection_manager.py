@@ -100,7 +100,7 @@ class WorkerConnectionManager(Module):
         """
         import fileinput
 
-        logger.info('worker:%s - connecting to master @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
+        logger.info('worker:%s - connecting to Node @ %s:%s' % (self.worker_key, 'localhost', self.master_port))
         reactor.connectTCP('localhost', self.master_port, self.factory)
 
         # construct referenceable with remotes for MASTER

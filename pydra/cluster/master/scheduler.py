@@ -37,30 +37,6 @@ import logging
 logger = logging.getLogger('root')
 
 
-class WorkerJob:
-    """
-    Encapsulates a job that runs on a worker.
-    """
-
-    def __init__(self, root_task_id, task_key, args, subtask_key=None,
-            workunit_key=None, on_main_worker=False):
-        self.root_task_id = root_task_id
-        self.task_key = task_key
-        self.args = args
-        self.subtask_key = subtask_key
-        self.workunit_key = workunit_key
-        self.on_main_worker = on_main_worker
-
-    def __str__(self):
-        return 'root=%s task=%s subtask=%s' % (self.root_task_id, self.task_key, self.subtask_key)
-
-    def __repr__(self):
-        return self.__str__()
-        
-    def __unicode__(self):
-        return self.__str__()
-
-
 class TaskScheduler(Module):
     """
     Handles Scheduling tasks
@@ -171,30 +147,27 @@ class TaskScheduler(Module):
         Under the hood, the scheduler creates a task instance for the task, puts
         it into the queue, and then tries to advance the queue.
         """
-        logger.info('Task:%s - Queued:  %s' % (task_key, args))
+        logger.info('Queued Task: %s - Args:  %s' % (task_key, args))
 
         task_instance = TaskInstance()
         task_instance.task_key = task_key
-        task_instance.args = simplejson.dumps(args)
         task_instance.priority = priority
-        task_instance.subtask_key = None
+        task_instance.args = simplejson.dumps(args)
         task_instance.queued = datetime.now()
         task_instance.status = STATUS_STOPPED
         task_instance.save()
-        task_id = task_instance.id
         
         # queue the root task as the first work request.  This lets the queue
         # advancement logic to function the same for a root task or a subtask
-        task_instance.queue_worker_request((None, args, None, None))
+        task_instance.queue_worker_request(task_instance)
         
         with self._queue_lock:
-            heappush(self._queue, [task_instance.compute_score(), task_id])
+            heappush(self._queue, [task_instance.compute_score(),task_instance])
             # cache this task
-            self._active_tasks[task_id] = task_instance
+            self._active_tasks[task_instance.id] = task_instance
 
         threads.deferToThread(self._schedule)        
         return task_instance
-    
 
 
     def cancel_task(self, task_id):
@@ -205,32 +178,26 @@ class TaskScheduler(Module):
         """
         task_id = int(task_id)
         with self._queue_lock:
-            found = False
-            for i in range(len(self._queue)):
-                if self._queue[i][1] == task_id:
-                    logger.debug('Cancelling Task: %s' % task_id)
-                    del self._queue[i]
-                    found = True
-                    # cancel any workers assigned to the task.  task is not
-                    # marked cancelled until all workers have reported they
-                    # stopped
-                    task_workers = self.get_workers_on_task(task_id)
-                    if task_workers:
-                        for worker_key in task_workers:
-                            worker = self.workers[worker_key]
-                            logger.debug('Signalling Stop: %s' % worker_key)
-                            worker.remote.callRemote('stop_task')
-                    else:
-                        # this worker was waiting for workers, just mark it
-                        # cancelled
-                        task = self._active_tasks[task_id]
-                        del self._active_tasks[task_id]
-                        task.status = STATUS_CANCELLED
-                        task.completed = datetime.now()
-                        task.save()
-                        
-                    break
-        return found
+            task = self._active_tasks.get(task_id)
+            self._queue.remove([task.priority, task])
+            # cancel any workers assigned to the task.  task is not
+            # marked cancelled until all workers have reported they
+            # stopped
+            task_workers = self.get_workers_on_task(task_id)
+            if task_workers:
+                for worker_key in task_workers:
+                    worker = self.workers[worker_key]
+                    logger.debug('Signalling Stop: %s' % worker_key)
+                    worker.remote.callRemote('stop_task')
+            else:
+                # this worker was waiting for workers, just mark it
+                # cancelled
+                task = self._active_tasks[task_id]
+                del self._active_tasks[task_id]
+                task.status = STATUS_CANCELLED
+                task.completed = datetime.now()
+                task.save()
+        return task != None
 
 
     def add_worker(self, worker_key, task_status=None):
@@ -252,27 +219,26 @@ class TaskScheduler(Module):
 
         job = self._active_workers.get(worker_key, None)
         if job:
-            task_instance = self._active_tasks[job.root_task_id]
+            task_instance = job.task_instance
             
             if worker_key in self._main_workers:
                 # this is a main worker
-                if not job.subtask_key or task_status == STATUS_CANCELLED:
+                if not job.local_workunit or task_status == STATUS_CANCELLED:
                     logger.info('Main worker:%s finishes the root task' %
                             worker_key)
+                    
+                    status = STATUS_COMPLETE if task_status is None else task_status
+                    task_instance.status = status
+                    task_instance.completed = datetime.now()
+                    task_instance.save()
+                    
                     with self._worker_lock:
                         self._main_workers.remove(worker_key)
                         self._idle_workers.append(worker_key)
                         del self._active_workers[worker_key]
                         
                     with self._queue_lock:
-                        del self._active_tasks[job.root_task_id]
-                        
-                    status = STATUS_COMPLETE if task_status is None else task_status
-                    task_instance.status = status
-                    task_instance.completed = datetime.now()
-                    task_instance.save()
-
-                    with self._queue_lock:
+                        del self._active_tasks[job.task_id]
                         if status in (STATUS_CANCELLED, STATUS_COMPLETE, STATUS_FAILED):
                             # safe to remove the task
                             # release any unreleased workers
@@ -280,21 +246,19 @@ class TaskScheduler(Module):
                                 avatar = self.workers[key]
                                 avatar.remote.callRemote('release_worker')
 
-                            length = len(self._queue)
-                            for i in range(0, length):
-                                if self._queue[i][1] == job.root_task_id:
-                                    del self._queue[i]
-                                    logger.info(
-                                            'Task %d: %s is removed from the queue' % \
-                                            (job.root_task_id, job.task_key))
-                                    break
-                            heapify(self._queue)
+                            t = [job.priority, job]
+                            if t in self._queue:
+                                self._queue.remove(t)
+                                heapify(self._queue)
+                                logger.info(
+                                    'Task %d: %s is removed from the queue' % \
+                                    (job.task_id, job.task_key))
+
             else:
                 # not a main worker
-                logger.info("Task %d returns a worker: %s" % (job.root_task_id,
+                logger.info("Task %d returns a worker: %s" % (job.task_id,
                             worker_key))
                 if job.subtask_key is not None:
-                    # just double-check to make sure
                     with self._worker_lock:
                         del self._active_workers[worker_key]
                         task_instance.running_workers.remove(worker_key) 
@@ -328,14 +292,12 @@ class TaskScheduler(Module):
             elif job.subtask_key:
                 logger.warning('%s failed during task, returning work unit' % worker_key)
 
-                task_instance = self.get_task_instance(job.root_task_id)
+                task_instance = job.task_instance
                 main_worker = self.workers.get(task_instance.worker, None)
 
                 if main_worker:
                     # requeue failed work.
-                    task_instance.queue_worker_request(
-                                    (task_instance.worker, job.args,
-                                        job.subtask_key, job.workunit_key) )
+                    task_instance.queue_worker_request(job)
                 
             return False
 
@@ -353,32 +315,42 @@ class TaskScheduler(Module):
                 # we don't need to retain a main worker
                 job = self._active_workers.get(worker_key, None)
                 if job:
-                    task_instance = self._active_tasks.get(job.root_task_id, None)
-                    if task_instance and worker_key <> task_instance.worker:
-                        task_instance.running_workers.remove(worker_key)
-                        task_instance.waiting_workers.append(worker_key)
-                        del self._active_workers[worker_key]
+                    task_instance = job.task_instance
+                    task_instance.running_workers.remove(worker_key)
+                    task_instance.waiting_workers.append(worker_key)
+                    del self._active_workers[worker_key]
 
 
 
-    def request_worker(self, requester_key, subtask_key, args, workunit_key):
+    def request_worker(self, requester_key, subtask, args, workunit):
         """
         Requests a worker for a workunit on behalf of a (main) worker.
-
-        Calling this method means that the worker with key 'requester_key' is a
-        main worker.
+        
+        @param requester_key - key of worker requesting work.  The requester
+                            can only request work for the task it is currently
+                            assigned
+        @param subtask - key of the subtask to run
+        @param args - arguments to pass to the task
+        @param workunit - key that will retrieve additional data for this
+                            workunit.
         """
-        job = self.get_worker_job(requester_key)
-        if job:
+        task_instance = self.get_worker_job(requester_key)
+        if task_instance:
             # mark this worker as a main worker.
             # it will be considered by the scheduler as a special worker
             # resource to complete the task.
             self._main_workers.add(requester_key)
 
-            task_instance = self._active_tasks[job.root_task_id]
-            task_instance.queue_worker_request( (requester_key, args,
-                        subtask_key, workunit_key) )
-            logger.debug('Work Request %s:  sub=%s  args=%s  w=%s ' % (requester_key, subtask_key, args, workunit_key))
+            job = WorkUnit()
+            job.task_instance = task_instance
+            job.subtask_key = subtask
+            job.args = simplejson.dumps(args)
+            job.workunit = workunit
+            job.save()
+
+            task_instance.queue_worker_request(job)
+            logger.debug('Work Request %s:  sub=%s  args=%s  w=%s ' % \
+                         (requester_key, subtask, args, workunit))
 
             self._schedule()
         else:
@@ -425,9 +397,8 @@ class TaskScheduler(Module):
         @param json_safe [True] - return only primitives, lists, and dicts. 
         """
         if json_safe:
-            return [self._active_tasks[x[1]].json_safe() \
-                for x in self._queue]
-        return [self._active_tasks[x[1]] for x in self._queue]
+            return [task[1].json_safe() for task in self._queue]
+        return [task[1] for task in self._queue]
 
     def get_worker_status(self, worker_key):
         """
@@ -453,8 +424,7 @@ class TaskScheduler(Module):
         way.
         """
 
-        root_task_id, task_key, args, subtask_key, workunit_key = \
-                        None, None, None, None, None
+        task, subtask, workunit = None, None, None
         
         finished_main_workers = []
         with self._queue_lock:
@@ -462,61 +432,58 @@ class TaskScheduler(Module):
             
             if self._queue:
                 # find taskinstance or a worker_request
-                task_instance, worker_request = None, None
-                for task in self._queue:
-                    root_task_id = task[1]
-                    task_instance = self._active_tasks[root_task_id]
-                    worker_request = task_instance.poll_worker_request()
-                    if worker_request:
+                task_instance, job = None, None
+                for item in self._queue:
+                    job = item[1].poll_worker_request()
+                    if job:
+                        task_instance = item[1]
                         break
-                    
-                if worker_request:
+
+                if job:
                     with self._worker_lock:
                         worker_key = None
-                        on_main_worker = False
-                        requester, args, subtask_key, workunit_key = worker_request
-                        task_key = task_instance.task_key                      
-                        if subtask_key and task_instance.waiting_workers:
+                        task = task_instance.task_key
+                        subtask = job.subtask_key
+                        workunit = job.workunit
+                        if subtask and task_instance.waiting_workers:
                             # consume waiting worker first
-                            task_instance.pop_worker_request()
                             worker_key = task_instance.waiting_workers.pop()
                             logger.info('Re-dispatching waiting worker:%s to %s:%s' % 
-                                    (worker_key, subtask_key, workunit_key))
+                                    (worker_key, subtask, workunit))
                             task_instance.running_workers.append(worker_key)
-    
-                        elif subtask_key and not self._active_workers[requester].workunit_key:
+
+                        elif subtask and not task_instance.local_workunit:
                             # the main worker can do a local execution
-                            task_instance.pop_worker_request()
+                            worker_key = task_instance.worker
+                            task_instance.local_workunit = job
                             logger.info('Main worker:%s assigned to task %s:%s' %
-                                    (requester, subtask_key, workunit_key))
-                            worker_key = requester
-                            on_main_worker = True
-    
+                                    (worker_key, subtask, workunit))
+
                         elif self._idle_workers:
                             # dispatching to idle worker last
-                            task_instance.pop_worker_request()
                             worker_key = self._idle_workers.pop()
                             task_instance.running_workers.append(worker_key)
                             logger.info('Worker:%s assigned to task=%s, subtask=%s:%s' %
-                                    (worker_key, task_instance.task_key, subtask_key, workunit_key))
+                                    (worker_key, task_instance.task_key, subtask, job.workunit))
 
                     # was a worker found for the job
                     if worker_key:
-                        job = WorkerJob(root_task_id, task_key, args, subtask_key, \
-                            workunit_key, on_main_worker)
-                        self._active_workers[worker_key] = job
-            
+                        task_instance.pop_worker_request()
+                        job.worker = worker_key
+                        if not (subtask and job.on_main_worker):
+                            self._active_workers[worker_key] = job
+
                         # notify remote worker to start     
                         worker = self.workers[worker_key]
-                        pkg = self.task_manager.get_task_package(task_key)
+                        pkg = self.task_manager.get_task_package(task)
                         main_worker = task_instance.worker if task_instance.worker else worker_key
-                        d = worker.remote.callRemote('run_task', task_key, pkg.version,
-                                args, subtask_key, workunit_key, main_worker,
+                        d = worker.remote.callRemote('run_task', task, pkg.version,
+                                job.args, subtask, workunit, main_worker,
                                 task_instance.id)
-                        d.addCallback(self.run_task_successful, worker_key, subtask_key)
+                        d.addCallback(self.run_task_successful, worker_key, subtask)
                         d.addErrback(self.run_task_failed, worker_key)            
             
-                        return worker_key, root_task_id
+                        return worker_key, job.task_id
         
         return None
 
@@ -544,8 +511,7 @@ class TaskScheduler(Module):
         """
         with self._queue_lock:
             for task in self._queue:
-                task_instance = self._active_tasks[task[1]]
-                task[0] = task_instance.compute_score()
+                task[0] = task[1].compute_score()
             heapify(self._queue)
             reactor.callLater(self.update_interval, self._update_queue)
 
@@ -617,28 +583,14 @@ class TaskScheduler(Module):
         # in Fault recovery it might also be useful for analysis purposes 
         # if one node is faulty
         job = self.get_worker_job(worker_key)
-        task_instance = self._active_tasks[job.root_task_id]
-
-        if job and task_instance:
-            if subtask_key:
-                work_unit = WorkUnit()
-                work_unit.task_instance = task_instance
-                work_unit.subtask_key = subtask_key
-                work_unit.workunit_key = job.workunit_key
-                work_unit.args = simplejson.dumps(job.args)
-                work_unit.started = datetime.now()
-                work_unit.worker = worker_key
-                work_unit.status = STATUS_RUNNING
-                work_unit.save()
-                job.model = work_unit
-
-            else:
+        if job:
+            if not subtask_key:
                 self._main_workers.add(worker_key)
-                task_instance.worker = worker_key
-                task_instance.status = STATUS_RUNNING
-                task_instance.started = datetime.now()
-                task_instance.last_succ_time = datetime.now()
-                task_instance.save()
+                job.last_succ_time = datetime.now()
+            job.worker = worker_key
+            job.status = STATUS_RUNNING
+            job.started = datetime.now()
+            job.save()
 
 
     def send_results(self, worker_key, results, workunit_key, failed=False):
@@ -647,63 +599,58 @@ class TaskScheduler(Module):
 
             Tasks runtime and log should be saved in the database
         """
-        logger.debug('Worker:%s - sent results: w=%s results=%s' % \
-            (worker_key, workunit_key, results))
+        logger.debug('Worker:%s - sent results' % worker_key)
         status = STATUS_FAILED if failed else STATUS_COMPLETE
         status_msg = 'failed' if failed else 'completed'
         # TODO: this lock does not appear to be sufficient because all of the
         # other functions use specific locks, might need to obtain both locks
         with self._lock:
             job = self.get_worker_job(worker_key)
-            
-            logger.info('Worker:%s - %s: %s:%s (%s)' %  \
-                (status_msg, worker_key, job.task_key, job.subtask_key, \
-                 job.workunit_key))
 
             # check to make sure the task was still in the queue.  Its possible
             # this call was made at the same time a task was being canceled.  
             # Only worry about sending the results back to the Task Head 
             # if the task is still running
-            if job.subtask_key:
-                task_instance = self.get_task_instance(job.root_task_id)
+            if job:
+                task_instance = job.task_instance
+                if workunit_key:
+                    if isinstance(job, (TaskInstance)):
+                        job = job.local_workunit
+                        task_instance.local_workunit = None
+                    else:
+                        # Hold this worker for the next workunit or mainworker
+                        # releases it.
+                        self.hold_worker(worker_key)
+    
+                    logger.info('Worker:%s - %s: %s:%s (%s)' %  \
+                        (status_msg, worker_key, job.task_key, job.subtask_key, \
+                         job.workunit))
 
-                # if this was a subtask the main task needs the results and to 
-                # be informed
-                main_worker = self.workers[task_instance.worker]
-                logger.debug('Worker:%s - informed that subtask completed' %
-                        main_worker.name)
-                main_worker.remote.callRemote('receive_results', worker_key,
-                        results, job.subtask_key, job.workunit_key)
-
-                # Clear attributes if mainworker. This prevents bugs later on
-                # with scheduling and task completion if not cleared
-                if job.on_main_worker:
-                    job.on_main_worker = False
-                    job.workunit_key = None
-                    job.subtask_key = None
-
+                    # advance the scheduler if there is a request waiting 
+                    # for this task, otherwise there will be nothing to advance.
+                    # this reassigns the waiting worker quickly.
+                    if len(task_instance._worker_requests) != 0:
+                        threads.deferToThread(self._schedule)
+    
+                    # if this was a subtask the main task needs the results and to 
+                    # be informed
+                    main_worker = self.workers[task_instance.worker]
+                    logger.debug('Worker:%s - informed that subtask completed' %
+                            main_worker.name)
+                    main_worker.remote.callRemote('receive_results', worker_key,
+                            results, job.subtask_key, job.workunit)
+    
+                    # save information about this workunit to the database
+                    job.completed = datetime.now()
+                    job.status = status
+                    job.save()
+    
                 else:
-                    # Hold this worker for the next workunit or mainworker
-                    # releases it.
-                    self.hold_worker(worker_key)
-
-                # advance the scheduler if there is already a request waiting 
-                # for this task, otherwise there will be nothing to advance.
-                if len(task_instance._worker_requests) != 0:
-                    threads.deferToThread(self._schedule)
-
-                # save information about this workunit to the database
-                work_unit = job.model
-                work_unit.completed = datetime.now()
-                work_unit.status = status
-                work_unit.save()
-
-            else:
-                # this is the root task, so we can return the worker to the
-                # idle pool
-                logger.info("Root task:%s completed by worker:%s" %
-                        (job.task_key, worker_key))
-                self.add_worker(worker_key, status)
+                    # this is the root task, so we can return the worker to the
+                    # idle pool
+                    logger.info("Root task:%s completed by worker:%s" %
+                            (job.task_key, worker_key))
+                    self.add_worker(worker_key, status)
 
 
     def worker_stopped(self, worker_key):
@@ -713,10 +660,9 @@ class TaskScheduler(Module):
         job = self.get_worker_job(worker_key)
         if job.subtask_key:
             # save information about this workunit to the database
-            work_unit = job.model
-            work_unit.completed = datetime.now()
-            work_unit.status = STATUS_CANCELLED
-            work_unit.save()
+            job.completed = datetime.now()
+            job.status = STATUS_CANCELLED
+            job.save()
         
         logger.info(' Worker:%s - stopped' % worker_key)
         self.add_worker(worker_key, STATUS_CANCELLED)
@@ -726,19 +672,17 @@ class TaskScheduler(Module):
         """
         Release a worker held by the worker calling this function.
 
+        This should eventually use logic to intelligently select the worker to
+        release.  For now it just releases the first worker in the list.
+        
         @param worker_key: worker signally that it does not have additional
                            workunits but is holding a worker.
         """
-
-        # select the best worker to release.  For now just release the first
-        # worker in the waiting worker list
         logger.debug('[%s] request worker release' % worker_key)
         released_worker_key = None
         job = self._active_workers.get(worker_key, None)
         if job:
-            task_instance = self._active_tasks.get(job.root_task_id, None)
-            if task_instance:
-                released_worker_key = task_instance.waiting_workers.pop()
+            released_worker_key = job.task_instance.waiting_workers.pop()
 
         if released_worker_key:
             logger.debug('Task %s - releasing worker: %s' % \
@@ -811,13 +755,12 @@ class TaskScheduler(Module):
         if self._next_task_status_update < now:
             for key, worker in self.workers.items():
                 if self.get_worker_status(key) == 1:
-                    data = self.get_worker_job(key)
-                    if data.subtask_key and not data.on_main_worker:
+                    job = self.get_worker_job(key)
+                    if job.subtask_key and not job.on_main_worker:
                         continue
-                    task_instance_id = data.root_task_id
                     deferred = worker.remote.callRemote('task_status')
                     deferred.addCallback(self.fetch_task_status_success, \
-                    task_instance_id)
+                    job.task_id)
             self.next_task_status_update = now + timedelta(0, 3)
 
 

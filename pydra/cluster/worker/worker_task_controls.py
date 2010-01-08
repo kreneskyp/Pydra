@@ -19,6 +19,7 @@
 from __future__ import with_statement
 from threading import Lock
 
+import simplejson
 from twisted.internet import reactor, threads
 
 from pydra.cluster.constants import *
@@ -105,6 +106,7 @@ class WorkerTaskControls(Module):
         # process args to make sure they are no longer unicode.  This is an
         # issue with the args coming through the django frontend.
         clean_args = {}
+        args = simplejson.loads(args)
         if args:
             for arg_key, arg_value in args.items():
                 clean_args[arg_key.__str__()] = arg_value

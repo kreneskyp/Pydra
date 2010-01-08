@@ -51,7 +51,10 @@ class WorkerConnectionManager(Module):
 
     def __init__(self):
         self._services = [self.get_worker_service]
-        self._listeners = {'NODE_INITIALIZED':self.enable_workers}
+        self._listeners = {
+                    'NODE_INITIALIZED':self.enable_workers,
+                    'WORKER_FINISHED':self.remove_worker
+                }
 
         #locks
         self._lock = Lock() #general lock, use when multiple shared resources are touched
@@ -97,25 +100,41 @@ class WorkerConnectionManager(Module):
         return internet.TCPServer(pydra_settings.WORKER_PORT, pb.PBServerFactory(p))
 
 
-    def worker_authenticated(self, worker_avatar):
+    def remove_worker(self, worker):
         """
-        Callback when a worker has been successfully authenticated
+        Removes a worker from the pool of workers.  This is usually done when
+        the worker is shutting down but has not disconnected yet.
+        
+        @param worker - worker avatar
         """
         with self._lock:
-            self.workers[worker_avatar.name] = worker_avatar
-        self.emit('WORKER_CONNECTED', worker_avatar)
+            if worker.name in self.workers:
+                logger.debug('Removing worker from pool: %s' % worker.name)
+                del self.workers[worker.name]
+
+
+    def worker_authenticated(self, worker):
+        """
+        Callback when a worker has been successfully authenticated
+        
+        @param worker - worker avatar
+        """
+        with self._lock:
+            self.workers[worker.name] = worker
+        self.emit('WORKER_CONNECTED', worker)
 
 
     def worker_disconnected(self, worker):
         """
         Callback from worker_avatar when it is disconnected
+        
+        @param worker - worker avatar
         """
         with self._lock:
             if not worker.finished and worker.name in self.workers:
                 logger.debug('Removing worker from pool: %s' % worker.name)
                 del self.workers[worker.name]
         self.emit('WORKER_DISCONNECTED', worker)
-        
 
     
 

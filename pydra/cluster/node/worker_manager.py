@@ -135,7 +135,6 @@ class WorkerManager(Module):
 
             if worker.name in self.workers:
                 worker.finished = True
-                del self.workers[worker_key]
 
 
     def proxy_to_master(self, remote, worker, *args, **kwargs):
@@ -164,8 +163,22 @@ class WorkerManager(Module):
 
 
     def release_worker(self, master, worker_id, *args, **kwargs):
-        self.workers[worker_id].finished = True
-        return self.proxy_to_worker('release_worker', worker_id, *args, **kwargs)
+        """
+        Releases a worker that was held by a task.
+        """
+        worker = self.workers[worker_id]
+        worker.finished = True
+        
+        # send release on to worker.  must occur before worker is removed from
+        # the pool.
+        deferred = self.proxy_to_worker('release_worker', worker_id, *args, **kwargs)
+        
+        # emit WORKER_FINISHED to force cleanup of worker object.  Must occur
+        # before response is sent to master.  Otherwise master could send a new
+        # request before the worker is fully cleaned up
+        self.emit('WORKER_FINISHED', worker)
+        
+        return deferred
 
 
     def request_worker(self, *args, **kwargs):
@@ -182,6 +195,9 @@ class WorkerManager(Module):
 
     def run_task(self, avatar, worker_key, key, version, args={}, \
             subtask_key=None,workunit_key=None, main_worker=None, task_id=None):
+        """
+        Runs a task on this node.  This function should 
+        """
         self.task_manager.retrieve_task(key, version, self._run_task, \
                 self.retrieve_task_failed, \
                 worker_key, args, subtask_key, \
@@ -198,6 +214,17 @@ class WorkerManager(Module):
         explicit and deliberate division of repsonsibility.  Allowing
         decisions here dilutes the ability of the Master to control the
         cluster
+
+        @param key - task key
+        @param version - version of task to run
+        @param task_class - task class to be created TODO why is this here?
+        @param module_search_path - TODO why is this here?
+        @param worker_key - key of worker to run task on
+        @param args - args for task
+        @param subtask_key - key of subtask to run
+        @param workunit_key - key of workunit to run
+        @param main_worker - main worker for this task
+        @param task_id - id of task being run
         """
         logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
             % (key, args, subtask_key, workunit_key, \
@@ -216,7 +243,7 @@ class WorkerManager(Module):
                 # worker not running. start it saving the information required
                 # to start the subtask.  This function will return a deferred
                 # to the master.  The deferred will be
-                logger.debug('RunTask - Spawning worker: %s', key)
+                logger.debug('RunTask - Spawning worker: %s', worker_key)
                 worker = WorkerAvatar(self.worker_connection_manager, \
                                                             worker_key)
                 worker.worker_key = worker_key
@@ -270,7 +297,7 @@ class WorkerManager(Module):
             worker = self.workers[worker_key]
 
             if worker.main_worker == worker_key and not worker.local_subtask:
-                del self.workers[worker_key]
+                self.emit('WORKER_FINISHED', worker)
                 worker.finished = True
 
             else:

@@ -105,16 +105,13 @@ class TaskInstanceManager(models.Manager):
         return self.filter(status=None).exclude(started=None)
 
 
-
-class TaskInstance(models.Model):
+class AbstractJob(models.Model):
     """
-    Represents and instance of a Task.  This is used to track when a Task was 
-    run and whether it completed.
-
+    Encapsulates work that runs on a worker.
+    
     task_key:      Key that identifies the code to be run
     subtask_key:   Path within the task that identifies the child task to run
-    args:          Dictionary of arguments passed to the task
-    queued:        Datetime when this task instance was queued
+    args:          Dictionary of arguments passed to the task    
     started:       Datetime when this task instance was started
     completed:     Datetime when this task instance completed successfully or 
                    failed
@@ -125,29 +122,61 @@ class TaskInstance(models.Model):
     task_key        = models.CharField(max_length=255)
     subtask_key     = models.CharField(max_length=255, null=True)
     args            = models.TextField(null=True)
-    queued          = models.DateTimeField(auto_now_add=True)
     started         = models.DateTimeField(null=True)
     completed       = models.DateTimeField(null=True)
     worker          = models.CharField(max_length=255, null=True)
     status          = models.IntegerField(null=True)
     log_retrieved   = models.BooleanField(default=False)
-
-    objects = TaskInstanceManager()
-
-    def __init__(self, *args, **kwargs):
-        super(TaskInstance, self).__init__(*args, **kwargs) 
+    on_main_worker  = True
         
+    def __init__(self, *eargs, **kwargs):
+        super(AbstractJob, self).__init__(*eargs, **kwargs)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return 'root=%s task=%s subtask=%s' % (self.task_id, self.task_key, \
+                                               self.subtask_key)
+        
+    def __unicode__(self):
+        return self.__str__()
+
+    class Meta:
+        abstract = True
+
+
+class TaskInstance(AbstractJob):
+    """
+    Represents and instance of a Task.  This is used to track when a Task was 
+    run and whether it completed.
+
+    queued:        Datetime when this task instance was queued
+    """
+    queued  = models.DateTimeField(auto_now_add=True)
+    objects = TaskInstanceManager()
+    workunit = None #not used, included for compatibility with WorkUnit
+
+    def __init__(self, *eargs, **kw):
+        super(TaskInstance, self).__init__(*eargs, **kw) 
+        print eargs, kw
         # scheduling-related
         self.priority         = 5
         self.running_workers  = [] # running workers keys (excluding the main worker)
         self.waiting_workers  = [] # workers waiting for more workunits
         self.last_succ_time   = None # when this task last time gets a worker
-        self._worker_requests = [] # (args, subtask_key, workunit_key)
+        self._worker_requests = [] # List of WorkUnit objects
+        self.local_workunit   = None # a workunit executed by main worker
     
         # others
-        self.main_worker  = None
         self._request_lock = Lock()
 
+    def __getattribute__(self, key):
+        if key == 'task_id':
+            return self.id
+        elif key == 'task_instance':
+            return self
+        return super(TaskInstance, self).__getattribute__(key)
 
     def compute_score(self):
         """
@@ -170,7 +199,7 @@ class TaskInstance(models.Model):
         return object as a dictionary of json safe values.  This is needed
         because some complex types like Datetime will cause an exception if
         you attempt to serialize them with simplejson
-        """
+        """        
         return {
             'id':self.id,
             'task_key':self.task_key,
@@ -214,10 +243,7 @@ class TaskInstance(models.Model):
                 return None
 
     def __str__(self):
-        return '%s' % self.json_safe()
-        
-    def __repr__(self):
-        return self.__str__()
+        return 'TaskInstance: %s' % self.json_safe()
 
     class Meta:
         permissions = (
@@ -226,32 +252,25 @@ class TaskInstance(models.Model):
         )
 
 
-class WorkUnit(models.Model):
+class WorkUnit(AbstractJob):
     """
     Workunits are subtask requests that can be distributed by pydra.  A
     workunit is generally the smallest unit of work for a task.  This
     model represents key data points about them.
-
-    subtask_key:   Path within the task that identifies the child task to run
-    workunit_key:  key that uniquely identifies this workunit within the 
-                   datasource for the task.
-    args:          Dictionary of arguments passed to the task
-    started:       Datetime when this workunit was started
-    completed:     Datetime when this workunit completed successfully or 
-                   failed
-    worker:        Identifier for the worker that ran this workunit
-    status:        Current Status of the task instance
-    log_retrieved: Was the logfile retrieved from the remote worker
+    
+    workunit:  key that uniquely identifies this workunit within the 
+                datasource for the task.  This might also be the data itself
+                depending on how the key was initialized
     """
-    task_instance   = models.ForeignKey(TaskInstance, related_name='workunits')
-    subtask_key     = models.CharField(max_length=255)
-    workunit_key    = models.CharField(max_length=255)
-    args            = models.TextField(null=True)
-    started         = models.DateTimeField(null=True)
-    completed       = models.DateTimeField(null=True)
-    worker          = models.CharField(max_length=255, null=True)
-    status          = models.IntegerField(null=True)
-    log_retrieved   = models.BooleanField(default=False)
+    task_instance = models.ForeignKey(TaskInstance, related_name='workunits')
+    workunit      = models.CharField(max_length=255)
+
+    def __getattribute__(self, key):
+        if key == 'task_id':
+            return self.task_instance.id
+        elif key == 'on_main_worker':
+            return self.task_instance.worker == self.worker
+        return super(WorkUnit, self).__getattribute__(key)
 
     def json_safe(self):
         return {
