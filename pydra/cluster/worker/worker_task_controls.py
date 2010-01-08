@@ -116,8 +116,9 @@ class WorkerTaskControls(Module):
         if not self.__task_instance:
             self.__task_instance = task_class()
             self.__task_instance.parent = self
-            self.__task_instance.logger = get_task_logger(self.worker_key, \
-                task_id)
+            if not subtask_key:
+                self.__task_instance.logger = get_task_logger(self.worker_key, \
+                                                                task_id)
 
         # start the task.  If this is actually a subtask, then the task is
         # responsible for starting the subtask instead of the main task
