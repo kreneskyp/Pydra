@@ -25,48 +25,73 @@ def chain_subslicer(obj, ss_list):
 # sources
 
 class Datasource(object, UserDict.DictMixin):
+    """
+    The parent of all data sources, and the reference implementation of the
+    Datasource API.
+    """
 
     def __init__(self):
         self.subslicer = None
 
-    def connect(self):
-        pass
-
-    def close(self):
-        pass
-
-    def __iter__(self):
-        # implement this
-        raise NotImplementedError
-
-    def _load(self, key):
-        # implement this
-        raise NotImplementedError
-
-    def load(self, key):
-        obj = self._load(key)
+    def __getitem__(self, key):
+        obj = self.load(key)
 
         if self.subslicer:
             return chain_subslicer(obj, self.subslicer)
 
         return obj
 
+    def __iter__(self):
+        """
+        Return an iterator of keys.
+
+        Each key must be returned as a 1-tuple.
+        """
+        raise NotImplementedError
+
+    def open(self):
+        logger.debug("%s: Stub: Opening..." % self.__class__.__name__)
+
+    def close(self):
+        logger.debug("%s: Stub: Closing..." % self.__class__.__name__)
+
+    def load(self, key):
+        """
+        Called internally to look up the data corresponding to `key`.
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError
+
+
+class DatasourceList(Datasource):
+    """
+    A simple datasource that wraps a list.
+    """
+
+    def __init__(self, l):
+        super(DatasourceList, self).__init__()
+        self.list = l
+
+    def __iter__(self):
+        return ((index,) for index in xrange(len(self.list)))
+
+    def load(self, key):
+        return self.list[key[-1]]
+
 
 class DatasourceDict(Datasource):
+    """
+    A simple datasource that wraps a dict.
+    """
 
     def __init__(self, dictionary):
         super(DatasourceDict, self).__init__()
         self.store = dictionary
 
-
     def __iter__(self):
-        """key generation"""
-        for key in self.store.iterkeys():
-            yield key, # tuple
+        return ((key,) for key in self.store.iterkeys())
 
-    def _load(self, key):
-        """data reading"""
-
+    def load(self, key):
         return self.store[key[-1]]
 
 
@@ -76,15 +101,12 @@ class DatasourceDir(Datasource):
         super(DatasourceDir, self).__init__()
         self.directory = directory
 
-
     def __iter__(self):
         """generate key for input files"""
-        files = iter(os.walk(self.directory)).next()[2]
+        files = next(os.walk(self.directory))[2]
+        return ((filename,) for filename in files)
 
-        for filename in files:
-            yield filename,
-
-    def _load(self, key, mode="r"):
+    def load(self, key, mode="r"):
         """open particular input file"""
         filename = key[-1]
         path = os.path.join(self.directory, filename)
@@ -92,13 +114,24 @@ class DatasourceDir(Datasource):
 
 
 class DatasourceSQL(Datasource):
+    """
+    Generic SQL datasource.
+    """
+
+    pass
+
+
+class DatasourceMySQL(DatasourceSQL):
+    """
+    SQL datasource for MySQL.
+    """
 
     def __init__(self, **kwargs):
         super(DatasourceSQL, self).__init__()
         self.kwargs = kwargs
         self.db = None
 
-    def connect(self):
+    def open(self):
         self.db = MySQLdb.connect(**self.kwargs)
         logger.debug("datasource: connecting to DB")
 
@@ -106,11 +139,10 @@ class DatasourceSQL(Datasource):
         self.db.close()
         logger.debug("datasource: closing connection to DB")
 
-
     def __iter__(self):
         """generate key for database"""
         yield "_mysql",
 
-    def _load(self, key):
+    def load(self, key):
         return self.db.cursor()
 
