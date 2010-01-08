@@ -89,7 +89,12 @@ class WorkerManager(Module):
         finished flag set
         """
         if worker.finished:
-            worker.popen.wait()
+            while True:
+                try:
+                    worker.popen.wait()
+                    break
+                except OSError:
+                    logger.warn('Error cleaning up worker process, retrying')
 
 
     def init_node(self, avatar_name, master_host, master_port, node_key):
