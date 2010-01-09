@@ -159,7 +159,6 @@ class TaskInstance(AbstractJob):
 
     def __init__(self, *eargs, **kw):
         super(TaskInstance, self).__init__(*eargs, **kw) 
-        print eargs, kw
         # scheduling-related
         self.priority         = 5
         self.running_workers  = [] # running workers keys (excluding the main worker)
