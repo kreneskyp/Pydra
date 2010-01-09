@@ -94,7 +94,7 @@ def task_log_path(task, subtask=None, workunit=None, worker=None):
     if worker:    
         dir = '%s/worker.%s' % (log_dir, worker)
     else:
-        dir = pydra_settings.LOG_ARCHIVE
+        dir = settings.LOG_ARCHIVE
     
     if workunit:
         return \

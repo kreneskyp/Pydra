@@ -35,7 +35,9 @@ class NodeServer(ModuleManager):
     """
     def __init__(self):
 
-        logger.info('===== Node - Starting =====')
+        logger.info('=========================================================')
+        logger.info('=================== Node - Starting =====================')
+        logger.info('=========================================================')
 
         self.modules = [
             TaskManager(None),
@@ -44,7 +46,8 @@ class NodeServer(ModuleManager):
             WorkerConnectionManager,
             MasterConnectionManager,
             TaskSyncClient,
-            NodeZeroConfService
+            NodeZeroConfService,
+            NodeLogAggregator,
         ]
 
         ModuleManager.__init__(self)

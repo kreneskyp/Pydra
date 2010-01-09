@@ -18,10 +18,12 @@
 """
 
 from pydra.cluster.controller.web.interface import TwistedWebInterface
+from pydra.logs.log_aggregator import MasterLogAggregator
 from pydra.cluster.module import ModuleManager
 from pydra.cluster.master import *
 from pydra.cluster.master.task_sync import TaskSyncServer
 from pydra.cluster.tasks.task_manager import TaskManager
+
 
 import pydra_settings
 
@@ -37,7 +39,9 @@ class Master(ModuleManager):
     """
 
     def __init__(self):
-        logger.info('====== starting master ======')
+        logger.info('=========================================================')
+        logger.info('=================== starting master =====================')
+        logger.info('=========================================================')
 
         """
         List of modules to load.  They will be loaded sequentially
@@ -49,7 +53,8 @@ class Master(ModuleManager):
             TaskSyncServer,
             TaskScheduler,
             TwistedWebInterface,
-            NodeManager
+            NodeManager,
+            MasterLogAggregator
         ]
 
         ModuleManager.__init__(self)

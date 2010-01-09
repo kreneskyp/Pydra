@@ -52,52 +52,71 @@ class MasterLogAggregator(Module):
         ]
         
         self._listeners = {
-            #'CLUSTER_IDLE':self.aggregate_logs
+            'CLUSTER_IDLE':self.aggregate_logs
         }
 
+        self.task_iteration_lock = Lock()
         self.transfer_lock = Lock()
         self.transfers = []
 
 
-    def aggregate_logs(self):
+    def aggregate_logs(self, workers=None):
         """
         Scans TaskInstances and their Workunits and selects logs to aggregate.
 
-        For now this aggregates all logs in order of descending age.  At some
-        point this should be updated to pull from idle workers.
+        This function synchronizes querying and iteration of tasks and workunits
+        with pending log transfers.  This is required because as each worker
+        becomes idle.  It will trigger a call to this function. A full iteration
+        will occur before the next call is processed, reducing the number of
+        times a task might be processed.
+        
+        @param workers [None] - list of idle workers.  Logs are only requested
+                                from idle workers.  If None, logs are retrieved
+                                from all workers
         """
-        logger.info('Cluster Idle, aggregating all logs')
-        query = TaskInstance.objects \
-                    .filter(Q(log_retrieved=False) | Q(workunits__log_retrieved=False)) \
-                    .order_by('completed')
-        for task in query:
-            self.aggregate_task_logs(task)
+        with self.task_iteration_lock:
+            logger.info('Cluster Idle, aggregating all logs')
+            query = TaskInstance.objects \
+                        .filter(Q(log_retrieved=False) \
+                                | Q(workunits__log_retrieved=False)) \
+                        .order_by('completed')
+            for task in query:
+                self.aggregate_task_logs(task)
     
     
-    def aggregate_task_logs(self, task):
+    def aggregate_task_logs(self, task, workers=None):
         """
         aggregates all logs for a give task or workunit.  Logs are not
         retrieved if the task or workunit is still running.  Completed workunits
         for a running task will be retrieved
+        
+        @param workers [None] - list of idle workers.  Logs are only requested
+                                from idle workers.  If None, logs are retrieved
+                                from all workers
         """
         if isinstance(task, (int,)):
             task = TaskInstance.objects.get(task)
             
         # aggregate main task log
         if not task.log_retrieved and task.status in STATUSES:
-            self.aggregate_log(task.worker, task.id)
+            if not workers or task.worker in workers:
+                self.aggregate_log(task.worker, task.id)
 
         # aggregate workunit logs, if any
         for wu in task.workunits.filter(log_retrieved=False) \
                                     .filter(status__in=STATUSES):
-            self.aggregate_log(wu.worker, task.id, wu.subtask_key, \
-                               wu.workunit_key)
+            if not workers or wu.worker in workers:
+                self.aggregate_log(wu.worker, task.id, wu.subtask_key, \
+                               wu.workunit)
 
 
     def aggregate_log(self, worker, task, subtask=None, workunit=None):
         """
         Aggregates a single log file.  Either the main task log, or a subtask
         log
+        
+        This function synchronizes per file download requests to prevent excess
+        requests for the same file.
         
         @param worker - id of worker sending the log
         @param task - id of task
@@ -131,18 +150,17 @@ class MasterLogAggregator(Module):
         log = zlib.decompress(response)
         dir, path = task_log_path(task, subtask, workunit)
         
-        if os.path.exists(path):
-            os.remove(path)
-        
         if not os.path.exists(dir):
             os.mkdir(dir)
-            
+        elif os.path.exists(path):
+            os.remove(path)
         out = open(path ,'w')
         out.write(log)
         
         # mark log as received
         if workunit:
-            item = Workunit.objects.get(workunit)
+            item = WorkUnit.objects.get(task_instance__id=task, \
+                                        workunit=workunit)
         else:
             item = TaskInstance.objects.get(id=task)
         item.log_retrieved = True
@@ -168,6 +186,7 @@ class NodeLogAggregator(Module):
             ('MASTER', self.delete_log)
         ]
 
+        self.delete_lock = Lock()
 
     def send_log(self, master, worker, task, subtask=None, workunit=None):
         """
@@ -201,4 +220,8 @@ class NodeLogAggregator(Module):
         dir, path = task_log_path(task, subtask, workunit, worker)
         if os.path.exists(path):
             logger.debug('Deleting Log: %s' % path)
-            #os.remove(path)
+            # synchronize deletes to ensure directory gets deleted
+            with self.delete_lock:
+                os.remove(path)
+                if not os.listdir(dir):
+                    os.rmdir(dir)

@@ -422,6 +422,9 @@ class TaskScheduler(Module):
         parallel tasks. At the extreme case, a single main worker can finish
         the whole task even without other workers, albeit probably in a slow
         way.
+        
+        If no tasks are in the queue or no job is in the queue CLUSTER_IDLE is
+        emited
         """
 
         task, subtask, workunit = None, None, None
@@ -484,7 +487,12 @@ class TaskScheduler(Module):
                         d.addErrback(self.run_task_failed, worker_key)            
             
                         return worker_key, job.task_id
-        
+
+                else:
+                    self.emit('CLUSTER_IDLE', self._idle_workers)
+            else:
+                self.emit('CLUSTER_IDLE', self._idle_workers)
+                    
         return None
 
 
