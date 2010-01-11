@@ -24,6 +24,7 @@ from pydra.cluster.controller.amf.authenticator import AMFAuthenticator
 import simplejson
 from twisted.application import internet
 from twisted.cred import checkers
+from twisted.internet.defer import Deferred
 from twisted.web import server, resource, http, http_headers
 from twisted.web.error import ForbiddenResource, NoResource, Error
 
@@ -65,6 +66,19 @@ def authenticated(fn):
         return 0
 
     return new
+
+
+def deferred_response(response, request):
+    """
+    Generic callback for web requests receive a Deferred from the mapped
+    function.  This simply json encodes the response and passes it to the
+    request
+    
+    @param response - response from deferred function
+    @param request - http request object from original call
+    """
+    request.write(simplejson.dumps(response))
+    request.finish()
 
 
 class FunctionResource(resource.Resource):
@@ -109,7 +123,13 @@ class FunctionResource(resource.Resource):
                     results = self.function(user, *args, **kwargs)
                 else:
                     results = self.function(*args, **kwargs)
-                return simplejson.dumps(results)
+
+                # if the method returns a deferred hook up
+                if isinstance(results, (Deferred)):
+                    results.addCallback(deferred_response, req)
+                    return server.NOT_DONE_YET
+                else:
+                    return simplejson.dumps(results)
 
             except Exception, e:
                 import traceback
