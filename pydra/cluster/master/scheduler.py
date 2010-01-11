@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 import simplejson
 from heapq import heappush, heappop, heapify
 from twisted.internet import reactor, threads
+from twisted.internet.defer import Deferred, DeferredList
 
 from pydra.cluster.module import Module
 from pydra.cluster.tasks import *
@@ -107,7 +108,7 @@ class TaskScheduler(Module):
         }
 
         self._interfaces = [
-            self.task_statuses,
+            (self.fetch_task_status, {'name':'task_statuses'}),
             self.cancel_task,
             self.queue_task,
             (self.get_queued_tasks, {'name':'list_queue'}),
@@ -117,6 +118,7 @@ class TaskScheduler(Module):
         self._lock = Lock()         # general lock        
         self._worker_lock = Lock()  # lock for worker only transactions
         self._queue_lock = Lock()   # lock for queue only transactions
+        self._fetch_status_lock = Lock() # lock for retrieving statuses
 
         # task statuses
         self._task_statuses = {}
@@ -746,69 +748,78 @@ class TaskScheduler(Module):
 
     def fetch_task_status(self):
         """
-        updates the list of statuses.  this function is used because all
-        workers must be queried to receive status updates.  This results in a
-        list of deferred objects.  There is no way to block until the results
-        are ready.  instead this function updates all the statuses. Subsequent
-        calls for status will be able to fetch the status.  It may be delayed 
-        by a few seconds but thats minor when a task could run for hours.
+        updates the list of task statuses, a dictionary of task status and
+        progress.
+        
+        This function is a combination of tabulating statuses from queued task
+        objects and calls to workers.
 
         For now, statuses are only queried for Main Workers.  Including 
         statuses of subtasks requires additional logic and overhead to pass the
         intermediate results to the main worker.
+        
+        @returns the current cached statuses, or a deferred if the statuses
+                are still being fetched
         """
 
-        # limit updates so multiple controllers won't cause excessive updates
+        # cache updates so multiple controllers won't cause excessive calls
+        # to the workers.  While a status update is in progress _task_statuses
+        # will be set to deferred so all requests will return the new statuses
+        # as soon as they are returned
         now = datetime.now()
-        if self._next_task_status_update < now:
-            for key, worker in self.workers.items():
-                if self.get_worker_status(key) == 1:
-                    job = self.get_worker_job(key)
-                    if job.subtask_key and not job.on_main_worker:
-                        continue
-                    deferred = worker.remote.callRemote('task_status')
-                    deferred.addCallback(self.fetch_task_status_success, \
-                    job.task_id)
-            self.next_task_status_update = now + timedelta(0, 3)
+        with self._fetch_status_lock:
+            if self._next_task_status_update > now:
+                return self._task_statuses
+            statuses_deferred = Deferred()
+            self._task_statuses = statuses_deferred
+        self.next_task_status_update = now + timedelta(0, 3)
+        
+        deferreds = []
+        statuses = {}
+        for priority, task in self._queue:
+            if task.status == STATUS_STOPPED:
+                statuses[task.id] = {'s':STATUS_STOPPED}
+            else:
+                start = time.mktime(task.started.timetuple())
+                status = {'s':task.status, 't':start, 'p':-1}
+                statuses[task.id] = status
+                worker = self.workers[task.worker]
+                deferred = worker.remote.callRemote('task_status')
+                deferred.addCallback(self.fetch_task_status_success, status)
+                deferreds.append(deferred)
+
+        # Possible that there are only queued tasks, or nothing in the queue. In
+        # which case no deferreds from the worker will be pending, immediately 
+        # call the success method
+        if deferreds:
+            deferred_list = DeferredList(deferreds, consumeErrors=True)
+            deferred_list.addCallback(self.fetch_task_statuses_success,statuses)
+            return deferred_list
+        return self.fetch_task_statuses_success(None, statuses)
 
 
-    def fetch_task_status_success(self, result, task_instance_id):
+    def fetch_task_status_success(self, progress, status):
         """
         updates task status list with response from worker used in conjunction
         with fetch_task_status()
+        
+        @param progress - result from remote call to task_status.  progress
+                        completed as an integer 0 - 100
+        @param status - dictionary containing status of task
         """
-        self._task_statuses[task_instance_id] = result
+        status['p'] = progress
 
 
-    def task_statuses(self):
+    def fetch_task_statuses_success(self, results, statuses):
         """
-        Returns the status of all running tasks.  This is a detailed list
-        of progress and status messages.
+        Called when all workers have reported their status.  Saves the final
+        list of results as the current list and returns it.  This also triggers
+        the callback for any deferreds waiting for completion
+        
+        @param results - results from deferred list
+        @param statuses - completed list of statuses.
         """
-
-        # tell the master to fetch the statuses for the task.
-        # this may or may not complete by the time we process the list
-        self.fetch_task_status()
-
-        statuses = {}
-        for instance in self.get_queued_tasks(False):
-            if instance.status == STATUS_STOPPED:
-                statuses[instance.id] = {'s':STATUS_STOPPED}
-                
-            else:
-                start = time.mktime(instance.started.timetuple())
-
-                # call worker to get status update
-                try:
-                    progress = self._task_statuses[instance.id]
-    
-                except KeyError:
-                    # its possible that the progress does not exist yet. Because
-                    # the task has just started and fetch_task_status is not 
-                    # complete
-                    pass
-                    progress = -1
-    
-                statuses[instance.id] = {'s':STATUS_RUNNING, 't':start, 'p':progress}
-
+        with self._fetch_status_lock:
+            self._task_statuses.callback(statuses)
+            self._task_statuses = statuses
         return statuses
