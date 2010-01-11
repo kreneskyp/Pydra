@@ -17,6 +17,8 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from datetime import datetime
+
 from django.template.defaultfilters import stringfilter
 from django import template
 from django.utils.safestring import mark_safe
@@ -130,11 +132,21 @@ def task_status_text(code):
         return "unknown status"
 register.filter('task_status_text', task_status_text)
 
-"""
-Filter that renders string with no escaping
-"""
+
 @register.filter(name='no_escape')
 def no_escape(string):
+    """
+    Filter that renders string with no escaping
+    """
     return mark_safe(string)
 register.filter('no_escape', no_escape)
+
+
+@register.filter(name='int_date')
+def int_date(int_):
+    """
+    Filter that converts an int to a DateTime
+    """
+    return datetime.fromtimestamp(int_)
+register.filter('int_date', int_date)
 

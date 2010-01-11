@@ -433,7 +433,7 @@
                 <tr id="{{key}}" class="{% cycle '' 'stripe' %}">
                     <td>{{key}}</td>
                     <td class="description">{{task.description}}</td>
-                    <td class="last_run">{% if task.last_run %}{{task.last_run}}{%else%}<i>never</i>{%endif%}</td>
+                    <td class="last_run">{% if task.last_run %}{{task.last_run|int_date}}{%else%}<i>never</i>{%endif%}</td>
                     <td class="buttons">
                         {% if perms.pydra_server.can_run_tasks %}
                             <div class="button_run button" title="Run Task"></div>
