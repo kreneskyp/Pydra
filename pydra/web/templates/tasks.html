@@ -248,8 +248,8 @@
                                 .show()
                                 .progressBar({width:300,
                                               barImage:'{{MEDIA}}/images/progressbg_yellow_300.gif',
-                                              boxImage:'{{MEDIA}}/images/progressbar_300.gif'
-                                });
+                                              boxImage:'{{MEDIA}}/images/progressbar_300.gif'})
+                                .progressBar(status['p']);
 
                             // update time started element
                             started = new Date(parseInt(status['t'])*1000);
