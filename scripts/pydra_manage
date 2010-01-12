@@ -10,7 +10,7 @@ from django.core.management import execute_manager, ManagementUtility
 
 from pydra.config import configure_django_settings
 configure_django_settings()
-import pydra_web_settings as settings
+import pydra_settings as settings
 
 if __name__ == "__main__":
     
