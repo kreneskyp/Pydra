@@ -61,7 +61,7 @@ class TaskManager(Module):
 
     lazy_init = False
 
-    def __init__(self, scan_interval=10, lazy_init=False):
+    def __init__(self, scan_interval=60, lazy_init=False):
         """
         @param scan_interval - interval at which TASKS_DIR is scanned for
                                 changes.  No scanning when set to None
@@ -222,7 +222,6 @@ class TaskManager(Module):
         files = os.listdir(self.tasks_dir_internal)
         for pkg_name in files:
             self.init_package(pkg_name)
-
         # trigger the autodiscover procedure immediately
         if self.scan_interval:
             reactor.callLater(0, self.autodiscover)
@@ -252,11 +251,11 @@ class TaskManager(Module):
                 elif len(versions) != 1:
                     # load the newest version
                     logger.warn('Internal task cache contains more than one version of the task')
-                    cur = versions[0]
-                    for v in versions:
-                        if os.path.getmtime('%s/%s' % (pkg_dir,v)) > \
-                            os.path.getmtime('%s/%s' % (pkg_dir,cur)):
-                                cur = v
+                    v = versions[0]
+                    for dir in versions:
+                        if os.path.getmtime('%s/%s' % (pkg_dir,dir)) > \
+                            os.path.getmtime('%s/%s' % (pkg_dir,v)):
+                                v = dir
                 else:
                     v = versions[0]
                 
@@ -531,6 +530,7 @@ class TaskManager(Module):
             sha1_hash = packaging.compute_sha1_hash(pkg_dir)
             internal_folder = os.path.join(self.tasks_dir_internal,
                     pkg_name, sha1_hash)
+
             pkg = self.registry.get((pkg_name, None), None)
             if not pkg or pkg.version <> sha1_hash:
                 # copy this folder to tasks_dir_internal
@@ -539,7 +539,7 @@ class TaskManager(Module):
                 except OSError:
                     # already in tree, just update the timestamp so it shows
                     # as the newest version
-                    os.utime('%s/%s' % (internal_folder, pkg_dir), None)
+                    os.utime('%s' % (internal_folder), None)
                     logger.warn('Package %s v%s already exists' % (pkg_name,
                                 sha1_hash))
             # find updates

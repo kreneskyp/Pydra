@@ -88,6 +88,10 @@ class TaskPackage:
         @param pkg_folder
         """
         if os.path.exists(pkg_folder):
+            if not self.version:
+                self.version = compute_sha1_hash(pkg_folder)
+            
+            logger.info('Loading Package: %s - %s' % (self.name, self.version))
             meta = _read_config(os.path.join(pkg_folder, 'META'))
             try:
                 self.dependency = meta['Dependency'].split(', \t')
@@ -133,8 +137,7 @@ class TaskPackage:
                             except:
                                 logger.error('ERROR Loading task: %s' % key)
 
-            if not self.version:
-                self.version = compute_sha1_hash(pkg_folder)
+            
 
 
 def _read_config(meta_file_name):
