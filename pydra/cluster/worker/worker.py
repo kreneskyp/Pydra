@@ -45,7 +45,7 @@ class Worker(ModuleManager):
         logger = init_logging(pydra_settings.LOG_FILENAME_NODE, '[%s]' % worker_key)
 
         self.modules = [
-            TaskManager(None),
+            TaskManager(None, True),
             WorkerConnectionManager,
             WorkerTaskControls,
         ]

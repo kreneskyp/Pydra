@@ -19,7 +19,7 @@
 from __future__ import with_statement
 
 import cStringIO
-from threading import Lock
+from threading import Lock, RLock
 import os
 import shutil
 import tarfile
@@ -59,8 +59,16 @@ class TaskManager(Module):
         'get_task',
     ]    
 
-    def __init__(self, scan_interval=60):
+    lazy_init = False
 
+    def __init__(self, scan_interval=10, lazy_init=False):
+        """
+        @param scan_interval - interval at which TASKS_DIR is scanned for
+                                changes.  No scanning when set to None
+        @param lazy_init - lazy init causes tasks to only be loaded when
+                            requested.  Assumes scan_interval=None
+        """
+        
         self._interfaces = [
             self.list_tasks, 
             self.task_history,
@@ -68,11 +76,15 @@ class TaskManager(Module):
         ]
 
         self._listeners = {
-            'MANAGER_INIT':self.init_task_cache,
             'TASK_RELOAD':self.read_task_package,
             'TASK_STARTED':self._task_started,
             'TASK_STARTED':self._task_stopped,
         }
+        
+        if lazy_init:
+            self.lazy_init = True
+        else:
+            self._listeners['MANAGER_INIT']=self.init_task_cache
 
         self.tasks_dir = pydra_settings.TASKS_DIR
         self.tasks_dir_internal = pydra_settings.TASKS_DIR_INTERNAL
@@ -84,12 +96,12 @@ class TaskManager(Module):
 
         self._task_callbacks = {} # task_key : callback list
 
-        self._lock = Lock()
+        self._lock = RLock()
         self._callback_lock = Lock()
 
         self.__initialized = False
 
-        # in seconds; currently no way to customize this value        
+        # in seconds, None causes no updates    
         self.scan_interval = scan_interval
 
 
@@ -202,32 +214,67 @@ class TaskManager(Module):
 
 
     def init_task_cache(self):
-        with self._lock:
-            # read task_cache_internal (this is one-time job)
-            files = os.listdir(self.tasks_dir_internal)
-            for pkg_name in files:
-                pkg_dir = os.path.join(self.tasks_dir_internal, pkg_name)
-                if os.path.isdir(pkg_dir):
-                    versions = os.listdir(pkg_dir)
-                    if len(versions) != 1:
-                        logger.error('Internal task cache is not clean!')
-                    else:
-                        v = versions[0]
-                        full_pkg_dir = os.path.join(pkg_dir, v)
-                        pkg = packaging.TaskPackage(pkg_name, full_pkg_dir)
-                        if pkg.version <> v:
-                            # verification
-                            logger.warn('Invalid package %s:%s' % (pkg_name, v))
-                        else:
-                            self._add_package(pkg)
+        """
+        initializes the cache of tasks.  This scans TASKS_DIR_INTERNAL, the
+        already versioned tasks.  
+        """
+        # read task_cache_internal (this is one-time job)
+        files = os.listdir(self.tasks_dir_internal)
+        for pkg_name in files:
+            self.init_package(pkg_name)
 
         # trigger the autodiscover procedure immediately
-        reactor.callLater(0, self.autodiscover)
+        if self.scan_interval:
+            reactor.callLater(0, self.autodiscover)
 
+
+    def init_package(self, pkg_name, version=None):
+        """
+        Attempts to load a single package into the registry.
+        
+        @param pkg_name - name of package to load into the registry
+        @param version - version of package to load into the registry.  Defaults
+                         to None, resulting in latest version.
+        @param returns pkg if loaded, None otherwise
+        """
+        with self._lock:
+            pkg_dir = os.path.join(self.tasks_dir_internal, pkg_name)
+            if os.path.isdir(pkg_dir):
+                versions = os.listdir(pkg_dir)
+                if not versions:
+                    raise TaskNotFoundException(pkg_name)
+
+                elif version:
+                    # load specified version if available
+                    if not version in versions:
+                        raise TaskNotFoundException(pkg_name)
+                    v = version
+                elif len(versions) != 1:
+                    # load the newest version
+                    logger.warn('Internal task cache contains more than one version of the task')
+                    cur = versions[0]
+                    for v in versions:
+                        if os.path.getmtime('%s/%s' % (pkg_dir,v)) > \
+                            os.path.getmtime('%s/%s' % (pkg_dir,cur)):
+                                cur = v
+                else:
+                    v = versions[0]
+                
+                # load this version
+                full_pkg_dir = os.path.join(pkg_dir, v)
+                pkg = packaging.TaskPackage(pkg_name, full_pkg_dir, v)
+                if pkg.version <> v:
+                    # verification
+                    logger.warn('Invalid package %s:%s' % (pkg_name, v))
+                self._add_package(pkg)
+                return pkg
+        return None
 
     def autodiscover(self):
         """
-        Periodically scan the task_cache folder.
+        Periodically scan the task_cache folder.  This function is used for
+        checking for new or updated tasks.  This function is CPU intensive as
+        read_task_package() computes the hash of a directory.
         """
         old_packages = self.list_task_packages()
 
@@ -235,9 +282,9 @@ class TaskManager(Module):
         for filename in files:
             pkg_dir = os.path.join(self.tasks_dir, filename)
             if os.path.isdir(pkg_dir):
-                pkg = self.read_task_package(filename)
+                self.read_task_package(filename)
                 try:
-                    old_packages.remove(pkg.name)
+                    old_packages.remove(filename)
                 except ValueError:
                     pass
 
@@ -300,9 +347,11 @@ class TaskManager(Module):
     def retrieve_task(self, task_key, version, callback, errcallback,
             *callback_args, **callback_kwargs):
         """
-        task_key is referenced as 'package_name.task_name'
-
-        @task_key: the task key
+        Retrieves a task and calls callback passing the retrieved task.  If the
+        requested version is not available, it will be retrieved first and this
+        function will be called back again.
+        
+        @task_key: the task key, referenced as 'package_name.task_name'
         @version: the version of the task
         @callback: callback to make after the latest task code is retrieved
         @errcallback: callback to make if task retrieval fails
@@ -313,7 +362,15 @@ class TaskManager(Module):
         pkg_name = task_key[:task_key.find('.')]
         needs_update = False
         with self._lock:
+            
+            # get the task. if configured for lazy init, this class will only
+            # attempt to load a task into the registry once it is requested.
+            # subsequent requests will pull from the registry.
             pkg = self.registry.get( (pkg_name, version), None)
+            if not pkg and self.lazy_init:
+                logger.debug('Lazy Init: %s' % pkg_name)
+                pkg = self.init_package(pkg_name, version)
+
             if pkg:
                 pkg_status = pkg.status
                 if pkg_status == packaging.STATUS_OUTDATED:
@@ -347,8 +404,8 @@ class TaskManager(Module):
                 self._task_callbacks[pkg_name].append( (task_key, errcallback,
                             callback, callback_args, callback_kwargs) )
             except KeyError:
-                self._task_callbacks[pkg_name]= [ (task_key, errcallback,
-                        callback, callback_args, callback_kwargs) ]
+                self._task_callbacks[pkg_name]= [(task_key, errcallback,
+                        callback, callback_args, callback_kwargs)]
 
 
     def active_sync(self, pkg_name, response=None, phase=1):
@@ -452,6 +509,21 @@ class TaskManager(Module):
 
 
     def read_task_package(self, pkg_name):
+        """
+        Reads the directory corresponding to a TaskPackage from TASKS_DIR and
+        imports it into TASKS_DIR_INTERNAL.  Tasks have a hash computed that is
+        used as the version.  Imported packages are also added to the registry
+        and emit TASK_ADDED or TASK_UPDATED
+        
+        After updating or adding a new task, any callbacks pending for the
+        tasks (ie. task waiting for sync) will be executed.
+        
+        This method is CPU intensive as all files within the package are SHA1
+        hashed
+        
+        @param pkg_name - name of package, also the root directory.
+        @returns TaskPackage if loaded, otherwise None
+        """
         # this method is slow in finding updates of tasks
         with self._lock:
             pkg_dir = self.get_package_location(pkg_name)
@@ -459,30 +531,28 @@ class TaskManager(Module):
             sha1_hash = packaging.compute_sha1_hash(pkg_dir)
             internal_folder = os.path.join(self.tasks_dir_internal,
                     pkg_name, sha1_hash)
-            pkg = self.registry.get( (pkg_name, None), None)
+            pkg = self.registry.get((pkg_name, None), None)
             if not pkg or pkg.version <> sha1_hash:
                 # copy this folder to tasks_dir_internal
                 try:
                     shutil.copytree(pkg_dir, internal_folder)
                 except OSError:
+                    # already in tree, just update the timestamp so it shows
+                    # as the newest version
+                    os.utime('%s/%s' % (internal_folder, pkg_dir), None)
                     logger.warn('Package %s v%s already exists' % (pkg_name,
                                 sha1_hash))
-
-            pkg = packaging.TaskPackage(pkg_name, internal_folder)
-
             # find updates
-            if (pkg.name, None) not in self.registry:
+            if (pkg_name, None) not in self.registry:
                 signal = 'TASK_ADDED'
                 updated = True
-            elif pkg.version <> self.registry[pkg.name, None].version:
+            elif sha1_hash <> self.registry[pkg.name, None].version:
                 signal = 'TASK_UPDATED'
 
-            self._add_package(pkg)
-
-            # make a copy in tasks_dir_internal
-
-
         if signal:
+            pkg = packaging.TaskPackage(pkg_name, internal_folder)
+            self._add_package(pkg)
+            
             # invoke attached task callbacks
             callbacks = self._task_callbacks.get(pkg_name, None)           
             module_path, cycle = self._compute_module_search_path(pkg_name)
@@ -495,8 +565,8 @@ class TaskManager(Module):
                     callback(task_key, pkg.version, pkg.tasks[task_key],
                             module_path, *args, **kwargs)
             self.emit(signal, pkg_name)
-
-        return pkg
+            return pkg
+        return None
 
 
     def get_task_package(self, task_key):
@@ -508,6 +578,13 @@ class TaskManager(Module):
 
     
     def _add_package(self, pkg):
+        """
+        Adds a package to the registry, making it available for execution.
+        Packages dependant on other packages that have not been loaded yet will
+        cause an exception to be raised.
+        
+        @param pkg - TaskPackage to add
+        """
         for dep in pkg.dependency:
             for key in self.registry.keys():
                 if key[0] == dep:
@@ -528,6 +605,13 @@ class TaskManager(Module):
 
 
     def _compute_module_search_path(self, pkg_name):
+        """
+        Creates a list of import paths that a package depends on.  These paths
+        must be on the python path (sys.path) for this task package to be able
+        to import its dependencies
+        
+        @param pkg_name - name of task package, also the root directory
+        """
         pkg_location = self.get_package_location(pkg_name)
         module_search_path = [pkg_location, os.path.join(pkg_location,'lib')]
         st, cycle = graph.dfs(self.package_dependency, pkg_name)
@@ -540,11 +624,17 @@ class TaskManager(Module):
 
 
     def _task_started(self, task_key, version):
-        # record a task usage
+        """
+        Listener for task start.  Used for tracking Tasks that are currently
+        running.
+        """
         pass
 
 
     def _task_stopped(self, task_key, version):
-        # check if the task is in use, and if not, remove it
+        """
+        Listener for task completion.  Used for deleting obsolete versions of
+        Tasks that could not be deleted earlier due it being in use
+        """
         pass
 

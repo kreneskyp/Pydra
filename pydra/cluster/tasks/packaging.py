@@ -59,14 +59,22 @@ class TaskPackage:
     Depends = <pkg_name1>, <pkg_name2>,    
     """
     
-    def __init__(self, name, folder):
+    def __init__(self, name, folder, version=None):
+        """
+        @param version - version to assign to this task.  If None will be
+                        computed by hashing the contents of the directory.  This
+                        Allows the TaskManager or other classes that already
+                        know the version to skip the expensive SHA1 generation.
+                        setting the version to an arbitrary value that is
+                        incorrect will likely cause bad errors, be forewarned!
+        """
         self.name = name
         self.dependency = [] # a list of depended package names
 
         self.status = STATUS_NORMAL
 
         self.tasks = {} # task_key: task_class
-        self.version = None
+        self.version = version
 
         self._init(folder)
 
@@ -77,7 +85,7 @@ class TaskPackage:
         may be as the user defines it.  Or it may be a directory name that
         specifies the hash of the package.
 
-        @pkg_folder directory containing tasks.
+        @param pkg_folder
         """
         if os.path.exists(pkg_folder):
             meta = _read_config(os.path.join(pkg_folder, 'META'))
@@ -125,7 +133,8 @@ class TaskPackage:
                             except:
                                 logger.error('ERROR Loading task: %s' % key)
 
-            self.version = compute_sha1_hash(pkg_folder)
+            if not self.version:
+                self.version = compute_sha1_hash(pkg_folder)
 
 
 def _read_config(meta_file_name):
