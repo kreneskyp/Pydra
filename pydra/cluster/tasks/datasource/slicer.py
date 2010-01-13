@@ -21,3 +21,13 @@ class MapSlicer(IterSlicer):
     """
 
     pass
+
+class LineSlicer(IterSlicer):
+    """
+    Slicer specialized for handling text blobs.
+    """
+
+    def __init__(self, blob, sep="\n"):
+        self.blob = blob
+        self.sep = sep
+        self.iterator = (i for i in blob.split(sep))
