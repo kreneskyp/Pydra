@@ -16,9 +16,14 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
+import cStringIO
+import os
+import shutil
+import tarfile
+import zlib
 
+from pydra_settings import TASKS_DIR_INTERNAL
 from pydra.cluster.module import Module
-from pydra.cluster.tasks.task_manager import TaskManager
 
 class TaskSyncClient(Module):
 
@@ -35,31 +40,43 @@ class TaskSyncClient(Module):
             'TASK_OUTDATED' : self.request_sync,
         }
 
-        self._friends = {
-            'task_manager' : TaskManager,
-        }
 
-
-    def request_sync(self, pkg_name):
-        self._request_sync_internal( (pkg_name, None, 1) )
-
-
-    def _request_sync_internal(self, response_tuple):
+    def request_sync(self, pkg_name, version):
         """
         Internal method to send sync requests to the TaskSyncServer.
 
-        @param response_tuple: a tuple of (pkg_name, response, phase)
+        @param pkg_name - name of package to sync
+        @param version - version of package to sync
         """
-        # send the request to the master
-        pkg_name, response, phase = response_tuple
-        request = self.task_manager.active_sync(pkg_name, response, phase)
-        if request[1]:
-            # still expecting a remote answer; now send the req to the master
-            deferred = self.master.remote.callRemote('sync_task', pkg_name, request[0],
-                    phase)
-            # using self as a callback
-            deferred.addCallback(self._request_sync_internal)
-        else:
-            # the task has been successfully synchronized
-            self.emit('TASK_RELOAD', pkg_name)
+        deferred = self.master.remote.callRemote('sync_task', pkg_name, version)
+        deferred.addCallback(self.receive_sync, pkg_name, version)
 
+
+    def receive_sync(self, file, pkg_name, version):
+        """
+        Receives a TaskPackage as a tarzip'd file.  The file is unpacked into
+        TASK_DIR_INTERNAL
+        
+        Subclass implementators should guarantee that active_sync() and
+        passive_sync() match.
+
+        @param pkg_name: the name of the task package to be updated
+        @param version: version of the task to retrieve
+        @param file: the tarziped TaskPackage directory
+        """
+        pkg_folder = '%s/%s/%s' % (TASKS_DIR_INTERNAL, pkg_name, version)
+        buf = zlib.decompress(file)
+        in_file = cStringIO.StringIO(buf)
+        tar = tarfile.open(mode='r', fileobj=in_file)
+
+        # delete existing folder if it exists
+        if os.path.exists(pkg_folder):                    
+            shutil.rmtree(pkg_folder)
+        os.mkdir(pkg_folder)
+
+        # extract the new package files
+        tar.extractall(pkg_folder)
+        tar.close()
+        in_file.close()
+
+        self.emit('TASK_RELOAD', pkg_name, version)

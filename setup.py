@@ -59,6 +59,7 @@ data_files.append(['/var/run/pydra', []])
 # deploy examples to tasks directory
 data_files.append(['/var/lib/pydra/tasks/demo', ['examples/demo/demo_task.py', 'examples/demo/mapreduce.py']])
 data_files.append(['/var/lib/pydra/tasks_internal', []])
+data_files.append(['/var/lib/pydra/tasks_sync_cache', []])
 
 setup(name='Pydra',
       version='0.5.1',

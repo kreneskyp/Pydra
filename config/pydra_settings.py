@@ -84,9 +84,12 @@ WORKER_PORT = 18800
 # Directory in which to place tasks to deploy to Pydra.  Tasks will be parsed
 # and versioned.  Processed Tasks are stored in TASKS_DIR_INTERNAL.  Modifying
 # files within TASKS_DIR_INTERNAL _WILL_ break things.
+#
+# tarziped files will be stored in TASK_SYNC_CACHE to speed up task
+# synchronization.  Setting this param to None turns off the cache
 TASKS_DIR = '%s/tasks' % RUNTIME_FILES_DIR
 TASKS_DIR_INTERNAL = '%s/tasks_internal' % RUNTIME_FILES_DIR
-
+TASKS_SYNC_CACHE  = '%s/task_sync_cache' % RUNTIME_FILES_DIR
 
 # Automatically add nodes found with autodiscovery 
 MULTICAST_ALL = False 

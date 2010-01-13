@@ -18,13 +18,11 @@
 """
 from __future__ import with_statement
 
-import cStringIO
 from threading import Lock, RLock
 import os
 import shutil
-import tarfile
 import time
-import zlib
+
 
 from django.core.paginator import Paginator, InvalidPage, EmptyPage
 from django.template import Context, loader
@@ -61,7 +59,7 @@ class TaskManager(Module):
 
     lazy_init = False
 
-    def __init__(self, scan_interval=60, lazy_init=False):
+    def __init__(self, scan_interval=20, lazy_init=False):
         """
         @param scan_interval - interval at which TASKS_DIR is scanned for
                                 changes.  No scanning when set to None
@@ -76,7 +74,7 @@ class TaskManager(Module):
         ]
 
         self._listeners = {
-            'TASK_RELOAD':self.read_task_package,
+            'TASK_RELOAD':self.init_package,
             'TASK_STARTED':self._task_started,
             'TASK_STARTED':self._task_stopped,
         }
@@ -266,6 +264,18 @@ class TaskManager(Module):
                     # verification
                     logger.warn('Invalid package %s:%s' % (pkg_name, v))
                 self._add_package(pkg)
+
+                # invoke attached task callbacks
+                callbacks = self._task_callbacks.get(pkg_name, None)           
+                module_path, cycle = self._compute_module_search_path(pkg_name)
+                while callbacks:
+                    task_key, errcallback, callback, args, kw = callbacks.pop(0)
+                    if cycle:
+                        errcallback(task_key, pkg.verison,
+                                'Cycle detected in dependency')
+                    else:
+                        callback(task_key, pkg.version, pkg.tasks[task_key],
+                                module_path, *args, **kw)
                 return pkg
         return None
 
@@ -398,105 +408,13 @@ class TaskManager(Module):
                 needs_update = True
 
         if needs_update:
-            self.emit('TASK_OUTDATED', pkg_name)
+            self.emit('TASK_OUTDATED', pkg_name, version)
             try:
                 self._task_callbacks[pkg_name].append( (task_key, errcallback,
                             callback, callback_args, callback_kwargs) )
             except KeyError:
                 self._task_callbacks[pkg_name]= [(task_key, errcallback,
                         callback, callback_args, callback_kwargs)]
-
-
-    def active_sync(self, pkg_name, response=None, phase=1):
-        """
-        Actively generates requests to update the local package to make
-        it be the same as a remote package.
-
-        This synchronization process may take one or more times of
-        communication with the remote side. The 'phase' parameter, starting
-        from 1, specifies the phase that the invocation of this method is in.
-        The final step typically manipulates the local file system and makes
-        the package content consistent with the remote package.
-
-        Subclass implementators should guarantee that active_sync() and
-        passive_sync() match.
-
-        @param pkg_name: the name of the task package to be updated
-        @param response: the response received from the remote side
-        @param phase: the phase in which invocation of this method is made
-        @return a pair of values consisting of the request as a string, and
-                a flag indicating whether it expect a remote response any more.
-        """
-        def on_remove_error(func, path, execinfo):
-            logger.error('Error %s occurred while trying to remove %s' %
-                    (execinfo, path))
-
-        pkg = self.registry.get(pkg_name, None)
-        if phase == 1:
-            return pkg.version if pkg else None, True
-        elif phase == 2:
-            pkg_folder = self.get_package_location(pkg_name)
-            if response:
-                buf = zlib.decompress(response)
-                in_file = cStringIO.StringIO(buf)
-                tar = tarfile.open(mode='r', fileobj=in_file)
-
-                # remove old package files
-                if pkg:
-                    for f in os.listdir(pkg_folder):
-                        full_path = os.path.join(pkg_folder, f)
-                        if os.path.isdir(full_path):
-                            shutil.rmtree(full_path, onerror=on_remove_error)
-                        else:
-                            os.remove(full_path)
-                else:
-                    # create the folder
-                    os.mkdir(pkg_folder)
-
-                # extract the new package files
-                tar.extractall(pkg_folder)
-                tar.close()
-                in_file.close()
-            self.read_task_package(pkg_name)
-            return None, False
-            
-
-    def passive_sync(self, pkg_name, request, phase=1):
-        """
-        Passively generates response to a remote sync request. The other side
-        of the synchronization can make use this response to synchronize its
-        package content with this package.
-
-        This synchronization process may take one or more times of
-        communication with the remote side. The 'phase' parameter, starting
-        from 1, specifies the phase that the invocation of this method is in.
-
-        Subclass implementators should guarantee that active_sync() and
-        passive_sync() match.
-
-        @param pkg_name: the name of the task package to be updated
-        @param request: the request received from the remote side
-        @param phase: the phase in which invocation of this method is made
-        @return the response data
-        """
-        # always sync with the latest version
-        pkg = self.registry.get( (pkg_name, None), None)
-        if pkg:
-            if pkg.version <> request:
-                pkg_folder = self.get_package_location(pkg.name)
-                out_file = cStringIO.StringIO()
-                tar = tarfile.open(mode='w', fileobj=out_file)
-                for f in os.listdir(pkg_folder):
-                    tar.add(os.path.join(pkg_folder, f), f)
-                tar.close()
-                diff = out_file.getvalue()
-                diff = zlib.compress(diff)
-                out_file.close()
-                return diff
-            return ''
-        else:
-            # no such package
-            return None
 
 
     def list_task_keys(self):
@@ -550,20 +468,7 @@ class TaskManager(Module):
                 signal = 'TASK_UPDATED'
 
         if signal:
-            pkg = packaging.TaskPackage(pkg_name, internal_folder)
-            self._add_package(pkg)
-            
-            # invoke attached task callbacks
-            callbacks = self._task_callbacks.get(pkg_name, None)           
-            module_path, cycle = self._compute_module_search_path(pkg_name)
-            while callbacks:
-                task_key, errcallback, callback, args, kwargs = callbacks.pop(0)
-                if cycle:
-                    errcallback(task_key, pkg.verison,
-                            'Cycle detected in dependency')
-                else:
-                    callback(task_key, pkg.version, pkg.tasks[task_key],
-                            module_path, *args, **kwargs)
+            pkg = self.init_package(pkg_name, sha1_hash)
             self.emit(signal, pkg_name)
             return pkg
         return None
