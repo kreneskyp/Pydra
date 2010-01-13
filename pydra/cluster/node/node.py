@@ -40,7 +40,7 @@ class NodeServer(ModuleManager):
         logger.info('=========================================================')
 
         self.modules = [
-            TaskManager(None),
+            TaskManager(None, True),
             NodeInformation,
             WorkerManager,
             WorkerConnectionManager,
