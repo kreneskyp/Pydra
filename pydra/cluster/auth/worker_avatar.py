@@ -31,6 +31,7 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
     Worker is capable of calling
     """
     popen = None         # popen instance for controlling worker system process
+    pid = None           # fallback in case popen fails
     key = None           # Key that identifies task
     version = None       # version of task package containing task
     args = None          # Task arguments
@@ -69,3 +70,31 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
         if self.authenticated:
             self.server.worker_disconnected(self)
         self.remote = None
+
+
+    def get_pid(self, results):
+        """
+        XXX ocassionally processes will have a communcation error
+        while loading.  The process will be running but the POpen
+        object is not constructed.  This means that we have no
+        access to the subprocess functions.  Instead we must get
+        the pid from the newly run process after it starts.  The
+        pid can then be used instead of the Popen object.
+        
+        relevant bugs:
+            http://pydra-project.osuosl.org/ticket/158
+            http://bugs.python.org/issue1068268
+            
+        @param results - results from deferred.  this is used as a callback
+                        results aren't needed.
+        """
+        deferred = self.remote.callRemote('getpid')
+        deferred.addCallback(self.set_pid)
+
+
+    def set_pid(self, pid):
+        """
+        Sets the pid
+        """
+        self.pid = pid
+

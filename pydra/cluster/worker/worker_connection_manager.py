@@ -18,6 +18,7 @@
 """
 from __future__ import with_statement
 from threading import Lock
+import os
 
 from twisted.cred import credentials
 from twisted.internet import reactor
@@ -77,6 +78,10 @@ class WorkerConnectionManager(Module):
             'MANAGER_INIT':self.connect,
             'WORKER_FINISHED':self.disconnect
         }
+
+        self._remotes = [
+            ('MASTER', os.getpid)
+        ]
 
         self.reconnect_count = 0
         self.factory = MasterClientFactory(self.reconnect)
@@ -145,4 +150,3 @@ class WorkerConnectionManager(Module):
         Callback called when conenction to master fails
         """
         self.reconnect()
-

@@ -89,12 +89,16 @@ class WorkerManager(Module):
         finished flag set
         """
         if worker.finished:
-            while True:
-                try:
-                    worker.popen.wait()
-                    break
-                except OSError:
-                    logger.warn('Error cleaning up worker process, retrying')
+            # XXX If an error occurs while creating the worker process we won't
+            # have a popen object. It also means we won't need to call wait()
+            # for it to clean up
+            if worker.popen:
+                while True:
+                    try:
+                        worker.popen.wait()
+                        break
+                    except OSError:
+                        logger.warn('Error cleaning up worker process, retrying')
 
 
     def init_node(self, avatar_name, master_host, master_port, node_key):
@@ -254,10 +258,24 @@ class WorkerManager(Module):
                 worker.worker_key = worker_key
                 worker.run_task_deferred = Deferred()
                 pydra_root = pydra.__file__[:pydra.__file__.rfind('/')]
-                worker.popen = Popen(['python',
-                            '%s/cluster/worker/worker.py' % pydra_root,
-                            worker_key,
-                            pydra_settings.WORKER_PORT.__str__()])
+                try:
+                    worker.popen = Popen(['python',
+                                '%s/cluster/worker/worker.py' % pydra_root,
+                                worker_key,
+                                pydra_settings.WORKER_PORT.__str__()])
+                except OSError:
+                    # XXX ocassionally processes will have a communcation error
+                    # while loading.  The process will be running but the POpen
+                    # object is not constructed.  This means that we have no
+                    # access to the subprocess functions.  Instead we must get
+                    # the pid from the newly run process after it starts.  The
+                    # pid can then be used instead of the Popen object.
+                    #
+                    # relevant bugs:
+                    #    http://pydra-project.osuosl.org/ticket/158
+                    #    http://bugs.python.org/issue1068268
+                    debug.warn('OSError while spawning process, failing back to pid. see ticket #158')
+                    worker.run_task_deferred.addCallback(worker.get_pid)
                 self.workers[worker_key] = worker
 
             worker.key = key
