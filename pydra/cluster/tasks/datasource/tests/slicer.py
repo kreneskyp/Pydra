@@ -26,9 +26,10 @@ class LineSlicerTest(unittest.TestCase):
 
         s = """
             Jackdaws love my big sphinx of quartz.
+            The quick brown fox jumps over the lazy dog.
             """
         slicer = LineSlicer(s)
-        self.assertEqual(s.split("\n"), [line for line in slicer])
+        self.assertEqual([51, 108], [pos for pos in slicer])
 
 if __name__ == "__main__":
     unittest.main()
