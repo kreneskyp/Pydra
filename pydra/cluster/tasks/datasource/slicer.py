@@ -24,6 +24,20 @@ class MapSlicer(IterSlicer):
 
     pass
 
+def mma(old, new, weight):
+    """
+    Performs a Moving Modified Average, using the old value, new value,
+    and a weight.
+
+    Weight must be greater than zero.
+
+    Borrowed from public-domain code by Corbin Simpson
+    http://github.com/MostAwesomeDude/madsnippets
+    """
+
+    return ((weight - 1) * old + new) / weight
+
+
 class LineSlicer(IterSlicer):
     """
     Slicer specialized for handling text blobs.
@@ -49,9 +63,14 @@ class LineSlicer(IterSlicer):
         while True:
             s = self.handle.read(count)
             if not s:
+                # EOF
                 return None
             index = s.find(self.sep)
             if index != -1:
+                # Update file handle
                 position += index
                 self.handle.seek(position + 1)
+                # Update approximate count
+                count = mma(count, index, 100)
+
                 return position
