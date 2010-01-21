@@ -6,16 +6,23 @@ from pydra.cluster.tasks.datasource.slicer import LineSlicer
 
 class DirSelector(object):
     """
-    Selects files from a directory.
+    Selects a directory, yielding files.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, recursive=True):
         self.path = path
-        self.files = set(next(os.walk(self.path))[2])
+        if recursive:
+            self.files = set()
+            for directory, chaff, files in os.walk(self.path):
+                self.files.update(os.path.join(directory, i)
+                    for i in files)
+        else:
+            self.files = set(os.path.join(self.path, i)
+                for i in next(os.walk(self.path))[2])
 
     def __iter__(self):
         for f in self.files:
-            yield os.path.join(self.path, f)
+            yield FileSelector(f)
 
     def __getitem__(self, filename):
         if filename in self.files:
