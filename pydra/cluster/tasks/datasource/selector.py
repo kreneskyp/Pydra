@@ -1,3 +1,4 @@
+import mmap
 import os
 import os.path
 
@@ -22,3 +23,20 @@ class DirSelector(object):
             return LineSlicer(handle)
         else:
             raise KeyError
+
+class FileSelector(object):
+    """
+    Selects files. Can yield file-based slicers.
+    """
+
+    def __init__(self, path):
+        self.path = path
+
+    @property
+    def handle(self):
+        # XXX with h as...?
+        # XXX heuristic?
+        h = open(self.path, "rb")
+        m = mmap.mmap(h.fileno(), 0, prot=mmap.PROT_READ)
+        h.close()
+        return m
