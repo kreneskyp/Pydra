@@ -239,8 +239,15 @@ def task_history_detail(request):
         detail = None
         error = e.code
 
+    try:
+        log = pydra_controller.task_logs(id)
+    except ControllerException, e:
+        history = None
+        error = e.code
+
     return render_to_response('task_history_detail.html', {
         'task': detail,
+        'log' : log,
         'controller_error': error
     }, context_instance=c)
 

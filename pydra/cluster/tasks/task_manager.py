@@ -70,7 +70,8 @@ class TaskManager(Module):
         self._interfaces = [
             self.list_tasks, 
             self.task_history,
-            self.task_history_detail
+            self.task_history_detail,
+            self.task_logs,
         ]
 
         self._listeners = {
@@ -351,6 +352,12 @@ class TaskManager(Module):
                     'description':task.description,
                     'workunits':workunits
                }
+
+    def task_logs(self, task_id):
+        
+        return {
+            'task.log':"wooohooo",
+        }
 
 
     def retrieve_task(self, task_key, version, callback, errcallback,
