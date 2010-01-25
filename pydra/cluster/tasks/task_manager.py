@@ -71,7 +71,7 @@ class TaskManager(Module):
             self.list_tasks, 
             self.task_history,
             self.task_history_detail,
-            self.task_logs,
+            self.task_log,
         ]
 
         self._listeners = {
@@ -353,13 +353,21 @@ class TaskManager(Module):
                     'workunits':workunits
                }
 
-    def task_logs(self, task_id):
+    def task_log(self, task_id):
+        """
+        Returns the main task.log file for a given task if the task is 
+        completed. Else returns nothing.
+        """
+
+        from pydra.logs.logger import *
+
+        dir, logfile = task_log_path(task_id)
+
+        fp = open(logfile, 'r')
+        log = fp.read()
+        fp.close()
+        return log
         
-        return {
-            'task.log':"wooohooo",
-        }
-
-
     def retrieve_task(self, task_key, version, callback, errcallback,
             *callback_args, **callback_kwargs):
         """

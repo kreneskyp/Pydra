@@ -240,7 +240,12 @@ def task_history_detail(request):
         error = e.code
 
     try:
-        log = pydra_controller.task_logs(id)
+        log = []
+        raw_log = pydra_controller.task_log(id)
+        raw_log = raw_log.split("\n")
+        for line in raw_log:
+            log.append(line.strip())
+        
     except ControllerException, e:
         history = None
         error = e.code
@@ -250,7 +255,6 @@ def task_history_detail(request):
         'log' : log,
         'controller_error': error
     }, context_instance=c)
-
 
 def task_progress(request):
     """
