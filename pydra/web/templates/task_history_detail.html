@@ -30,14 +30,6 @@
                 $('.button_rerun').live('click', function(evt) {
                     $.post('/jobs/run/', {'key':'{{task_key}}'});
                 });
-
-                $(".button_hidelog").click(function() { 
-                    $('#log').slideUp('slow', function() { });
-                });
-                    
-                $(".button_showlog").click(function(){
-                    $('#log').slideDown('slow', function() { });   
-                });
             });
         </script>
 
@@ -58,14 +50,6 @@
                 width: 450px;
             }
             
-            #log {
-                background:#eee;
-                border:2px solid #999;
-                height:500px;
-                font-size:.9em;
-                overflow:scroll;
-            }
-
             #status {
                 -moz-border-radius:5px;
                 border:1px solid black;
@@ -112,7 +96,7 @@
                 padding-right:5px;
             }
 
-            tr.stripe pre.stripe td { background-color:#f6f9fb }
+            tr.stripe td { background-color:#f6f9fb }
   
             .buttons { width: 5.25em; }
 
@@ -140,11 +124,6 @@
             .button_cancel {
                 background-image:url({{MEDIA}}/images/icons/delete.png);
             }
-            
-            .logstripe { background-color:#f6f9fb }
-            
-            .logtable { width:100%; }
-
         </style>
 {% endblock %}
 
@@ -193,18 +172,4 @@
             {% endfor %}
         </table>
         {% endif %}
-
-        <br />
-        <button class=button_showlog>Show Log</button>
-        <button class=button_hidelog>Hide Log</button>
-        <br /> 
-        <div id="log">
-            <table class="logtable">
-            {% for line in log %}
-                <tr class="{% cycle '' 'logstripe' %}">
-                    <td>{{line}}</td>
-                </tr>        
-            {% endfor %}
-            </table>
-        </div>    
 {% endblock %}

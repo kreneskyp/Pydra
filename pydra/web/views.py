@@ -268,7 +268,9 @@ def task_log(request):
         except ControllerException, e:
             data = e.code
 
-    return HttpResponse(data, mimetype='text/html');
+    log = data.split('\n')
+
+    return render_to_response('log.html', { 'log': log, });
  
 
 def task_progress(request):
