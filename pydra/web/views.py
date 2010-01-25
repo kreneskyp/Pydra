@@ -239,34 +239,34 @@ def task_history_detail(request):
         detail = None
         error = e.code
 
-    try:
-        log = []
-        raw_log = pydra_controller.task_log(id)
-        raw_log = raw_log.split("\n")
-        for line in raw_log:
-            log.append(line.strip())
-        
-    except ControllerException, e:
-        history = None
-        error = e.code
-
     return render_to_response('task_history_detail.html', {
         'task': detail,
-        'log' : log,
         'controller_error': error
     }, context_instance=c)
 
-def task_workunit_log(request):
+def task_log(request):
     """
-    Handler for retrieving workunit logs via ajax 
+    Handler for retrieving workunit logs 
     """
     c = RequestContext(request, {
     }, [pydra_processor])
 
-    try:
-        data = pydra_controller.task_workunit_log(task_id, subtask, workunit_id)
-    except ControllerException, e:
-        data = e.code
+    task_id = request.GET['task_id']
+    if request.GET.has_key('subtask'):
+        subtask = request.GET['subtask']
+    if request.GET.has_key('workunit_id'):
+        workunit_id = request.GET['workunit_id']
+    
+    if request.GET.has_key('subtask') and request.GET.has_key('workunit_id'):
+        try:
+            data = pydra_controller.task_log(task_id, subtask, workunit_id)
+        except ControllerException, e:
+            data = e.code
+    else:
+        try:
+            data = pydra_controller.task_log(task_id)
+        except ControllerException, e:
+            data = e.code
 
     return HttpResponse(data, mimetype='text/html');
  

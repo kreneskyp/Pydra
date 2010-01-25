@@ -72,7 +72,6 @@ class TaskManager(Module):
             self.task_history,
             self.task_history_detail,
             self.task_log,
-            self.task_workunit_log,
         ]
 
         self._listeners = {
@@ -354,33 +353,25 @@ class TaskManager(Module):
                     'workunits':workunits
                }
 
-    def task_log(self, task_id):
+    def task_log(self, task_id, subtask=None, workunit_id=None):
         """ 
-        Returns the main task.log file for a given task if the task is 
-        completed. Else returns nothing.
+        Returns the logfile for the given task.
+    
+        @param task - id of task
+        @param subtask - task path to subtask, default = None
+        @param workunut - workunit key, default = None
         """
         from pydra.logs.logger import *
 
-        dir, logfile = task_log_path(task_id)
+        if subtask:
+            dir, logfile = task_log_path(task_id, subtask, workunit_id)
+        else:
+            dir, logfile = task_log_path(task_id)
 
         fp = open(logfile, 'r')
         log = fp.read()
         fp.close()
         return log
-    
-    def task_workunit_log(self, task_id, subtask, workunit_id):
-        """ 
-        Returns an individual workunit log file if the task is 
-        completed. Else returns nothing.
-        """ 
-        from pydra.logs.logger import *
-        
-        dir, logfile = task_log_path(task_id, subtask, workunit_id)
-
-        fp = open(logfile, 'r')
-        log = fp.read()
-        fp.close()
-        return log 
     
     def retrieve_task(self, task_key, version, callback, errcallback,
             *callback_args, **callback_kwargs):

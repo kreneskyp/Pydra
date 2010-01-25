@@ -46,6 +46,7 @@ urlpatterns = patterns('',
     # job history urls
     (r'^jobs/history/$', task_history), 
     (r'^jobs/history/detail/$', task_history_detail), 
+    (r'^jobs/history/log/$', task_log),
 
     #authentication
     (r'^accounts/login/$', login),
