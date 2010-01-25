@@ -30,6 +30,14 @@
                 $('.button_rerun').live('click', function(evt) {
                     $.post('/jobs/run/', {'key':'{{task_key}}'});
                 });
+
+                $(".button_hidelog").click(function() { 
+                    $('#log').slideUp('slow', function() { });
+                });
+                    
+                $(".button_showlog").click(function(){
+                    $('#log').slideDown('slow', function() { });   
+                });
             });
         </script>
 
@@ -187,6 +195,9 @@
         {% endif %}
 
         <br />
+        <button class=button_showlog>Show Log</button>
+        <button class=button_hidelog>Hide Log</button>
+        <br /> 
         <div id="log">
             <table class="logtable">
             {% for line in log %}
