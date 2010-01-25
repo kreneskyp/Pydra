@@ -256,6 +256,21 @@ def task_history_detail(request):
         'controller_error': error
     }, context_instance=c)
 
+def task_workunit_log(request):
+    """
+    Handler for retrieving workunit logs via ajax 
+    """
+    c = RequestContext(request, {
+    }, [pydra_processor])
+
+    try:
+        data = pydra_controller.task_workunit_log(task_id, subtask, workunit_id)
+    except ControllerException, e:
+        data = e.code
+
+    return HttpResponse(data, mimetype='text/html');
+ 
+
 def task_progress(request):
     """
     Handler for retrieving status 
