@@ -241,6 +241,7 @@ def task_history_detail(request):
 
     return render_to_response('task_history_detail.html', {
         'task': detail,
+        'task_id': request.GET['id'],
         'controller_error': error
     }, context_instance=c)
 

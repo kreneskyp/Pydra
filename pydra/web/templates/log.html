@@ -17,39 +17,16 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-{% load pydra_extras %}
-
 {% block head %}
-    {{ block.super }}
-        <script>
-            $(document).ready(function() {
-                $(".button_hidelog").click(function() { 
-                    $('#log').slideUp('slow', function() { });
-                });
-                    
-                $(".button_showlog").click(function(){
-                    $('#log').slideDown('slow', function() { });   
-                });
-            });
-        </script>
-
         <style>
             
             #log {
                 background:#eee;
                 border:2px solid #999;
-                height:500px;
+                height:300px;
                 font-size:.9em;
                 overflow:scroll;
             }
-
-            th {
-                background-color:#888888;
-                border:1px solid black;
-                color:white;
-            }
-
-            th.title { background-color:#666666; }
 
             td {
                 border-bottom: 1px dotted #444444;
@@ -70,10 +47,6 @@
 {% endblock %}
 
 {% block content %}
-        <br />
-        <button class=button_showlog>Show Log</button>
-        <button class=button_hidelog>Hide Log</button>
-        <br /> 
         <div id="log">
             <table class="logtable">
             {% for line in log %}

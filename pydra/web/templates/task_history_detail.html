@@ -27,9 +27,28 @@
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
 
             $(document).ready(function() {
-                $('.button_rerun').live('click', function(evt) {
-                    $.post('/jobs/run/', {'key':'{{task_key}}'});
+                /* show details first */
+                $('#workunits').show();
+                $('#logs').hide();
+                
+                /* hide logs, show details */
+                $('#showdetails').click(function() {
+                   $('#workunits').show();
+                   $('#logs').hide();
                 });
+              
+                /* hide details, show logs */
+                $('#showlogs').click(function() {
+                   $('#workunits').hide();
+                   $('#logs').show();
+                   $.get('/jobs/history/detail/log/', 
+                            {task_id:'{{task_id}}'}, 
+                            function(data) {
+                                $('#logs').html(data);
+                            } 
+                         );     
+                });
+               
             });
         </script>
 
@@ -128,6 +147,8 @@
 {% endblock %}
 
 {% block submenu %}
+    <span class="menuitem" id="showdetails"><a class="menuitem" href="#">Details</a></span>
+    <span class="menuitem lastmenuitem" id="showlogs"><a class="menuitem" href="#">Logs</a></span>
 {% endblock %}
 
 {% block content %}
@@ -172,4 +193,9 @@
             {% endfor %}
         </table>
         {% endif %}
+
+        <br />
+        <div id="logs"></div>
+        <br />
+
 {% endblock %}
