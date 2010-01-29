@@ -31,6 +31,9 @@ class DirSelector(object):
         else:
             raise KeyError
 
+    def __len__(self):
+        return len(self.files)
+
 class FileSelector(object):
     """
     Selects files. Can yield file-based slicers.
