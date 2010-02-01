@@ -23,11 +23,11 @@
             #log {
                 background:#eee;
                 border:2px solid #999;
-                height:300px;
+                overflow:auto;
+                max-height:300px;
                 font-size:.9em;
-                overflow:scroll;
             }
-
+            
             td {
                 border-bottom: 1px dotted #444444;
                 border-left: 1px dotted #444444;
@@ -43,16 +43,38 @@
             
             .logtable { width:100%; }
 
+            .workunitlog { display:none; }
+
         </style>
+        <script>
+            function wu_log_onclick(task_id, subtask, workunit_id) {
+                if ( $('#'+workunit_id).is(':visible') ) {
+                    $('#'+workunit_id).fadeOut('slow', function() {});   
+                }
+                else if ( $('#'+workunit_id).is(':hidden') ) {
+                    $.get('/jobs/history/detail/log/', 
+                            {task_id:task_id, subtask:subtask, workunit_id:workunit_id},
+                            function(data) {
+                                $('#'+workunit_id).html(data);
+                                $('#'+workunit_id).fadeIn('slow', function() {});
+                            });
+                }
+            }
+        </script>
 {% endblock %}
 
 {% block content %}
         <div id="log">
             <table class="logtable">
             {% for line in log %}
-                <tr class="{% cycle '' 'logstripe' %}">
-                    <td>{{line}}</td>
-                </tr>        
+                    <tr class="{% cycle '' 'logstripe' %}">
+                        {% if line.subtask %}
+                            <td onclick="wu_log_onclick({{line.task_id}}, '{{line.subtask}}', {{line.workunit_id}})" id="workunitlog">{{line.line}}</td>
+                            <tr class="workunitlog" id="{{line.workunit_id}}"></tr>
+                        {% else %}
+                            <td>{{line.line}}</td>
+                        {% endif %}
+                    </tr>        
             {% endfor %}
             </table>
         </div>    

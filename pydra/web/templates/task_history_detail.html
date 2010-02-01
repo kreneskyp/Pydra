@@ -30,25 +30,24 @@
                 /* show details first */
                 $('#workunits').show();
                 $('#logs').hide();
-                
+
                 /* hide logs, show details */
                 $('#showdetails').click(function() {
-                   $('#workunits').show();
-                   $('#logs').hide();
+                    $('#logs').hide();
+                    $('#workunits').fadeIn('slow', function() {});
                 });
               
                 /* hide details, show logs */
                 $('#showlogs').click(function() {
                    $('#workunits').hide();
-                   $('#logs').show();
                    $.get('/jobs/history/detail/log/', 
                             {task_id:'{{task_id}}'}, 
                             function(data) {
                                 $('#logs').html(data);
                             } 
-                         );     
+                         );
+                   $('#logs').fadeIn('slow', function() {});
                 });
-               
             });
         </script>
 
