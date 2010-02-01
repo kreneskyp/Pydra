@@ -14,8 +14,8 @@ class DirSelector(object):
         if recursive:
             self.files = set()
             for directory, chaff, files in os.walk(self.path):
-                self.files.update(os.path.join(directory, i)
-                    for i in files)
+                self.files.update(
+                    os.path.join(directory, i) for i in files)
         else:
             self.files = set(os.path.join(self.path, i)
                 for i in next(os.walk(self.path))[2])
@@ -34,6 +34,10 @@ class DirSelector(object):
     def __len__(self):
         return len(self.files)
 
+    @property
+    def key(self):
+        return self.path
+
 class FileSelector(object):
     """
     Selects files. Can yield file-based slicers.
@@ -42,11 +46,20 @@ class FileSelector(object):
     def __init__(self, path):
         self.path = path
 
+        self._handle = None
+
+    @property
+    def key(self):
+        return self.path
+
     @property
     def handle(self):
+        if self._handle:
+            return self._handle
         # XXX with h as...?
         # XXX heuristic?
         h = open(self.path, "rb")
         m = mmap.mmap(h.fileno(), 0, prot=mmap.PROT_READ)
         h.close()
+        self._handle = m
         return m

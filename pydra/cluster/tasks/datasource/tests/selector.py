@@ -2,17 +2,31 @@
 
 import unittest
 
-from pydra.cluster.tasks.datasource.selector import DirSelector
+from pydra.cluster.tasks.datasource.selector import DirSelector, FileSelector
 
-class DirSelectorTest(unittest.TestCase):
+class DirSelectorCheeseTest(unittest.TestCase):
 
-    def test_cheeses(self):
+    def setUp(self):
 
-        ds = DirSelector("cheeses")
-        self.assertEqual(len(ds), 1)
+        self.ds = DirSelector("cheeses")
+
+    def test_length(self):
+
+        self.assertEqual(len(self.ds), 2)
 
 class FileSelectorTest(unittest.TestCase):
-    pass
+
+    def setUp(self):
+
+        self.fs = FileSelector("cheeses/cheddar.txt")
+
+    def test_handle(self):
+
+        handle = self.fs.handle
+        self.assertTrue(len(handle))
+
+        handle2 = self.fs.handle
+        self.assertEqual(handle, handle2)
 
 if __name__ == "__main__":
     import os.path
