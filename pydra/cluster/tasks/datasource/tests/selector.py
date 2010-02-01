@@ -15,4 +15,6 @@ class FileSelectorTest(unittest.TestCase):
     pass
 
 if __name__ == "__main__":
+    import os.path
+    os.chdir(os.path.dirname(__file__))
     unittest.main()
