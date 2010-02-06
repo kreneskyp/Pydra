@@ -131,7 +131,7 @@ class NodeManager(Module):
                         job = self._active_workers[w_key]
                         worker_status[html_key] = (1, job.task_key, \
                                 job.subtask_key, \
-                                job.workunit_key if job.workunit_key else -1)
+                                job.workunit if job.workunit else -1)
                     else:
                         worker_status[html_key] = -1
 

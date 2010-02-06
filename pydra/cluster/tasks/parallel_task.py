@@ -54,8 +54,8 @@ class ParallelTask(Task):
         """
         if key == 'subtask':
             if not self.__dict__['subtask']:
-                subtask = self.__subtask_class(self.__subtask_args, \
-                                                        self.__subtask_kwargs)
+                subtask = self.__subtask_class(*self.__subtask_args, \
+                                                    **self.__subtask_kwargs)
                 self.subtask = subtask
             return self.__dict__['subtask']
         return Task.__getattribute__(self, key)
@@ -101,7 +101,7 @@ class ParallelTask(Task):
         """        
         data, index = self.get_work_unit()
         while data is not None:
-            logger.debug('[%s] Paralleltask - assigning remote work: key=%s, args=%s' % (self.get_worker().worker_key, data, index))
+            logger.debug('[%s] Paralleltask - assigning remote work: key=%s, args=%s' % (self.get_worker().worker_key, '--', index))
             self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
             data, index = self.get_work_unit()
 
@@ -121,7 +121,7 @@ class ParallelTask(Task):
         # save data, if any
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
-            self._workunit_total = len(data)
+            self._workunit_total = len(self._data)
             logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
         # request initial workers
         self._request_workers()
@@ -201,7 +201,6 @@ class ParallelTask(Task):
 
         This method *MUST* lock while it is altering the lists of data
         """
-        logger.debug('[%s] Paralleltask - getting a workunit' % self.get_worker().worker_key)
         data = None
         with self._lock:
 
@@ -215,8 +214,6 @@ class ParallelTask(Task):
 
             #remove from _data and add to in_progress
             self._data_in_progress[self._workunit_count] = data
-        logger.debug('[%s] Paralleltask - got a workunit: %s %s' % (self.get_worker().worker_key, data, self._workunit_count))
-
         return data, self._workunit_count;
 
 
@@ -227,8 +224,12 @@ class ParallelTask(Task):
         A parallel task's progress is a derivitive of its workunits:
            COMPLETE_WORKUNITS / TOTAL_WORKUNITS
         """
-        total = self._workunit_completed + len(self._data) + \
+        data = len(self._data) if self._data else 0
+        total = self._workunit_completed + data + \
             len(self._data_in_progress)
+
+        if total == 0:
+            return 0
 
         return 100 * self._workunit_completed  / total
 

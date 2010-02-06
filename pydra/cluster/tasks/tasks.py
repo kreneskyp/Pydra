@@ -160,6 +160,7 @@ class Task(object):
         """
         results = self.work(**kwargs)
         self._complete(results)
+        return results
 
 
     def get_key(self):

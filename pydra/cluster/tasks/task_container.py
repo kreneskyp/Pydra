@@ -83,7 +83,6 @@ class TaskContainer(Task):
         Task.__init__(self, msg)
         self.subtasks = []
         self.sequential = sequential
-
         for task in self.subtasks:
             task.parent = self
 
@@ -100,7 +99,7 @@ class TaskContainer(Task):
         for subtask in self.subtasks:
             subtask.task.reset()
 
-    def get_subtask(self, task_path):
+    def _get_subtask(self, task_path, clean=False):
         """
         Overridden to deal with the oddity of how ContainerTask children are
         indicated in keys.  Children are indicated as integer followed by
@@ -114,17 +113,15 @@ class TaskContainer(Task):
         """
         if len(task_path) == 1:
             if task_path[0] == self.__class__.__name__:
-                return self
+                return task_path, self
             else:
                 raise TaskNotFoundException("Task not found")
 
-        # pop this classes name off the list
-        task_path.pop(0)
-
         try:
             # get index and recurse into subtask
-            index = int(task_path.pop(0))
-            return self.subtasks[index].task.get_subtask(task_path)
+            index = int(task_path[1])
+            task = self.subtasks[index].task
+            return task_path[:2], task
         except (ValueError, IndexError):
             raise TaskNotFoundException("Task not found")
 
