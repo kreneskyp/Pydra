@@ -361,7 +361,7 @@ class TaskManager(Module):
         @param subtask - task path to subtask, default = None
         @param workunut - workunit key, default = None
         """
-        from pydra.logs.logger import *
+        from pydra.logs.logger import task_log_path
 
         if subtask:
             dir, logfile = task_log_path(task_id, subtask, workunit_id)
