@@ -1,3 +1,4 @@
+from __future__ import with_statement
 """
     Copyright 2009 Oregon State University
 
