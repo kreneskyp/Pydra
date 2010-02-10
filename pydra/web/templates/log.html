@@ -69,7 +69,7 @@
         <script>
             function wu_log_onclick(td, task_id, subtask, workunit_id) {
                 if ( $('#'+workunit_id).is(':visible') ) {
-                    $('#'+workunit_id).fadeOut('slow');
+                    $('#'+workunit_id).slideUp('slow');
                     $(td).removeClass('visible');
                 }
                 else if ( $('#'+workunit_id).is(':hidden') ) {
@@ -78,7 +78,7 @@
                             function(data) {
                                 $('#'+workunit_id)
                                     .html(data)
-                                    .fadeIn('slow');
+                                    .slideDown('slow');
                             });
                     $(td).addClass('visible');
                 }
