@@ -50,7 +50,8 @@ class WorkerTaskControls(Module):
             ('MASTER', self.task_status),
             ('MASTER', self.receive_results),
             ('MASTER', self.release_worker),
-            ('MASTER', self.return_work)
+            ('MASTER', self.return_work),
+            ('MASTER', self.subtask_started)
         ]
 
         self._friends = {
@@ -92,7 +93,7 @@ class WorkerTaskControls(Module):
         @param task_id - ID of the task instance
         """
         logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
-            % (key, args, subtask_key, workunit, main_worker))
+            % (key, '--', subtask_key, workunit, main_worker))
 
         # Register task with worker
         with self._lock:
@@ -341,3 +342,12 @@ class WorkerTaskControls(Module):
     def retrieve_task_failed(self, task_key, version, err):
         pass
 
+    def subtask_started(self, *args):
+        """
+        Called to inform the task that a queued subtask was started on a remote
+        worker
+        
+        @param subtask - subtask path.
+        @param id - id for workunit.
+        """
+        self.__task_instance.subtask_started(*args)

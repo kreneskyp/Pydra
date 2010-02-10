@@ -279,6 +279,17 @@ class Task(object):
         """
         pass
 
+    
+    def subtask_started(self, subtask, id):
+        """
+        Called to inform the task that a queued subtask was started on a remote
+        worker
+        
+        @param subtask - subtask path.
+        @param id - id for workunit.
+        """
+        self.logger.info('*** Workunit Started - %s:%s ***' % (subtask, id))
+
 
     def status(self):
         """

@@ -51,6 +51,7 @@ class WorkerManager(Module):
             ('MASTER', self.task_status),
             ('MASTER', self.receive_results),
             ('MASTER', self.release_worker),
+            ('MASTER', self.subtask_started),
 
             # master proxy - functions exposed to the workers that are passed
             # through to the Master
@@ -158,6 +159,9 @@ class WorkerManager(Module):
         """
         Proxy a function to a worker.  function and args are just
         passed through to the worker
+        
+        @param remote - remote function to call
+        @param worker_id - id of worker this is proxied to
         """
         worker = self.workers[worker_id]
         return worker.remote.callRemote(remote, *args, **kwargs)
@@ -236,7 +240,7 @@ class WorkerManager(Module):
         @param task_id - id of task being run
         """
         logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
-            % (key, args, subtask_key, workunit_key, \
+            % (key, '--', subtask_key, workunit_key, \
             main_worker))
         worker = None
 
@@ -362,6 +366,17 @@ class WorkerManager(Module):
 
     def stop_task(self, master, worker_id):
         return self.proxy_to_worker('stop_task', worker_id)
+
+
+    def subtask_started(self, master, worker, *args):
+        """
+        Called to inform the task that a queued subtask was started on a remote
+        worker
+        
+        @param subtask - subtask path.
+        @param id - database id for workunit.
+        """
+        return self.proxy_to_worker('subtask_started', worker, *args)
 
 
     def task_status(self, master, worker_id):

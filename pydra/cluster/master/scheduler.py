@@ -352,7 +352,7 @@ class TaskScheduler(Module):
 
             task_instance.queue_worker_request(job)
             logger.debug('Work Request %s:  sub=%s  args=%s  w=%s ' % \
-                         (requester_key, subtask, args, workunit))
+                         (requester_key, subtask, '--', workunit))
 
             self._schedule()
         else:
@@ -597,6 +597,10 @@ class TaskScheduler(Module):
             if not subtask_key:
                 self._main_workers.add(worker_key)
                 job.last_succ_time = datetime.now()
+            else:
+                # notify main worker that a subtask was started
+                worker = self.workers[job.task_instance.worker].remote
+                worker.callRemote('subtask_started', job.subtask_key, job.workunit)
             job.worker = worker_key
             job.status = STATUS_RUNNING
             job.started = datetime.now()
