@@ -1,24 +1,10 @@
-<!--
-    Copyright 2009 Oregon State University
-
-    This file is part of Pydra.
-
-    Pydra is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    Pydra is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 {% block head %}
         <style>
+            
+            * {
+                margin:0;
+                padding:0;
+            }
             
             #log {
                 background:#eee;
@@ -28,54 +14,79 @@
                 font-size:.9em;
             }
             
+            
             td {
                 border-bottom: 1px dotted #444444;
-                border-left: 1px dotted #444444;
-                border-right:1px dotted #444444;
+                border-left: 0;
+                border-right:0;
             }
 
             td, th {
                 padding-left:5px;
                 padding-right:5px;
             }
-
-            .logstripe { background-color:#f6f9fb }
             
-            .logtable { width:100%; }
+            td.last {
+                border-bottom:0;
+            }
 
-            .workunitlog { display:none; }
+            .logstripe { background-color:#f6f9fb; }
+            
+            .logtable {
+                width:100%;
+                border-collapse:collapse;
+            }
+            .workunit {
+                background-color:#c2e192;
+                border-top: 1px dotted #124612;
+                border-bottom: 1px dotted #124612;
+                cursor:pointer;
+            }
+            
+            .workunit.visible {
+                border-top:3px solid #124612;
+                border-bottom:2px dashed #124612;
+            }
+            
+            .workunit.visible {border-left:5px solid #124612;}
+            
+            .workunitlog { display:none;}
+            .workunitlog .logtable {
+                border-bottom:3px solid #124612;
+                border-left:5px solid #124612;
+            }
+
+            .workunitlog .logtable td{
+                padding-left: 5px;
+            }
+
+            .error {color:#c83737;}
+            .warn {color:orange;}
+            .info {color:black;}
+            .debug {color:#666666;}
 
         </style>
         <script>
-            function wu_log_onclick(task_id, subtask, workunit_id) {
+            function wu_log_onclick(td, task_id, subtask, workunit_id) {
                 if ( $('#'+workunit_id).is(':visible') ) {
-                    $('#'+workunit_id).fadeOut('slow', function() {});   
+                    $('#'+workunit_id).fadeOut('slow');
+                    $(td).removeClass('visible');
                 }
                 else if ( $('#'+workunit_id).is(':hidden') ) {
                     $.get('/jobs/history/detail/log/', 
                             {task_id:task_id, subtask:subtask, workunit_id:workunit_id},
                             function(data) {
-                                $('#'+workunit_id).html(data);
-                                $('#'+workunit_id).fadeIn('slow', function() {});
+                                $('#'+workunit_id)
+                                    .html(data)
+                                    .fadeIn('slow');
                             });
+                    $(td).addClass('visible');
                 }
             }
         </script>
 {% endblock %}
 
-{% block content %}
-        <div id="log">
-            <table class="logtable">
-            {% for line in log %}
-                    <tr class="{% cycle '' 'logstripe' %}">
-                        {% if line.subtask %}
-                            <td onclick="wu_log_onclick({{line.task_id}}, '{{line.subtask}}', {{line.workunit_id}})" id="workunitlog">{{line.line}}</td>
-                            <tr class="workunitlog" id="{{line.workunit_id}}"></tr>
-                        {% else %}
-                            <td>{{line.line}}</td>
-                        {% endif %}
-                    </tr>        
-            {% endfor %}
-            </table>
-        </div>    
-{% endblock %}
+<div id="log">
+{% include "log_lines.html" %}
+</div>
+

@@ -245,41 +245,52 @@ def task_history_detail(request):
         'controller_error': error
     }, context_instance=c)
 
+
+LOG_LEVELS = (
+    (re.compile('^[\d\-,: ]{23} \[ERROR\].*'), 'error'),
+    (re.compile('^[\d\-,: ]{23} \[WARN\].*'), 'warning'),
+    (re.compile('^[\d\-,: ]{23} \[INFO\].*'), 'info'),
+    (re.compile('^[\d\-,: ]{23} \[DEBUG\].*'), 'debug'),
+)
 def task_log(request):
     """
     Handler for retrieving workunit logs 
     """
+    re_workunit = re.compile("\*{3} Workunit Started \- ([\S]+):(\d+) \*{3}$")
+    
     c = RequestContext(request, {
     }, [pydra_processor])
     log = []
         
     task_id = request.GET['task_id']
-    if request.GET.has_key('subtask'):
-        subtask = request.GET['subtask']
-    if request.GET.has_key('workunit_id'):
-        workunit_id = request.GET['workunit_id']
-    
-    if request.GET.has_key('subtask') and request.GET.has_key('workunit_id'):
-        try:
-            data = pydra_controller.task_log(task_id, subtask, workunit_id)
-        except ControllerException, e:
-            data = e.code
+    if 'subtask' in request.GET and 'workunit_id' in request.GET:
+        args = (task_id, request.GET['subtask'], request.GET['workunit_id'])
+        template = 'log_lines.html'
     else:
-        try:
-            data = pydra_controller.task_log(task_id)
-        except ControllerException, e:
-            data = e.code
-
-    rawlog = data.split('\n')
+        args = (task_id,)
+        template = 'log.html'
     
-    for line in rawlog:
-        result = re.search(r"Workunit '([\S]*)' \(id=(\d+)\) Starting", line)
-        if result:
-            log.append({'subtask':result.group(1), 'task_id':task_id, 'workunit_id':result.group(2), 'line':line,})     
-        else:
-            log.append({'line':line})
+    try:
+        data = pydra_controller.task_log(*args)
+    except ControllerException, e:
+        data = e.code
 
-    return render_to_response('log.html', { 'log': log, });
+    for line in data.split('\n'):
+        if line:
+            match = re_workunit.search(line)
+            for exp, css_class in LOG_LEVELS:
+                if exp.match(line):
+                    break
+            if match:
+                log.append({'subtask':match.group(1),
+                            'task_id':task_id,
+                            'workunit_id':match.group(2),
+                            'line':line,
+                            'css':css_class})
+            else:
+                log.append({'line':line, 'css':css_class})
+
+    return render_to_response(template, { 'log': log, });
  
 
 def task_progress(request):

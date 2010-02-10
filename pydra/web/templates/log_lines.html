@@ -1,0 +1,12 @@
+<table class="logtable">
+{% for line in log %}
+        <tr class="{% cycle '' 'logstripe' %}">
+            {% if line.subtask %}
+                <td class="{{line.css}} workunit" onclick="wu_log_onclick(this, {{line.task_id}}, '{{line.subtask}}', {{line.workunit_id}})" id="workunitlog">{{line.line}}</td>
+                <tr class="workunitlog" id="{{line.workunit_id}}"></tr>
+            {% else %}
+                <td class="{{line.css}} {%if forloop.last%}last{%endif%}">{{line.line}}</td>
+            {% endif %}
+        </tr>        
+{% endfor %}
+</table>
