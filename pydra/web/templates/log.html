@@ -1,0 +1,81 @@
+<!--
+    Copyright 2009 Oregon State University
+
+    This file is part of Pydra.
+
+    Pydra is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Pydra is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+{% block head %}
+        <style>
+            
+            #log {
+                background:#eee;
+                border:2px solid #999;
+                overflow:auto;
+                max-height:300px;
+                font-size:.9em;
+            }
+            
+            td {
+                border-bottom: 1px dotted #444444;
+                border-left: 1px dotted #444444;
+                border-right:1px dotted #444444;
+            }
+
+            td, th {
+                padding-left:5px;
+                padding-right:5px;
+            }
+
+            .logstripe { background-color:#f6f9fb }
+            
+            .logtable { width:100%; }
+
+            .workunitlog { display:none; }
+
+        </style>
+        <script>
+            function wu_log_onclick(task_id, subtask, workunit_id) {
+                if ( $('#'+workunit_id).is(':visible') ) {
+                    $('#'+workunit_id).fadeOut('slow', function() {});   
+                }
+                else if ( $('#'+workunit_id).is(':hidden') ) {
+                    $.get('/jobs/history/detail/log/', 
+                            {task_id:task_id, subtask:subtask, workunit_id:workunit_id},
+                            function(data) {
+                                $('#'+workunit_id).html(data);
+                                $('#'+workunit_id).fadeIn('slow', function() {});
+                            });
+                }
+            }
+        </script>
+{% endblock %}
+
+{% block content %}
+        <div id="log">
+            <table class="logtable">
+            {% for line in log %}
+                    <tr class="{% cycle '' 'logstripe' %}">
+                        {% if line.subtask %}
+                            <td onclick="wu_log_onclick({{line.task_id}}, '{{line.subtask}}', {{line.workunit_id}})" id="workunitlog">{{line.line}}</td>
+                            <tr class="workunitlog" id="{{line.workunit_id}}"></tr>
+                        {% else %}
+                            <td>{{line.line}}</td>
+                        {% endif %}
+                    </tr>        
+            {% endfor %}
+            </table>
+        </div>    
+{% endblock %}

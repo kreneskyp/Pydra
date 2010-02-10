@@ -16,7 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
-import math
+import math, re
 
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import user_passes_test
@@ -241,9 +241,46 @@ def task_history_detail(request):
 
     return render_to_response('task_history_detail.html', {
         'task': detail,
+        'task_id': request.GET['id'],
         'controller_error': error
     }, context_instance=c)
 
+def task_log(request):
+    """
+    Handler for retrieving workunit logs 
+    """
+    c = RequestContext(request, {
+    }, [pydra_processor])
+    log = []
+        
+    task_id = request.GET['task_id']
+    if request.GET.has_key('subtask'):
+        subtask = request.GET['subtask']
+    if request.GET.has_key('workunit_id'):
+        workunit_id = request.GET['workunit_id']
+    
+    if request.GET.has_key('subtask') and request.GET.has_key('workunit_id'):
+        try:
+            data = pydra_controller.task_log(task_id, subtask, workunit_id)
+        except ControllerException, e:
+            data = e.code
+    else:
+        try:
+            data = pydra_controller.task_log(task_id)
+        except ControllerException, e:
+            data = e.code
+
+    rawlog = data.split('\n')
+    
+    for line in rawlog:
+        result = re.search(r"Workunit '([\S]*)' \(id=(\d+)\) Starting", line)
+        if result:
+            log.append({'subtask':result.group(1), 'task_id':task_id, 'workunit_id':result.group(2), 'line':line,})     
+        else:
+            log.append({'line':line})
+
+    return render_to_response('log.html', { 'log': log, });
+ 
 
 def task_progress(request):
     """

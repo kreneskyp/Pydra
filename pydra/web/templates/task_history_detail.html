@@ -27,13 +27,32 @@
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
 
             $(document).ready(function() {
-                $('.button_rerun').live('click', function(evt) {
-                    $.post('/jobs/run/', {'key':'{{task_key}}'});
+                /* show details first */
+                $('#workunits').show();
+                $('#logs').hide();
+
+                /* hide logs, show details */
+                $('#showdetails').click(function() {
+                    $('#logs').hide();
+                    $('#workunits').fadeIn('slow', function() {});
+                });
+              
+                /* hide details, show logs */
+                $('#showlogs').click(function() {
+                   $('#workunits').hide();
+                   $.get('/jobs/history/detail/log/', 
+                            {task_id:'{{task_id}}'}, 
+                            function(data) {
+                                $('#logs').html(data);
+                            } 
+                         );
+                   $('#logs').fadeIn('slow', function() {});
                 });
             });
         </script>
 
         <style>
+            
             #content { padding-top:30px; }
   
             .label {
@@ -48,7 +67,7 @@
                 margin-right:30px;
                 width: 450px;
             }
-         
+            
             #status {
                 -moz-border-radius:5px;
                 border:1px solid black;
@@ -96,7 +115,7 @@
             }
 
             tr.stripe td { background-color:#f6f9fb }
-
+  
             .buttons { width: 5.25em; }
 
             .status { width:18px; padding-right:1px;}
@@ -123,12 +142,12 @@
             .button_cancel {
                 background-image:url({{MEDIA}}/images/icons/delete.png);
             }
-
-
         </style>
 {% endblock %}
 
 {% block submenu %}
+    <span class="menuitem" id="showdetails"><a class="menuitem" href="#">Details</a></span>
+    <span class="menuitem lastmenuitem" id="showlogs"><a class="menuitem" href="#">Logs</a></span>
 {% endblock %}
 
 {% block content %}
@@ -173,5 +192,9 @@
             {% endfor %}
         </table>
         {% endif %}
+
+        <br />
+        <div id="logs"></div>
+        <br />
 
 {% endblock %}
