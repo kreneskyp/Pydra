@@ -1,0 +1,11 @@
+{% load pydra_extras %}
+<span><i>[list]</i></span>
+<ul>
+{% for object in object %}
+    <li>
+        {% with object|generic as template %}
+            {% include template %}
+        {% endwith %}
+    </li>
+{% endfor %}
+</ul>

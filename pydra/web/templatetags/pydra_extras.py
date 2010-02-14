@@ -150,3 +150,16 @@ def int_date(int_):
     return datetime.fromtimestamp(int_)
 register.filter('int_date', int_date)
 
+
+@register.filter(name='generic')
+def generic(obj):
+    """
+    Filter that aides in rendering the structure of an unknown object.  This
+    function returns a template name that either recurses into a list/dict or
+    displays a value.  
+    """
+    if isinstance(obj, (list, tuple)):
+        return 'generic/list.html'
+    elif isinstance(obj, (dict, )):
+        return 'generic/dict.html'
+    return 'generic/value.html'

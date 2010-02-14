@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% load pydra_extras %}
+
+{% block head %}
+    {{block.super}}
+
+    <style>
+    
+    
+        #foo {
+            border:1px solid black;
+            overflow:scroll;
+            height:300px;
+        }
+        
+        
+        #foo li span{
+            
+        }
+    </style>
+    
+    <link rel="stylesheet" type="text/css" href="{{MEDIA}}/css/jquery.treeview.css" />
+    <script src="{{MEDIA}}/js/jquery.treeview.min.js" type="text/javascript" charset="utf-8"></script>
+    <script>
+        $(document).ready(function() {
+            $('#foo').children('ul').treeview();
+        });
+    
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<div id="foo">
+    {% with value as object %}
+    {% with value|generic as template %}
+        {% include template %}
+    {% endwith %}
+    {% endwith %}
+</div>
+
+{% endblock %}
