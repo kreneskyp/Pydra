@@ -82,7 +82,7 @@ def task_status(code):
 
     elif code == STATUS_STOPPED:
         css_class = "task_status_stopped"
-        title = "queued, but has not started yet"
+        title = "queued"
 
     elif code == STATUS_CANCELLED:
         css_class = "task_status_cancelled"
@@ -117,7 +117,7 @@ def task_status_text(code):
         return "completed succesfully"
 
     elif code == STATUS_STOPPED:
-        return "queued, but has not started yet"
+        return "queued"
 
     elif code == STATUS_CANCELLED:
        return "cancelled by user"

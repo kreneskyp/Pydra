@@ -35,6 +35,21 @@
                 });
                 
                 $('#tab_results').children('ul').treeview();
+                
+                $('#rerun').live('click', function(evt) {
+                    $.post('/jobs/run/', {'key':'{{task.details.task_key}}'});
+                });
+                
+                $('#cancel').live('click', function(evt) {
+                    $.post('{{ROOT}}/jobs/cancel/', {'i':{{task_id}}});
+                });
+                
+                status = {{task.details.status}};
+                if (status==0 || status==1 || status==2) {
+                    $('#cancel').show();
+                } else {
+                    $('#rerun').show();
+                }
             });
         </script>
 
@@ -67,19 +82,21 @@
                 border:1px solid black;
                 float:right;
                 line-height:15px;
-                padding:5px;
+                padding:0px;
                 width:160px;
             }
+            
+            #status span {margin-top:5px;}
+            #status .icon {margin:5px;}
 
-            #status._-2, #status._-1, #status._0 {
-                border-color:red;
+            #status._-2, #status._-1  {
+                background-color:#ee9c98;
             }
-            #status._1, #status._3{
+            #status._0, #status._1, #status._3{
                 background-color:#c2e192;
-                border-color:#124612;
                 color:#124612;
             }
-            #status.status_2 {border-color:yellow;}
+            #status._2 {background-color:#FFFFBA;}
 
             .tab {display:none;}
 
@@ -150,6 +167,22 @@
             }
             
             .tab.visible {display:inherit;}
+            
+            #status .action {
+                background-color:white;
+                border-top:1px solid black;
+                display:none;
+                height:26px;
+                width:100%;
+                -moz-border-radius-bottomleft:5px;
+                -moz-border-radius-bottomright:5px;
+            }
+            
+            #status .action .icon, #status .action span { float:left; }
+            #status .action {cursor:pointer}
+            #status .action span { line-height:16px; margin-left:40px; }
+            #rerun:hover span { color:green; }
+            #cancel:hover span { color:#AA0000; }
         </style>
 {% endblock %}
 
@@ -173,8 +206,14 @@
                 <div class="label">Completed:</div><div>{{task.details.completed|default:"--"}}</div>
             </div>
             <div id="status" class="_{{task.details.status}}">
-                    {{task.details.status|task_status}}{{task.details.status|task_status_text|capfirst}}
+                <span>{{task.details.status|task_status}}{{task.details.status|task_status_text|capfirst}}</span>
+                <div id="rerun" class="action" title="Re-run Task">
+                    <span>Re-run Job</span> <div class="button_rerun icon" ></div>
                 </div>
+                <div id="cancel" class="action" title="Cancel Task">
+                    <span>Cancel Job</span> <div class="button_cancel icon"></div>
+                </div>
+            </div>
         </div>
 
         {% if task.workunits %}
