@@ -163,3 +163,24 @@ def generic(obj):
     elif isinstance(obj, (dict, )):
         return 'generic/dict.html'
     return 'generic/value.html'
+
+
+@register.filter(name='more')
+def more(content, length=50):
+    """
+    Limits length of content.  If the content goes beyond the specified amount
+    the maximum amount is displayed with a "more" link.  The full content
+    is placed in a <div class="more"> tag.
+    
+    The div tag can then be used for a popup/drilldown/expander/etc that
+    displays the content when "more" is clicked on.  This filter does not
+    define what that is.
+    """
+    if len(content) < length:
+        return content
+    
+    word_break = content[:length-8].rfind(' ')
+    return mark_safe('%s  <span class="more_button">... more</span><div class="more">%s</div>' \
+                     % (content[:word_break], content))
+    
+    

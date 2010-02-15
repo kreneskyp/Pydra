@@ -47,6 +47,7 @@
                 status = {{task.details.status}};
                 if (status==0 || status==1 || status==2) {
                     $('#cancel').show();
+                    $('#logs').hide();
                 } else {
                     $('#rerun').show();
                 }
@@ -235,7 +236,7 @@
                     <td class="status">{{workunit.status|task_status}}</td>
                     <td class="subtask_key">{{workunit.subtask_key}}</td>
                     <td class="workunit_id">{{workunit.workunit_key}}</td>
-                    <td class="args">{{workunit.args}}</td>
+                    <td class="args" title="Workunit Arguments">{{workunit.args|more:90}}</td>
                     <td class="start_time">{{workunit.started|default:"--"}}</td>
                     <td class="completion_time">{{workunit.completed|default:"--"}}</td>
                </tr>

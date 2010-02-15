@@ -203,8 +203,66 @@
                 width:100px;
             }
 
+            .more_button{ color:blue; cursor:pointer;}
+            .more_button:hover {color:green;}
+            #more_popup, .more { display:none; }
             
+            #more_popup {
+                background-color:rgba(100, 100, 100, 0.4);
+                display:none;
+                margin-left:auto;
+                margin-right:auto;
+                top:50px;
+                width:600px;
+                padding:8px;
+                position:absolute;
+                text-align:center;
+                -moz-border-radius: 10px;
+                -webkit-border-radius: 10px;
+            }
+
+            #more_popup .inner {
+                background-color:white;
+                padding:15px;
+                border:1px solid #333333;
+                opacity: 1;
+                -moz-border-radius: 5px;
+                -webkit-border-radius: 5px;
+            }
+
+            #more_popup h2 { font-size:115%; font-weight:normal; border-bottom: 1px solid #666666;}
+            #more_popup .content {
+                color:#444444;
+                font-size:95%;
+                margin-top:10px;
+                max-height:400px;
+                overflow:scroll;
+                padding:5px;
+                text-align:justify;
+            }
+            #more_popup .button_close {
+                position:absolute;
+                top:12px;
+                right:7px;
+            }
+            
+            .absolute_center {
+                position:relative;
+                margin:0 auto;
+                text-align:left;
+                width:600px;
+            }
         </style>
+        
+        <!--[if IE]>
+        <style type="text/css">
+            .input_form {
+                background:transparent;
+                filter:progid:DXImageTransform.Microsoft.gradient(startColorstr=#99000050,endColorstr=#99000050);
+                zoom: 1;
+                }
+        </style>
+        <![endif]-->
     {% endblock %}
 
         <script>
@@ -213,6 +271,8 @@
             error_messages[-2] = 'Error: Unable to connect to Master Node.';
             error_messages[-3] = 'Error: Exception thrown in remote function.';
             error_messages[-4] = 'Error: RSA Key not found in Master.key,  Controller is unable to authenticate.';
+
+            var $more = undefined;
 
             /*
                 Check a response from an ajax call for errors making a remote
@@ -239,6 +299,19 @@
                         .html(error_messages[{{controller_error}}])
                         .show();
                 {% endif %}
+                $more = $('#more_popup');
+                $('.more_button').live('click',function(){
+                    $this = $(this);
+                    $content = $(this).next()
+                    $more.find('h2').html($this.parent().attr('title'));
+                    $more.find('.content').html($this.next().html());
+                    $more.show();
+                });
+                
+                $('.button_close').live('click', function(evt) {
+                    // hide the window and clear errors
+                    $more.hide();
+                });
             });
         </script>
 
@@ -267,6 +340,16 @@
         {% endblock %}
         </div>
 
+        <div class="absolute_center">
+        <div id="more_popup">
+            <div class="inner">
+                <h2></h2>
+                <div class="button_close button"></div>
+                <div class="content"></div>
+            </div>
+        </div>
+        </div>
+
         <div id="master_errors">
         </div>
 
@@ -274,6 +357,5 @@
             {% block content %}
             {% endblock %}
         </div>
-
 </body>
 </html>
