@@ -1,0 +1,15 @@
+{% load pydra_extras %}
+
+<span><i>[dict]</i></span>
+<ul class="data">
+{% for key, value in object.items %}
+    <li>
+        <span class="data"><b>{{key}}</b>:</span>
+        {% with value|generic as template %}
+        {% with value as object %}
+            {% include template %}
+        {% endwith %}
+        {% endwith %}
+    </li>    
+{% endfor %}
+</ul>
