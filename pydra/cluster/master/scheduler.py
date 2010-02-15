@@ -181,7 +181,7 @@ class TaskScheduler(Module):
         task_id = int(task_id)
         with self._queue_lock:
             task = self._active_tasks.get(task_id)
-            self._queue.remove([task.priority, task])
+            self._queue.remove([task.compute_score(), task])
             # cancel any workers assigned to the task.  task is not
             # marked cancelled until all workers have reported they
             # stopped
@@ -248,10 +248,9 @@ class TaskScheduler(Module):
                                 avatar = self.workers[key]
                                 avatar.remote.callRemote('release_worker')
 
-                            t = [job.priority, job]
+                            t = [job.compute_score(), job]
                             if t in self._queue:
                                 self._queue.remove(t)
-                                heapify(self._queue)
                                 logger.info(
                                     'Task %d: %s is removed from the queue' % \
                                     (job.task_id, job.task_key))
@@ -443,7 +442,7 @@ class TaskScheduler(Module):
                     if job:
                         task_instance = item[1]
                         break
-
+                
                 if job:
                     with self._worker_lock:
                         worker_key = None
@@ -468,8 +467,8 @@ class TaskScheduler(Module):
                             # dispatching to idle worker last
                             worker_key = self._idle_workers.pop()
                             task_instance.running_workers.append(worker_key)
-                            logger.info('Worker:%s assigned to task=%s, subtask=%s:%s' %
-                                    (worker_key, task_instance.task_key, subtask, job.workunit))
+                            logger.info('Worker:%s assigned to task=%s  key=%s, subtask=%s:%s' %
+                                    (worker_key, task_instance.id, task_instance.task_key, subtask, job.workunit))
 
                     # was a worker found for the job
                     if worker_key:
@@ -511,7 +510,6 @@ class TaskScheduler(Module):
             for t in queued:
                 self._queue.append([t.compute_score(), t.id])
                 self._active_tasks[t.id] = t
-            
 
 
     def _update_queue(self):

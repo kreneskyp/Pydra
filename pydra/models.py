@@ -196,7 +196,7 @@ class TaskInstance(AbstractJob):
         3) A task that has been out of worker supply for a long time should
            have a relatively higher score.
         """
-        return self.priority 
+        return (self.priority, self.queued)
 
     def json_safe(self):
         """
