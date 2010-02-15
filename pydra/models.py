@@ -208,6 +208,7 @@ class TaskInstance(AbstractJob):
             'id':self.id,
             'task_key':self.task_key,
             'status':self.status,
+            'args':self.args,
             'queued':self.queued.strftime('%Y-%m-%d %H:%m:%S') \
                                                     if self.queued else None,
             'started':self.started.strftime('%Y-%m-%d %H:%m:%S') \
