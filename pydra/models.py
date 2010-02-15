@@ -22,11 +22,7 @@ from threading import Lock
 import time
 
 from django.db import models
-
-""" ================================
-Models
-================================ """
-
+import simplejson
 
 class Node(models.Model):
     """
@@ -154,6 +150,7 @@ class TaskInstance(AbstractJob):
     queued:        Datetime when this task instance was queued
     """
     queued  = models.DateTimeField(auto_now_add=True)
+    results = models.TextField(null=True)
     objects = TaskInstanceManager()
     workunit = None #not used, included for compatibility with WorkUnit
 
@@ -169,6 +166,14 @@ class TaskInstance(AbstractJob):
     
         # others
         self._request_lock = Lock()
+        
+        if self.results and isinstance(self.results, (str,unicode)):
+            self.results = simplejson.loads(self.results)
+
+    def save(self, *args, **kwargs):
+        if self.results and not isinstance(self.results, (str,unicode)):
+            self.results = simplejson.dumps(self.results)
+        super(TaskInstance, self).save(*args, **kwargs)
 
     def __getattribute__(self, key):
         if key == 'task_id':
@@ -208,7 +213,8 @@ class TaskInstance(AbstractJob):
             'started':self.started.strftime('%Y-%m-%d %H:%m:%S') \
                                                     if self.started else None,
             'completed':self.completed.strftime('%Y-%m-%d %H:%m:%S') \
-                                                    if self.completed else None
+                                                    if self.completed else None,
+            'results':self.results
         }
 
     def queue_worker_request(self, request):

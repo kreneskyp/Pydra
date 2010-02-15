@@ -665,6 +665,8 @@ class TaskScheduler(Module):
                     logger.info("Root task:%s completed by worker:%s" %
                             (job.task_key, worker_key))
                     self.add_worker(worker_key, status)
+                    job.results = results
+                    job.save()
 
 
     def worker_stopped(self, worker_key):
