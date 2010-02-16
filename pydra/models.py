@@ -177,6 +177,28 @@ class TaskInstance(AbstractJob):
             return self
         return super(TaskInstance, self).__getattribute__(key)
 
+    
+    def get_batch(self, size=5):
+        """
+        Gets a batch greater than the size requested, or all remaining work
+        requests if there are not enough for the batch
+        """
+        batch = {}
+        count = 0
+        if self.poll_worker_request() and count < size:
+            job = pop_worker_request()
+            if job == self:
+                if len(self._worker_requests) == 1:
+                    return
+                pass
+            key = (job.task_key,job.subtask_key,job.args)
+            try:
+                batch[key].append(job.workunit)
+            except KeyError:
+                batch[key] = [job.workunit]
+            count += job.batch
+    
+
     def compute_score(self):
         """
         Computes a priority score for this task, which will be used by the
