@@ -3,31 +3,54 @@
 
 {% block head %}
     {{ block.super }}
+        <link rel="stylesheet" type="text/css" href="{{MEDIA}}/css/jquery.treeview.css" />
+        <script src="{{MEDIA}}/js/jquery.treeview.min.js" type="text/javascript" charset="utf-8"></script>
         <script>
             var can_run_tasks = {% if perms.pydra_server.can_run_tasks %}true{%else%}false{%endif%};
 
             $(document).ready(function() {
                 /* show details first */
-                $('#workunits').show();
-                $('#logs').hide();
 
-                /* hide logs, show details */
-                $('#showdetails').click(function() {
-                    $('#logs').hide();
-                    $('#workunits').fadeIn('slow', function() {});
-                });
-              
                 /* hide details, show logs */
-                $('#showlogs').click(function() {
-                   $('#workunits').hide();
+                $('#results, #workunits, #args').click(function(){
+                    $('.tab.visible')
+                        .hide()
+                        .removeClass('visible');
+                    $('#tab_' + this.id)
+                        .fadeIn('slow')
+                        .addClass('visible');
+                });
+                
+                $('#logs').click(function() {
+                   $('.tab.visible')
+                        .hide()
+                        .removeClass('visible');
                    $.get('/jobs/history/detail/log/', 
                             {task_id:'{{task_id}}'}, 
                             function(data) {
-                                $('#logs').html(data);
+                                $('#tab_logs').html(data);
                             } 
                          );
-                   $('#logs').fadeIn('slow', function() {});
+                   $('#tab_logs').fadeIn('slow').addClass('visible');
                 });
+                
+                $('#tab_results').children('ul').treeview();
+                
+                $('#rerun').live('click', function(evt) {
+                    $.post('/jobs/run/', {'key':'{{task.details.task_key}}'});
+                });
+                
+                $('#cancel').live('click', function(evt) {
+                    $.post('{{ROOT}}/jobs/cancel/', {'i':{{task_id}}});
+                });
+                
+                status = {{task.details.status}};
+                if (status==0 || status==1 || status==2) {
+                    $('#cancel').show();
+                    $('#logs').hide();
+                } else {
+                    $('#rerun').show();
+                }
             });
         </script>
 
@@ -41,6 +64,8 @@
                 min-width:75px;
             }
  
+            #details {min-width:860px}
+ 
             #description {
                 float:left;
                 height:100px;
@@ -48,32 +73,51 @@
                 width: 450px;
             }
             
+            #run {
+                width:200px;
+                float:left;
+            }
+            
             #status {
                 -moz-border-radius:5px;
                 border:1px solid black;
                 float:right;
                 line-height:15px;
-                padding:5px;
+                padding:0px;
                 width:160px;
             }
+            
+            #status span {margin-top:5px;}
+            #status .icon {margin:5px;}
 
-            #status._-2, #status._-1, #status._0 {
-                border-color:red;
+            #status._-2, #status._-1  {
+                background-color:#ee9c98;
             }
-            #status._1, #status._3{
+            #status._0, #status._1, #status._3{
                 background-color:#c2e192;
-                border-color:#124612;
                 color:#124612;
             }
-            #status.status_2 {border-color:yellow;}
+            #status._2 {background-color:#FFFFBA;}
 
-            #workunits {
+            .tab {display:none;}
+
+            #tab_workunits {
                 border: 0px solid black;
                 border-spacing:0;
                 border-collapse:collapse;
-                margin-top:20px;
                 width:100%;
             }
+
+            #tab_results, #tab_args {
+                border: 2px solid #888888;
+                font-family:monospace;
+                height:300px;
+                overflow:auto;
+                padding:5px;
+                width:100%;
+            }
+            
+            #tab_logs, #tab_args { margin-top:100px;}
 
             th {
                 background-color:#888888;
@@ -122,12 +166,32 @@
             .button_cancel {
                 background-image:url({{MEDIA}}/images/icons/delete.png);
             }
+            
+            .tab.visible {display:inherit;}
+            
+            #status .action {
+                background-color:white;
+                border-top:1px solid black;
+                display:none;
+                height:26px;
+                width:100%;
+                -moz-border-radius-bottomleft:5px;
+                -moz-border-radius-bottomright:5px;
+            }
+            
+            #status .action .icon, #status .action span { float:left; }
+            #status .action {cursor:pointer}
+            #status .action span { line-height:16px; margin-left:40px; }
+            #rerun:hover span { color:green; }
+            #cancel:hover span { color:#AA0000; }
         </style>
 {% endblock %}
 
 {% block submenu %}
-    <span class="menuitem" id="showdetails"><a class="menuitem" href="#">Details</a></span>
-    <span class="menuitem lastmenuitem" id="showlogs"><a class="menuitem" href="#">Logs</a></span>
+    <span class="menuitem" id="results">Results</span>
+    {% if task.details.args %}<span class="menuitem" id="args">Arguments</span>{% endif %}
+    {% if task.workunits %}<span class="menuitem" id="workunits">Workunits</span>{% endif %}
+    <span class="menuitem lastmenuitem" id="logs">Logs</span>
 {% endblock %}
 
 {% block content %}
@@ -137,17 +201,24 @@
                 <div class="label">Description:</div><div>{{task.description}}</div>
             </div>
             <div id="run">
-                <div id="status" class="_{{task.details.status}}">
-                    {{task.details.status|task_status}}{{task.details.status|task_status_text|capfirst}}
-                </div>
+                
                 <div class="label">Queued:</div><div>{{task.details.queued|default:"--"}}</div>
                 <div class="label">Started:</div><div>{{task.details.started|default:"--"}}</div>
                 <div class="label">Completed:</div><div>{{task.details.completed|default:"--"}}</div>
             </div>
+            <div id="status" class="_{{task.details.status}}">
+                <span>{{task.details.status|task_status}}{{task.details.status|task_status_text|capfirst}}</span>
+                <div id="rerun" class="action" title="Re-run Task">
+                    <span>Re-run Job</span> <div class="button_rerun icon" ></div>
+                </div>
+                <div id="cancel" class="action" title="Cancel Task">
+                    <span>Cancel Job</span> <div class="button_cancel icon"></div>
+                </div>
+            </div>
         </div>
 
         {% if task.workunits %}
-        <table id="workunits">
+        <table id="tab_workunits" class="tab">
             <thead>
                 <tr><th colspan="100%" class="title">Work Units</th></tr>
                 <tr>
@@ -165,7 +236,7 @@
                     <td class="status">{{workunit.status|task_status}}</td>
                     <td class="subtask_key">{{workunit.subtask_key}}</td>
                     <td class="workunit_id">{{workunit.workunit_key}}</td>
-                    <td class="args">{{workunit.args}}</td>
+                    <td class="args" title="Workunit Arguments">{{workunit.args|more:90}}</td>
                     <td class="start_time">{{workunit.started|default:"--"}}</td>
                     <td class="completion_time">{{workunit.completed|default:"--"}}</td>
                </tr>
@@ -173,8 +244,22 @@
         </table>
         {% endif %}
 
-        <br />
-        <div id="logs"></div>
-        <br />
+        <div id="tab_results" class="tab visible">
+            {% with task.details.results as object %}
+            {% with object|generic as template %}
+                {% include template %}
+            {% endwith %}
+            {% endwith %}
+        </div>
+        {% if task.details.args %}
+        <div id="tab_args" class="tab">
+            {% with task.details.args as object %}
+            {% with object|generic as template %}
+                {% include template %}
+            {% endwith %}
+            {% endwith %}
+        </div>
+        {% endif %}
+        <div id="tab_logs" class="tab"></div>
 
 {% endblock %}

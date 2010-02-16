@@ -247,10 +247,10 @@ def task_history_detail(request):
 
 
 LOG_LEVELS = (
-    (re.compile('^[\d\-,: ]{23} \[ERROR\].*'), 'error'),
-    (re.compile('^[\d\-,: ]{23} \[WARN\].*'), 'warning'),
-    (re.compile('^[\d\-,: ]{23} \[INFO\].*'), 'info'),
-    (re.compile('^[\d\-,: ]{23} \[DEBUG\].*'), 'debug'),
+    (re.compile('^.{23} \[ERROR\].*'), 'error'),
+    (re.compile('^.{23} \[WARN\].*'), 'warning'),
+    (re.compile('^.{23} \[INFO\].*'), 'info'),
+    (re.compile('^.{23} \[DEBUG\].*'), 'debug'),
 )
 def task_log(request):
     """

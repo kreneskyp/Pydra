@@ -135,3 +135,4 @@ class TestParallelTask(ParallelTask):
     def work_complete(self):
         self.logger.info('[%s] tabulating results!' % (self.get_worker().worker_key))
         self.logger.info(self._finished)
+        return self._finished
