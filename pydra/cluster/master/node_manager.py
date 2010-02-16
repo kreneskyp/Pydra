@@ -26,6 +26,7 @@ class NodeManager(Module):
 
     def __init__(self):
         self._interfaces = [
+            self.kill_worker,
             self.node_list,
             self.node_detail,
             self.node_edit,
@@ -145,3 +146,13 @@ class NodeManager(Module):
         return node_status
 
 
+    def kill_worker(self, worker_key, kill=False, fail=True):
+        """
+        Force a worker process to terminate.
+        
+        @param worker_key - id of worker to kill
+        @param kill [False] - send a SIGKILL to process instead of SIGTERM
+        @param fail [True] - workunit should return as if it failed.
+        """
+        worker = self.workers[worker_key].remote
+        worker.callRemote('kill_worker', kill, fail)

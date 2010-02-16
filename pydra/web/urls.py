@@ -36,6 +36,7 @@ urlpatterns = patterns('',
     (r'^nodes/edit/(\d?)$', node_edit),
     (r'^nodes/delete/(\d?)$', node_delete),
     (r'^nodes/status/$', node_status),
+    (r'^worker/terminate/$', kill_worker),
 
     # job urls
     (r'^jobs/$', jobs),

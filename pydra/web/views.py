@@ -348,3 +348,24 @@ def cancel_task(request):
         response = e.code
 
     return HttpResponse(response, mimetype='application/javascript')
+
+
+@user_passes_test(lambda u: u.has_perm('pydra.web.can_run'))
+def kill_worker(request):
+    """
+    Kill a worker process
+    """
+    id = request.GET['i']
+    kill = bool(int(request.GET['k']))
+    #       fail = bool(int(request.GET['f']))
+    fail = True
+
+    c = RequestContext(request, {
+    }, [pydra_processor])
+
+    try:
+        response = pydra_controller.kill_worker(id, kill, fail)
+    except ControllerException, e:
+        response = e.code
+
+    return HttpResponse(response, mimetype='application/javascript')

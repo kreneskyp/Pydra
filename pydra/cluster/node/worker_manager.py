@@ -45,6 +45,7 @@ class WorkerManager(Module):
 
             # worker proxy - functions exposed to the master that are for the
             # most part just passed through to the worker
+            ('MASTER', self.kill_worker),
             ('MASTER', self.run_task),
             ('MASTER', self.stop_task),
             ('MASTER', self.worker_status),
@@ -116,16 +117,23 @@ class WorkerManager(Module):
         self.emit('NODE_INITIALIZED', node_key)
 
 
-    def kill_worker(self, worker_key, kill=False):
+    def kill_worker(self, master, worker_key, kill=False, fail=True):
         """
         Stops a worker process.
 
         @param worker_key: key of worker to kill
         @param kill: send SIGKILL instead of SIGTERM. Default is signal
                      is SIGTERM.  SIGKILL should only be used in extreme cases
+        @param fail: workunit(s) should return as if they threw an exception.
+                    Otherwise they will be marked as canceled.  Failed workunits
+                    may be retried on other nodes depending on settings
         """
         with self.__lock:
+            if not worker_key in self.workers:
+                return
+            
             worker = self.workers[worker_key]
+            worker.finished = True
             logger.debug('Stopping %s with %s' % \
                         (worker_key, 'SIGKILL' if kill else 'SIGTERM'))
 
@@ -143,8 +151,11 @@ class WorkerManager(Module):
                 else:
                     os.system('kill %s' % worker.popen.pid)
 
-            if worker.name in self.workers:
-                worker.finished = True
+        if fail:
+            self.send_results(worker_key, 'Terminated by user', \
+                              worker.workunit_key, failed=True)
+        else:
+            self.worker_stopped(worker_key)
 
 
     def proxy_to_master(self, remote, worker, *args, **kwargs):

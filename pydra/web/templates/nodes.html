@@ -141,11 +141,40 @@
                 font-weight:bold;
                 color:orange;
             }
+            
+            td.actions {
+                width:20px;
+            }
+            
+            .popup {
+                width:500px;
+                border: 1px solid black;
+            }
+            
+            #kill h2 {
+                color:#AA0000;
+            }
+            
+            #kill h2 span {color:black;}
+            
+            #kill div.submit {
+                background-color:#ee9c98;
+                border: 1px solid black;
+                color:#550000;
+                margin:5px;
+                margin-left:auto;
+                margin-right:auto;
+                width: 75px;
+                text-align:center;
+            }
+            
+            .button_cancel {display:none;}
         </style>
 
         <script type="text/javascript">
 
             var worker_count = -1;
+            var $kill = undefined;
             
             function process_status_update(data) {
                 if (check_response_for_controller_errors(data)) {
@@ -195,13 +224,16 @@
                                     // worker is working on subtask
                                     $task.html(worker[1]+':'+worker[2] +  ' ('+worker[3]+')');
                                     workers_busy += 1;
+                                    $worker.find('.button_cancel').show();
                                 } else if (worker[1] != -1) {
                                     // worker is working on task
                                     $task.html(worker[1])
                                     workers_busy += 1;
+                                    $worker.find('.button_cancel').show();
                                 } else {
                                     //worker is idle
                                     $task.html('idle')
+                                    $worker.find('.button_cancel').hide();
                                 }
                             }
                         }
@@ -264,6 +296,37 @@
                         });
                     }
                 });
+                
+                $kill = $('#kill')
+                $('.button_cancel').live('click', function(){
+                    $node_row = $(this).parent().parent().prevUntil('.node');
+                    {% if perms.pydra_server.can_edit_nodes %}
+                        host = $node_row.find('.host a').html();
+                    {% else %}
+                        host = $node_row.find('.host').html();
+                    {% endif %}
+                    port = $node_row.children('.port').html();
+                    worker = parseInt($(this).parent().parent().children('.id').html())-1;
+                    id = host+":"+port+":"+worker
+                    $kill.find('h2 span').html(id);
+                    $kill.show();
+                });
+                
+                $kill.find('.submit').click(function(){
+                    id = $kill.find('h2 span').html();
+                    if ($('#sigkill').attr('checked')) {
+                        sigkill = 1;
+                    } else {
+                        sigkill = 0;
+                    }
+                    if ($('#fail').attr('checked')) {
+                        fail = 1;
+                    } else {
+                        fail = 0;
+                    }
+                    $.get('{{ROOT}}/worker/terminate',{i:id, k:sigkill, f:fail})
+                    $kill.hide();
+                });
             });
 
             function worker_expander($workers, index) {
@@ -284,8 +347,25 @@
     {% endif %}
 {% endblock %}
 
-{% block content %}
 
+{% block popups %}
+<div id="kill" class="popup">
+    <div class="popup_inner">
+        <h2>Terminate: <span></span></h2>
+            
+        <div class="content">Terminating a process may have unexpected results.
+        
+            By default this will send a SIGTERM to the worker process allowing it to shutdown as gracefully as possible.
+            Optionally you may send a SIGKILL by checking the box below.  Terminating a process with
+            SIGKILL may result in lost file handles or other lost resources.
+        </div>
+        <input type="checkbox" id="sigkill"> SIGKILL
+        <div class="submit">Terminate</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
         <table id="cluster">
             <tr>
                 <td>Capacity</td>
@@ -332,13 +412,19 @@
                         <td class="node_worker_status status"><div title="expand" class="toggle"></div><span class="connected">???</span> of <span class="total">{{node.cores}}</span></td>
                         <td></td>
                         <td></td>
+                        <td class="actions"></td>
                     </tr>
                         {% for id in node|node_range %}
                             <tr id="worker_{{node.id}}_{{id}}" class="worker {% if forloop.last %}last{% endif %}" style="display:none;">
                                 <td colspan="3"></td>
                                 <td class="status"><div class="inner">Unknown</div></td>
-                                <td class="id">{{forloop.counter}} </td>
+                                <td class="id">{{forloop.counter}}</td>
                                 <td class="task">Unknown</td>
+                                <td class="actions">
+                                    {% if perms.pydra_server.can_run %}
+                                        <div class="button button_cancel"></div>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                      </table>
