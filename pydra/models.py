@@ -150,9 +150,11 @@ class TaskInstance(AbstractJob):
     queued:        Datetime when this task instance was queued
     """
     queued  = models.DateTimeField(auto_now_add=True)
-    results = models.TextField(null=True)
+    results_json = models.TextField(null=True)
+    results = None
     objects = TaskInstanceManager()
     workunit = None #not used, included for compatibility with WorkUnit
+    
 
     def __init__(self, *eargs, **kw):
         super(TaskInstance, self).__init__(*eargs, **kw) 
@@ -167,12 +169,12 @@ class TaskInstance(AbstractJob):
         # others
         self._request_lock = Lock()
         
-        if self.results and isinstance(self.results, (str,unicode)):
-            self.results = simplejson.loads(self.results)
+        if self.results_json:
+            self.results = simplejson.loads(self.results_json)
 
     def save(self, *args, **kwargs):
-        if self.results and not isinstance(self.results, (str,unicode)):
-            self.results = simplejson.dumps(self.results)
+        if self.results:
+            self.results_json = simplejson.dumps(self.results)
         super(TaskInstance, self).save(*args, **kwargs)
 
     def __getattribute__(self, key):
