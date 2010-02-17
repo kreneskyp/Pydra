@@ -65,7 +65,12 @@ class NodeClientFactory(pb.PBClientFactory):
         """
         #lock - ensures that this blocks any connection attempts
         with self.connection_manager._lock:
-            self.node.ref = None
+            node = self.node
+            node.ref = None
+            for i in range(node.cores):
+                w_key = '%s:%s:%i' % (node.host, node.port, i)
+                del self.connection_manager.workers[w_key]
+                self.connection_manager.emit('WORKER_DISCONNECTED', w_key)
 
         self.connection_manager.reconnect_nodes(True);
         pb.PBClientFactory.clientConnectionLost(self, connector, reason)
@@ -323,13 +328,13 @@ class NodeConnectionManager(Module):
         #node key to be used by node and its workers
         node_key_str = '%s:%s' % (node.host, node.port)
 
-
         # create worker avatars
-        for i in range(node.cores):
-            worker_key = '%s:%i' % (node_key_str, i)
-            avatar = WorkerAvatarWrapper(worker_key, node.ref)
-            self.workers[worker_key] = avatar
-            self.emit('WORKER_CONNECTED', avatar)
+        with self._lock:
+            for i in range(node.cores):
+                worker_key = '%s:%i' % (node_key_str, i)
+                avatar = WorkerAvatarWrapper(worker_key, node.ref)
+                self.workers[worker_key] = avatar
+                self.emit('WORKER_CONNECTED', avatar)
 
 
         # we have allowed access for all the workers, tell the node to init
