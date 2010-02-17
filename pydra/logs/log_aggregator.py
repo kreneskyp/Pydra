@@ -80,7 +80,8 @@ class MasterLogAggregator(Module):
             query = TaskInstance.objects \
                         .filter(Q(log_retrieved=False) \
                                 | Q(workunits__log_retrieved=False)) \
-                        .order_by('completed')
+                        .order_by('completed') \
+                        .distinct()
             for task in query:
                 self.aggregate_task_logs(task)
     
