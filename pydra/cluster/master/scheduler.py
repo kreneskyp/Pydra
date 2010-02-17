@@ -592,13 +592,16 @@ class TaskScheduler(Module):
         # if one node is faulty
         job = self.get_worker_job(worker_key)
         if job:
-            if not subtask_key:
-                self._main_workers.add(worker_key)
-                job.last_succ_time = datetime.now()
-            else:
+            if subtask_key:
                 # notify main worker that a subtask was started
                 worker = self.workers[job.task_instance.worker].remote
                 worker.callRemote('subtask_started', job.subtask_key, job.workunit)
+                if isinstance(job, (TaskInstance,)):
+                    job = job.local_workunit
+            else:
+                self._main_workers.add(worker_key)
+                job.last_succ_time = datetime.now()
+                
             job.worker = worker_key
             job.status = STATUS_RUNNING
             job.started = datetime.now()
