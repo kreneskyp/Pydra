@@ -3,7 +3,9 @@ import os
 import os.path
 
 from pydra.cluster.tasks.datasource.slicer import LineSlicer
+from pydra.cluster.tasks.datasource.key import keyable
 
+@keyable
 class DirSelector(object):
     """
     Selects a directory, yielding files.
@@ -38,6 +40,7 @@ class DirSelector(object):
     def key(self):
         return self.path
 
+@keyable
 class FileSelector(object):
     """
     Selects files. Can yield file-based slicers.
