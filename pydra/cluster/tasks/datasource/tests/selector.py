@@ -14,6 +14,10 @@ class DirSelectorCheeseTest(unittest.TestCase):
 
         self.assertEqual(len(self.ds), 2)
 
+    def test_key(self):
+
+        self.assertTrue(hasattr(self.ds, "key") and self.ds.key)
+
 class FileSelectorTest(unittest.TestCase):
 
     def setUp(self):
@@ -27,6 +31,10 @@ class FileSelectorTest(unittest.TestCase):
 
         handle2 = self.fs.handle
         self.assertEqual(handle, handle2)
+
+    def test_key(self):
+
+        self.assertTrue(hasattr(self.fs, "key") and self.fs.key)
 
 if __name__ == "__main__":
     import os.path
