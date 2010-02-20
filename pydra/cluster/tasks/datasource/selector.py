@@ -36,10 +36,6 @@ class DirSelector(object):
     def __len__(self):
         return len(self.files)
 
-    @property
-    def key(self):
-        return self.path
-
 @keyable
 class FileSelector(object):
     """
@@ -50,10 +46,6 @@ class FileSelector(object):
         self.path = path
 
         self._handle = None
-
-    @property
-    def key(self):
-        return self.path
 
     @property
     def handle(self):

@@ -23,7 +23,7 @@ def keyinit(f):
            kids.append(args[0].key)
            args = args[:1]
            
-        self._key = (self.__class__, kids, args, kwargs)
+        self.key = (self.__class__, kids, args, kwargs)
 
     return init
 
