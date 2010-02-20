@@ -20,8 +20,8 @@ def keyinit(f):
 
         kids = []
         while args and hasattr(args[0], "key"):
-           kids.append(args[0].key)
-           args = args[:1]
+            kids.append(args[0].key)
+            args = args[1:]
            
         self.key = (self.__class__, kids, args, kwargs)
 
@@ -34,3 +34,15 @@ def keyable(c):
 
     c.__init__ = keyinit(c.__init__)
     return c
+
+def instance_from_key(key):
+    """
+    Instantiate an object from a key.
+    """
+
+    cls, kids, args, kwargs = key
+
+    if kids:
+        args = [instance_from_key(i) for i in kids] + list(args)
+
+    return cls(*args, **kwargs)
