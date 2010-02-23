@@ -35,9 +35,7 @@ class WorkerAvatar(ModuleAvatar, RSAAvatar):
     key = None           # Key that identifies task
     version = None       # version of task package containing task
     args = None          # Task arguments
-    subtask_key = None   # key to subtask worker is assigned to
-    local_subtask = None # key of subtask being run locally on the main worker
-    workunit_key = None  # key to workunit worker is assigned to
+    workunits = None     # structure containing workunits
     main_worker = None   # worker_key of mainworker for this task
     task_id = None       # unique identifier of Task this worker is assigned to
     run_task_deferred = None # defered set if run_task must be delayed

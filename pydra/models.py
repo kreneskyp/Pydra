@@ -155,7 +155,6 @@ class TaskInstance(AbstractJob):
     objects = TaskInstanceManager()
     workunit = None #not used, included for compatibility with WorkUnit
     
-
     def __init__(self, *eargs, **kw):
         super(TaskInstance, self).__init__(*eargs, **kw) 
         # scheduling-related
@@ -187,24 +186,43 @@ class TaskInstance(AbstractJob):
     
     def get_batch(self, size=5):
         """
-        Gets a batch greater than the size requested, or all remaining work
-        requests if there are not enough for the batch
+        Gets a batch approximatly the size requested.  Batches may consist
+        of individual workunits or slices containing multiple workunits.  Slices
+        are not guarunteed to match the requested size, and report an appoximate
+        size, so actual batch size can only be approximated.
+        
+        Workunits are stored as a dictionary of lists.  The keys for each list
+        are composed of the values common to other subtasks.  The lists contain
+        the unique values.
         """
-        batch = {}
+        job = self.poll_worker_request()
+        # if this is the TaskInstance, or only a single workunit, just
+        # return it.  It will be faster to deal with just that object
+        if job == self or len(self._worker_requests)==1:
+            return self.pop_worker_request()
+        
         count = 0
-        if self.poll_worker_request() and count < size:
-            job = pop_worker_request()
-            if job == self:
-                if len(self._worker_requests) == 1:
-                    return
-                pass
-            key = (job.task_key,job.subtask_key,job.args)
-            try:
-                batch[key].append(job.workunit)
-            except KeyError:
-                batch[key] = [job.workunit]
-            count += job.batch
+        workunits = []
+        while job and count < size:
+            # batches are only allowed to exceed the batch size by 25% unless
+            # there are no slices in the batch.  If the limit has been exceeded
+            # break and return the current batch.
+            if job.size > (size-count)+(size/4) and count:
+                break
+            workunits.append(job)
+            count += job.size
+            self.pop_worker_request()
+            job = self.poll_worker_request()
+        batch = Batch(workunits)
+        batch.args = self.args
+        batch.task_instance = self
+        batch.size = count
+
+        batch.subtask_key = workunits[0].subtask_key
+        return batch
     
+    def transmitable(self):
+        return None
 
     def compute_score(self):
         """
@@ -294,6 +312,7 @@ class WorkUnit(AbstractJob):
     """
     task_instance = models.ForeignKey(TaskInstance, related_name='workunits')
     workunit      = models.CharField(max_length=255)
+    size          = models.IntegerField(default=1)
 
     def __getattribute__(self, key):
         if key == 'task_id':
@@ -315,3 +334,77 @@ class WorkUnit(AbstractJob):
             'status':self.status,
             'log_retrieved':self.log_retrieved
         }
+
+    def transmitable(self):
+        return {self.subtask_key:[self.workunit]}
+
+
+class Batch(AbstractJob):
+    """
+    Batch contains a set of WorkUnits.  Batches are a proxy to most properties
+    and methods possessed by WorkUnits.  Executing methods or setting variables
+    on a Batch sets them on all contained WorkUnits.  This allows a Batch to be
+    used transparently almost anywhere a WorkUnit can be.
+    """
+    task_instance = models.ForeignKey(TaskInstance, related_name='batches')
+    size          = models.IntegerField(default=1)
+    
+    def __init__(self, iterator=None):
+        if iterator:
+            workunits = {}
+            batch = {}
+            for workunit in iterator:
+                workunits[workunit.workunit] = workunit
+                try:
+                    batch[workunit.subtask_key].append(workunit.workunit)
+                except KeyError:
+                    batch[workunit.subtask_key] = [workunit.workunit]
+            self.workunits = workunits
+            self._transmitable = batch
+        else:
+            self.workunits = []
+            self._transmitable = {}
+    
+    def __getattribute__(self, key):
+        if key == 'task_id':
+            return self.task_instance.id
+        elif key == 'task_key':
+            return self.task_instance.task_key
+        elif key == 'on_main_worker':
+            return self.task_instance.worker == self.worker
+        return super(Batch, self).__getattribute__(key)
+    
+    def __getitem__(self, key):
+        return self.workunits[key]
+    
+    def __setattr__(self, key, value):
+        """
+        Overridden to save values in contained WorkUnits as well.
+        """
+        super(Batch, self).__setattr__(key, value)
+        if key in ('worker', 'started', 'completed'):
+            for workunit in self.workunits.values():
+                workunit.__dict__[key] = value
+    
+    def __str__(self):
+        return 'Batch: %s @ %s' % (self.workunits.keys(), self.worker)
+    
+    def add(self, workunit):
+        """
+        Adds a workunit to this batch
+        """
+        self.workunits.append(workunit)
+        try:
+            self._transmitable[workunit.subtask_key].append(workunit.workunit)
+        except KeyError:
+            self._transmitable[workunit.subtask_key] = [workunit.workunit]
+    
+    def save(self):
+        """
+        Saves all workunits contained in this batch
+        """
+        for workunit in self.workunits.values():
+            workunit.save()
+    
+    def transmitable(self):
+        return self._transmitable
