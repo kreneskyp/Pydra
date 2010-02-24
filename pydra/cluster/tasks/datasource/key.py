@@ -46,3 +46,27 @@ def instance_from_key(key):
         args = [instance_from_key(i) for i in kids] + list(args)
 
     return cls(*args, **kwargs)
+
+def save_class(cls):
+    """
+    Serialize a class handle.
+    """
+
+    return cls.__name__, cls.__module__
+
+def restore_class(cls, g=globals()):
+    """
+    Deserialize a class identifier.
+    """
+
+    name, module = cls
+
+    if name in g:
+        return g[name]
+
+    try:
+        m = __import__(module, g)
+        if hasattr(m, name):
+            return getattr(m, name)
+    except ImportError:
+        pass
