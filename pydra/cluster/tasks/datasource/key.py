@@ -54,18 +54,25 @@ def save_class(cls):
 
     return cls.__name__, cls.__module__
 
-def restore_class(cls, g=globals()):
+def restore_class(cls, g={}, l={}):
     """
     Deserialize a class identifier.
+
+    g and l are dicts of globals and locals. If provided, l and then g will
+    be searched for the class to restore, before attempting to re-import the
+    original class module.
     """
 
     name, module = cls
+
+    if name in l:
+        return l[name]
 
     if name in g:
         return g[name]
 
     try:
-        m = __import__(module, g)
+        m = __import__(module, g, l, fromlist=[module])
         if hasattr(m, name):
             return getattr(m, name)
     except ImportError:
