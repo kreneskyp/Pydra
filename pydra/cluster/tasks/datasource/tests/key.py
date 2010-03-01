@@ -6,15 +6,23 @@ from pydra.cluster.tasks.datasource.key import save_class, restore_class
 
 class InstanceTest(unittest.TestCase):
 
-    def setUp(self):
+    def test_trivial(self):
         import socket
-        self.sock_class = socket.socket
+        sock_class = socket.socket
         del socket
 
-    def test_save_restore(self):
-        saved_class = save_class(self.sock_class)
+        saved_class = save_class(sock_class)
         restored_class = restore_class(saved_class)
-        self.assertEqual(restored_class, self.sock_class)
+        self.assertEqual(restored_class, sock_class)
+
+    def test_deep(self):
+        from xml.sax.handler import ContentHandler
+        ch_class = ContentHandler
+        del ContentHandler
+
+        saved_class = save_class(ch_class)
+        restored_class = restore_class(saved_class)
+        self.assertEqual(restored_class, ch_class)
 
 if __name__ == "__main__":
     import os.path
