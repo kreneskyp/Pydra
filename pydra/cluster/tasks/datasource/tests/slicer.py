@@ -2,6 +2,7 @@
 
 import unittest
 
+from pydra.cluster.tasks.datasource.key import instance_from_key
 from pydra.cluster.tasks.datasource.slicer import IterSlicer, MapSlicer, LineSlicer
 
 class IterSlicerTest(unittest.TestCase):
@@ -51,6 +52,14 @@ class LineSlicerTest(unittest.TestCase):
     def test_key(self):
 
         self.assertTrue(hasattr(self.slicer, "key") and self.slicer.key)
+
+    def test_state(self):
+
+        l = [next(self.slicer)]
+        saved = self.slicer.key
+        restored = instance_from_key(saved)
+        l.append(next(restored))
+        self.assertEqual([51, 108], l)
 
 if __name__ == "__main__":
     unittest.main()

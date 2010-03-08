@@ -54,28 +54,39 @@ class LineSlicer(IterSlicer):
         self.handle = handle
         self.sep = sep
 
-        self.next_sep = self.find_sep(0)
+        self.handle.seek(0)
+        self._state = self.find_sep()
 
     def next(self):
-        self.next_sep = self.find_sep(self.next_sep)
-        if self.next_sep is None:
+        self._state = self.find_sep()
+        if self._state is None:
             raise StopIteration
-        return self.next_sep
+        return self._state
 
-    def find_sep(self, starting_point):
+    def find_sep(self):
         position = self.handle.tell()
         count = 80
-        while True:
-            s = self.handle.read(count)
-            if not s:
-                # EOF
-                return None
+        s = ""
+        temp = self.handle.read(count)
+        while temp:
+            s += temp
             index = s.find(self.sep)
             if index != -1:
                 # Update file handle
-                position += index
-                self.handle.seek(position + 1)
+                self.handle.seek(position + index + 1)
                 # Update approximate count
                 count = mma(count, index, 100)
 
-                return position
+                return position + index
+            temp = self.handle.read(count)
+        # EOF
+        return None
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self._state = value
+        self.handle.seek(value + 1)
