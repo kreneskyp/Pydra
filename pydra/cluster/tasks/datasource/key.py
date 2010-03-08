@@ -72,7 +72,8 @@ def keyable(c):
             self._key_kwargs,
             self.state)
 
-    c.state = None
+    if not hasattr(c, "state"):
+        c.state = None
     c.__init__ = keyinit(c.__init__)
     c.key = property(keygetter)
 
