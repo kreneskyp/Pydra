@@ -10,13 +10,13 @@ class IterSlicer(object):
 
     def __init__(self, iterable):
         self.iterable = iterable
-        self.iterator = iter(iterable)
+        self.state = iter(iterable)
 
     def __iter__(self):
         return self
 
     def next(self):
-        return next(self.iterator)
+        return next(self.state)
 
 @keyable
 class MapSlicer(IterSlicer):
