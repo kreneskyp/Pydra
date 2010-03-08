@@ -53,8 +53,10 @@ def keyinit(f):
         while args and hasattr(args[0], "key"):
             kids.append(args[0].key)
             args = args[1:]
-           
-        self.key = (save_class(self.__class__), kids, args, kwargs)
+
+        self._key_kids = kids
+        self._key_args = args
+        self._key_kwargs = kwargs
 
     return init
 
@@ -63,7 +65,17 @@ def keyable(c):
     Simple class decorator to make a class keyable.
     """
 
+    def keygetter(self):
+        return (save_class(c),
+            self._key_kids,
+            self._key_args,
+            self._key_kwargs,
+            self.state)
+
+    c.state = None
     c.__init__ = keyinit(c.__init__)
+    c.key = property(keygetter)
+
     return c
 
 def instance_from_key(key):
@@ -71,11 +83,14 @@ def instance_from_key(key):
     Instantiate an object from a key.
     """
 
-    cls, kids, args, kwargs = key
+    cls, kids, args, kwargs, state = key
 
     cls = restore_class(cls)
 
     if kids:
         args = [instance_from_key(i) for i in kids] + list(args)
 
-    return cls(*args, **kwargs)
+    inst = cls(*args, **kwargs)
+    inst.state = state
+
+    return inst
