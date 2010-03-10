@@ -54,12 +54,14 @@ class LineSlicer(IterSlicer):
         self.handle = handle
         self.sep = sep
 
+        self._endpos = None
+
         self.handle.seek(0)
         self._state = self.find_sep()
 
     def next(self):
         self._state = self.find_sep()
-        if self._state is None:
+        if self._state is None or (self._endpos and self._state > self._endpos):
             raise StopIteration
         return self._state
 
@@ -84,9 +86,15 @@ class LineSlicer(IterSlicer):
 
     @property
     def state(self):
-        return self._state
+        if self._endpos:
+            return slice(self._state, self._endpos)
+        else:
+            return self._state
 
     @state.setter
     def state(self, value):
-        self._state = value
-        self.handle.seek(value + 1)
+        if isinstance(value, slice):
+            self._state, self._endpos = value.start, value.stop
+        else:
+            self._state = value
+        self.handle.seek(self._state + 1)

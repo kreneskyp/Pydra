@@ -42,12 +42,13 @@ class LineSlicerTest(unittest.TestCase):
         self.s = """
             Jackdaws love my big sphinx of quartz.
             The quick brown fox jumps over the lazy dog.
+            Pack my box with five dozen liquor jugs.
             """
         self.slicer = LineSlicer(self.s)
 
     def test_trivial(self):
 
-        self.assertEqual([51, 108], [pos for pos in self.slicer])
+        self.assertEqual([51, 108, 161], [pos for pos in self.slicer])
 
     def test_key(self):
 
@@ -60,6 +61,13 @@ class LineSlicerTest(unittest.TestCase):
         restored = instance_from_key(saved)
         l.append(next(restored))
         self.assertEqual([51, 108], l)
+
+    def test_state_slice(self):
+
+        self.slicer.state = slice(50, 150)
+        self.assertEqual([51, 108], [pos for pos in self.slicer])
+        self.slicer.state = slice(100, 200)
+        self.assertEqual([108, 161], [pos for pos in self.slicer])
 
 if __name__ == "__main__":
     unittest.main()
