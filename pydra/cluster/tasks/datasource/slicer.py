@@ -59,6 +59,23 @@ class LineSlicer(IterSlicer):
         self.handle.seek(0)
         self._state = self.find_sep()
 
+    def __getitem__(self, key):
+        if not isinstance(key, slice):
+            raise TypeError
+        # Hack together a copy of ourselves, set its state, and then expand
+        # the final slice to cover the last sep in the handle
+        ls = LineSlicer(self.handle, self.sep)
+        start, stop = key.start, key.stop
+        if start > stop:
+            start, stop = stop, start
+        ls.state = stop
+        stop = ls.find_sep()
+        if stop:
+            ls.state = slice(start, stop)
+        else:
+            ls.state = start
+        return ls
+
     def next(self):
         self._state = self.find_sep()
         if self._state is None or (self._endpos and self._state > self._endpos):

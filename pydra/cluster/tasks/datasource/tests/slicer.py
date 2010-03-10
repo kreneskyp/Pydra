@@ -69,5 +69,10 @@ class LineSlicerTest(unittest.TestCase):
         self.slicer.state = slice(100, 200)
         self.assertEqual([108, 161], [pos for pos in self.slicer])
 
+    def test_getitem(self):
+
+        ls = self.slicer[50:100]
+        self.assertEqual([51, 108], [pos for pos in ls])
+
 if __name__ == "__main__":
     unittest.main()
