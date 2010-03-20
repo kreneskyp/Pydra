@@ -218,19 +218,17 @@ class WorkerManager(Module):
 
 
     def run_task(self, avatar, worker_key, key, version, args={}, \
-            subtask_key=None,workunit_key=None, main_worker=None, task_id=None):
+            workunits=None, main_worker=None, task_id=None):
         """
-        Runs a task on this node.  This function should 
+        Runs a task on this node.  This function should
         """
         self.task_manager.retrieve_task(key, version, self._run_task, \
-                self.retrieve_task_failed, \
-                worker_key, args, subtask_key, \
-                workunit_key, main_worker, task_id)
+                self.retrieve_task_failed, worker_key, args, workunits, \
+                main_worker, task_id)
 
 
     def _run_task(self, key, version, task_class, module_search_path, \
-            worker_key, args={}, subtask_key=None, workunit_key=None, \
-            main_worker=None, task_id=None):
+            worker_key, args={}, workunits=None, main_worker=None, task_id=None):
         """
         Runs a task on this node.  The worker scheduler on master makes all
         decisions about which worker to run on.  This method only checks
@@ -250,9 +248,8 @@ class WorkerManager(Module):
         @param main_worker - main worker for this task
         @param task_id - id of task being run
         """
-        logger.info('RunTask:  key=%s  args=%s  sub=%s  w=%s  main=%s' \
-            % (key, '--', subtask_key, workunit_key, \
-            main_worker))
+        logger.info('RunTask:%s  key=%s  sub=%s  main=%s' \
+            % (task_id, key, workunits, main_worker))
         worker = None
 
         with self.__lock:
@@ -261,8 +258,7 @@ class WorkerManager(Module):
                 logger.debug('RunTask - Using existing worker %s' % worker_key)
                 worker = self.workers[worker_key]
                 worker.run_task_deferred = worker.remote.callRemote('run_task',\
-                        key, version, args, subtask_key, workunit_key, \
-                        main_worker, task_id)
+                        key, version, args, workunits, main_worker, task_id)
             else:
                 # worker not running. start it saving the information required
                 # to start the subtask.  This function will return a deferred
@@ -296,13 +292,12 @@ class WorkerManager(Module):
             worker.key = key
             worker.version = version
             worker.args = args
-            worker.workunit_key = workunit_key
             worker.main_worker = main_worker
             worker.task_id=task_id
             if worker_key == main_worker:
-                worker.local_subtask = subtask_key
+                worker.local_workunits = workunits
             else:
-                worker.subtask_key = subtask_key
+                worker.workunits = workunits
 
             return worker.run_task_deferred
 
@@ -316,8 +311,8 @@ class WorkerManager(Module):
         """
         sent_deferred = worker.run_task_deferred
         deferred = self._run_task(worker.key, worker.version, None, None, \
-                worker.worker_key, worker.args, worker.subtask_key, \
-                worker.workunit_key, worker.main_worker, worker.task_id)
+                worker.worker_key, worker.args, worker.workunits, \
+                worker.main_worker, worker.task_id)
         deferred.addCallback(sent_deferred.callback)
 
 
@@ -333,15 +328,14 @@ class WorkerManager(Module):
         """
         with self.__lock:
             worker = self.workers[worker_key]
-
-            if worker.main_worker == worker_key and not worker.local_subtask:
+            if worker.main_worker == worker_key and not worker.local_workunits:
                 self.emit('WORKER_FINISHED', worker)
                 worker.finished = True
 
             else:
                 # worker may be reused to clear all args to avoid confusion
-                worker.subtask_key = None
-                worker.local_subtask = None
+                worker.workunits = None
+                worker.local_workunits = None
 
             deferred = self.proxy_to_master('send_results', worker_key, \
                                                 results, *args, **kwargs)

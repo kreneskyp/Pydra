@@ -146,9 +146,9 @@
                 width:20px;
             }
             
-            .popup {
+            #kill {
                 width:500px;
-                border: 1px solid black;
+                left:-250px;
             }
             
             #kill h2 {
@@ -161,12 +161,19 @@
                 background-color:#ee9c98;
                 border: 1px solid black;
                 color:#550000;
-                margin:5px;
-                margin-left:auto;
-                margin-right:auto;
+                cursor:pointer;
+                margin:15px auto 0px auto;
                 width: 75px;
                 text-align:center;
+                -moz-border-radius: 5px;
+                -webkit-border-radius: 5px;
             }
+            
+            #kill .content {
+                border-bottom:1px solid black;
+            }
+            
+            #kill p {margin-bottom:10px;}
             
             .button_cancel {display:none;}
         </style>
@@ -350,16 +357,15 @@
 
 {% block popups %}
 <div id="kill" class="popup">
-    <div class="popup_inner">
+    <div class="inner">
         <h2>Terminate: <span></span></h2>
-            
-        <div class="content">Terminating a process may have unexpected results.
-        
-            By default this will send a SIGTERM to the worker process allowing it to shutdown as gracefully as possible.
-            Optionally you may send a SIGKILL by checking the box below.  Terminating a process with
-            SIGKILL may result in lost file handles or other lost resources.
+        <div class="button_close button"></div>
+        <div class="content"><p>Terminating a process may have unexpected results.</p>
+            <p><input type="checkbox" id="sigkill"> <b>SIGKILL - </b>By default a SIGTERM is sent to the worker process allowing it to shutdown as gracefully as possible.
+            Optionally you may send a SIGKILL.  Terminating a process with
+            SIGKILL may result in lost file handles or other lost resources.</p>
         </div>
-        <input type="checkbox" id="sigkill"> SIGKILL
+        
         <div class="submit">Terminate</div>
     </div>
 </div>

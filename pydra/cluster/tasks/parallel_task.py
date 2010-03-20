@@ -128,6 +128,12 @@ class ParallelTask(Task):
         logger.debug('[%s] Paralleltask - initial work assigned' % self.get_worker().worker_key)
 
 
+    def _batch_complete(self, results):
+        for workunit, result, failed in results:
+            if not failed:
+                self._work_unit_complete(results, workunit)
+
+
     def _work_unit_complete(self, results, index):
         """
         A work unit completed.  Handle the common management tasks to remove the data
