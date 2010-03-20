@@ -51,7 +51,7 @@ class TaskSyncServer(Module):
         """
         tarzip = '%s/%s_%s' % (TASKS_SYNC_CACHE, pkg_name, version)
         if TASKS_SYNC_CACHE and os.path.exists(tarzip):
-            out_file = open(tarzip, 'w').read()
+            out_file = open(tarzip, 'r').read()
         else:
             str_file = cStringIO.StringIO()
             tar = tarfile.open(mode='w', fileobj=str_file)
