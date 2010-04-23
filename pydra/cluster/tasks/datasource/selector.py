@@ -58,3 +58,15 @@ class FileSelector(object):
         h.close()
         self._handle = m
         return m
+
+@keyable
+class SQLSelector(object):
+    """
+    Selects rows from a SQL database.
+    """
+
+    def __init__(self, db):
+        if hasattr(db, "handle"):
+            self.handle = db.handle
+        else:
+            self.handle = db
