@@ -18,6 +18,9 @@ class SQLiteBackend(object):
 
         self.handle = None
 
+    def __del__(self):
+        self.disconnect()
+
     def connect(self, db):
         """
         Open a database.
@@ -28,10 +31,12 @@ class SQLiteBackend(object):
         database.
         """
 
-        self.handle = pysqlite2.dbapi2.Connection(db)
+        if not self.handle:
+            self.handle = pysqlite2.dbapi2.Connection(db)
 
     def disconnect(self):
-        self.handle.close()
+        if self.handle:
+            self.handle.close()
 
     @property
     def connected(self):
