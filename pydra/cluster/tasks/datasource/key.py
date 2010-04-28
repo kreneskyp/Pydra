@@ -4,6 +4,38 @@ This probably shouldn't be specific to the datasource API.
 
 import functools
 
+"""
+Tools for automatic serialization and deserialization.
+
+This module introduces two concepts: Keys and state. A class may be defined
+as "keyable," meaning that its instances will have an attribute called "key,"
+which may be used to recreate that instance at another run time, e.g. after
+pickling and thawing.
+
+Keys always have the following format:
+
+(cls, children, args, kwargs, state)
+
+~ cls is an identifier built from primitives that can be safely pickled.
+~ children is a list of keyable args; see below.
+~ args is the list of positional arguments given to __init__.
+~ kwargs is the dict of keyword arguments given to __init__.
+~ state is a class-definable primitive; see below.
+
+If any of the original args of the instance are keyable, they will be
+serialized in the key as well, in the children list. In order for this to
+work, there is currently a restriction, as follows: Keyable args must come
+before any non-keyable args if they are to be serialized.
+
+If a class stores internal state in its instance, and wishes for that state
+to be restored automatically upon reinstantiation, it may make available an
+attribute called "state," which will automatically be saved and restored.
+(For ease of use, it is highly recommended to use a property for the state
+attribute.)
+
+~ C.
+"""
+
 def save_class(cls):
     """
     Serialize a class handle.
@@ -18,6 +50,8 @@ def restore_class(cls, g={}, l={}):
     g and l are dicts of globals and locals. If provided, l and then g will
     be searched for the class to restore, before attempting to re-import the
     original class module.
+
+    Returns the class on success, or None on failure.
     """
 
     name, module = cls
@@ -38,7 +72,7 @@ def restore_class(cls, g={}, l={}):
 def keyinit(f):
     """
     Simple decorator to be placed on a class's __init__. Instances of the
-    class will have a _key attribute, which can be used to serialize and
+    class will have a key attribute, which can be used to serialize and
     deseralize the class.
 
     Keyable classes can be nested inside other keyable classes and will still
@@ -82,11 +116,15 @@ def keyable(c):
 def instance_from_key(key):
     """
     Instantiate an object from a key.
+
+    Returns None if the key could not be used.
     """
 
     cls, kids, args, kwargs, state = key
 
     cls = restore_class(cls)
+    if not cls:
+        return None
 
     if kids:
         args = [instance_from_key(i) for i in kids] + list(args)
