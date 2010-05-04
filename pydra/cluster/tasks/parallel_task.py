@@ -21,7 +21,7 @@ from __future__ import with_statement
 from threading import Thread, RLock
 from twisted.internet import reactor, threads
 
-from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED, STATUS_CANCELLED,\
+from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 
 import logging

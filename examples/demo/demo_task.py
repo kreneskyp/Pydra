@@ -18,7 +18,7 @@
 """
 
 from pydra.cluster.tasks import Task, TaskContainer, ParallelTask
-#from pydra.cluster.tasks.datasource import DatasourceList
+from pydra.cluster.tasks.datasource.slicer import IterSlicer
 import time
 
 from django import forms
@@ -124,7 +124,7 @@ class TestParallelTask(ParallelTask):
     def __init__(self):
         ParallelTask.__init__(self)
         self.set_subtask(TestTask, 'subtask')
-        #self.input = DatasourceList(range(10), kwargs_key='start')
+        self.input = IterSlicer(range(10))
         self._data = range(10)
         self._finished = []
 
