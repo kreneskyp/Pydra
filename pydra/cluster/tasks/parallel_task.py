@@ -31,7 +31,6 @@ class ParallelTask(Task):
     """
     ParallelTask - is a task that can be broken into discrete work units
     """
-    _lock = None                # general lock
     _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
@@ -41,7 +40,7 @@ class ParallelTask(Task):
 
     def __init__(self, msg=None):
         Task.__init__(self, msg)
-        self._lock = RLock()
+        self._lock = RLock()             # general lock
         self.subtask = None              # subtask that is parallelized
         self.__subtask_class = None      # class of subtask
         self.__subtask_args = None       # args for initializing subtask
