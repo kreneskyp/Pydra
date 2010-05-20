@@ -118,9 +118,6 @@ class TestParallelTask(ParallelTask):
     """
     description = 'A demo task illustrating a Parallel task.  This task runs 5 TestTasks at the same time'
 
-    _data = None
-    _finished = None
-
     def __init__(self):
         ParallelTask.__init__(self)
         self.set_subtask(TestTask, 'subtask')
