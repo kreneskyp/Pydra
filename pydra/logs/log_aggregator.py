@@ -149,6 +149,10 @@ class MasterLogAggregator(Module):
         @param workunit - id of workunit, default=None
         """
         logger.debug('Receiving Log: %s %s %s' % (task, subtask, workunit))
+
+        if not response:
+            logger.debug("Bogus log: %s %s %s" % (task, subtask, workunit))
+            return
         log = zlib.decompress(response)
         dir, path = task_log_path(task, subtask, workunit)
         
