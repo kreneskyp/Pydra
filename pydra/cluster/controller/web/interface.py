@@ -18,7 +18,9 @@
 """
 
 import datetime
+import StringIO
 import sys
+import traceback
 
 from pydra.cluster.controller.amf.authenticator import AMFAuthenticator
 import simplejson
@@ -30,7 +32,6 @@ from twisted.web.error import ForbiddenResource, NoResource, Error
 
 from pydra.cluster.auth.rsa_auth import load_crypto
 from pydra.cluster.module import InterfaceModule
-from pydra.util.traceback import FileList
 import pydra_settings
 
 # init logging
@@ -132,15 +133,19 @@ class FunctionResource(resource.Resource):
                     return simplejson.dumps(results)
 
             except Exception, e:
-                import traceback
-                type, value, traceback_ = sys.exc_info()
-                traceback.print_tb(traceback_, limit=10, file=sys.stdout)
-                filelist = FileList()
-                traceback.print_tb(traceback_, limit=10, file=filelist)
+                chaff, chaff, tb = sys.exc_info()
+
+                buf = StringIO.StringIO()
+                traceback.print_tb(tb, limit=10, file=buf)
+                traces = buf.getvalue()
+                buf.close()
+
+                sys.stdout.write(traces)
+
                 logger.error('FunctionResource - exception in mapped function \
                              [%s] %s' % (self.function, e))
                 error = simplejson.dumps({'exception':str(e), \
-                                          'traceback':filelist})
+                                          'traceback':traces})
                 req.setResponseCode(500)
                 req.setHeader("content-type", "text/html")
                 return error
