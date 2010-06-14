@@ -1,7 +1,3 @@
-"""
-This probably shouldn't be specific to the datasource API.
-"""
-
 import functools
 
 """
@@ -39,6 +35,8 @@ attribute.)
 def save_class(cls):
     """
     Serialize a class handle.
+
+    Not intended for public use.
     """
 
     return cls.__name__, cls.__module__
@@ -52,6 +50,8 @@ def restore_class(cls, g={}, l={}):
     original class module.
 
     Returns the class on success, or None on failure.
+
+    Not intended for public use.
     """
 
     name, module = cls
@@ -69,7 +69,7 @@ def restore_class(cls, g={}, l={}):
     except ImportError:
         pass
 
-def keyinit(f):
+def keyable_init(f):
     """
     Simple decorator to be placed on a class's __init__. Instances of the
     class will have a key attribute, which can be used to serialize and
@@ -77,6 +77,9 @@ def keyinit(f):
 
     Keyable classes can be nested inside other keyable classes and will still
     serialize properly.
+
+    Not intended for public use; when possible, use @keyable on your classes
+    instead of using this decorator directly.
     """
 
     @functools.wraps(f)
@@ -108,12 +111,13 @@ def keyable(c):
 
     if not hasattr(c, "state"):
         c.state = None
-    c.__init__ = keyinit(c.__init__)
+
+    c.__init__ = keyable_init(c.__init__)
     c.key = property(keygetter)
 
     return c
 
-def instance_from_key(key):
+def thaw(key):
     """
     Instantiate an object from a key.
 
@@ -127,7 +131,7 @@ def instance_from_key(key):
         return None
 
     if kids:
-        args = [instance_from_key(i) for i in kids] + list(args)
+        args = [thaw(i) for i in kids] + list(args)
 
     inst = cls(*args, **kwargs)
     inst.state = state
