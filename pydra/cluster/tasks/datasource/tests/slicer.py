@@ -2,8 +2,8 @@
 
 import unittest
 
-from pydra.cluster.tasks.datasource.key import instance_from_key
 from pydra.cluster.tasks.datasource.slicer import IterSlicer, MapSlicer, LineSlicer
+from pydra.util.key import instance_from_key
 
 class IterSlicerTest(unittest.TestCase):
 

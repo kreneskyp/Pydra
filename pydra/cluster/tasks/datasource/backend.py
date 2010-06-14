@@ -4,7 +4,7 @@ except ImportError:
     pysqlite2 = None
     print "Warning: pysqlite2 couldn't be found, SQLiteBackend will not work."
 
-from pydra.cluster.tasks.datasource.key import keyable
+from pydra.util.key import keyable
 
 @keyable
 class SQLiteBackend(object):

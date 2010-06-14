@@ -1,6 +1,6 @@
 import cStringIO
 
-from pydra.cluster.tasks.datasource.key import keyable
+from pydra.util.key import keyable
 
 @keyable
 class IterSlicer(object):

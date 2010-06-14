@@ -2,7 +2,7 @@
 
 import unittest
 
-from pydra.cluster.tasks.datasource.key import save_class, restore_class
+from pydra.util.key import save_class, restore_class
 
 class InstanceTest(unittest.TestCase):
 
