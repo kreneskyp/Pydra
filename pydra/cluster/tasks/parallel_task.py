@@ -23,6 +23,7 @@ from twisted.internet import reactor, threads
 
 from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
+from pydra.util.key import thaw
 
 import logging
 logger = logging.getLogger('root')
@@ -37,14 +38,18 @@ class ParallelTask(Task):
     _workunit_total = 0
     _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
     subtask_key = None          # cached key from subtask
+    _ds = None                  # Datasource slicer.
 
-    def __init__(self, msg=None):
+    def __init__(self, msg=None, datasource=None):
         Task.__init__(self, msg)
         self._lock = RLock()             # general lock
         self.subtask = None              # subtask that is parallelized
         self.__subtask_class = None      # class of subtask
         self.__subtask_args = None       # args for initializing subtask
         self.__subtask_kwargs = None     # kwargs for initializing subtask
+
+        if datasource:
+            self._ds = thaw(datasource)
 
 
     def __getattribute__(self, key):
