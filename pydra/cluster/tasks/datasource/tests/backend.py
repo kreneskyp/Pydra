@@ -2,12 +2,12 @@
 
 import unittest
 
-from pydra.cluster.tasks.datasource.backend import SQLiteBackend
+from pydra.cluster.tasks.datasource.backend import SQLBackend
 
 class InstanceTest(unittest.TestCase):
 
     def test_sqlite(self):
-        sb = SQLiteBackend()
+        sb = SQLBackend("sqlite")
         sb.connect(":memory:")
 
 if __name__ == "__main__":
