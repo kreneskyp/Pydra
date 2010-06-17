@@ -29,7 +29,6 @@ import pydra_settings as settings
 from pydra.util import makedirs
 
 LOG_FORMAT = "%%(asctime)s [%%(levelname)s] %s %%(message)s"
-LOG_FORMAT_TASK = "%(asctime)s [%(levelname)s] %(message)s"
 
 INITED_FILES = []
 INIT_LOCK = Lock()
@@ -134,7 +133,7 @@ def get_task_logger(worker, task, subtask=None, workunit=None):
     logger = logging.getLogger(logger_name)
     handler = FileHandler(filename)
     
-    formatter = logging.Formatter(LOG_FORMAT_TASK)
+    formatter = logging.Formatter(LOG_FORMAT % ("[%s]" % worker))
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(settings.LOG_LEVEL)
