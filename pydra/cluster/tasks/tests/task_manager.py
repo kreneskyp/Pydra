@@ -31,7 +31,6 @@ import pydra_settings
 from pydra.cluster.tasks import TaskNotFoundException, packaging
 from pydra.cluster.tasks.task_manager import TaskManager
 from pydra.models import TaskInstance
-from pydra.util.dir_tools import init_dir
 
 class TaskManager_Test(unittest.TestCase):
 
@@ -48,7 +47,7 @@ class TaskManager_Test(unittest.TestCase):
         # setup manager with an internal cache we can alter
         self.manager = TaskManager(None, True)
         self.tasks_dir_internal = '/var/lib/pydra/test_tasks_internal'
-        init_dir(self.tasks_dir_internal)
+        os.makedirs(self.tasks_dir_internal)
         self.manager.tasks_dir_internal = self.tasks_dir_internal
 
         # find at least one task package to use for testing
@@ -122,7 +121,7 @@ class TaskManager_Test(unittest.TestCase):
         internal_folder = os.path.join(self.tasks_dir_internal,
                     self.package, hash)
         pkg_dir = '%s/%s' % (pydra_settings.TASKS_DIR, self.package)
-        init_dir(pkg_dir)
+        os.makedirs(pkg_dir)
         shutil.copytree(pkg_dir, internal_folder)
         
         
