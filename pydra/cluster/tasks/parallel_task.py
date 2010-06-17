@@ -18,15 +18,14 @@
 """
 
 from __future__ import with_statement
+
+import logging
 from threading import Thread, RLock
 from twisted.internet import reactor, threads
 
 from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
 from pydra.util.key import thaw
-
-import logging
-logger = logging.getLogger('root')
 
 class ParallelTask(Task):
     """
@@ -50,6 +49,8 @@ class ParallelTask(Task):
 
         if datasource:
             self._ds = thaw(datasource)
+
+        self.logger = logging.getLogger('root')
 
 
     def __getattribute__(self, key):
@@ -105,7 +106,8 @@ class ParallelTask(Task):
         """        
         data, index = self.get_work_unit()
         while data is not None:
-            logger.debug('[%s] Paralleltask - assigning remote work: key=%s, args=%s' % (self.get_worker().worker_key, '--', index))
+            self.logger.debug('Paralleltask - assigning remote work: key=%s, args=%s'
+                % ('--', index))
             self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
             data, index = self.get_work_unit()
 
@@ -126,10 +128,10 @@ class ParallelTask(Task):
         if kwargs and kwargs.has_key('data'):
             self._data = kwargs['data']
             self._workunit_total = len(self._data)
-            logger.debug('[%s] Paralleltask - data was passed in!' % self.get_worker().worker_key)
+            self.logger.debug('Paralleltask - data was passed in!')
         # request initial workers
         self._request_workers()
-        logger.debug('[%s] Paralleltask - initial work assigned' % self.get_worker().worker_key)
+        self.logger.debug('Paralleltask - initial work assigned!')
 
 
     def _batch_complete(self, results):
@@ -145,7 +147,7 @@ class ParallelTask(Task):
 
         This method *MUST* lock while it is altering the lists of data
         """
-        logger.debug('[%s] Paralleltask - Work unit completed' % self.get_worker().worker_key)
+        self.logger.debug('Paralleltask - Work unit completed')
         with self._lock:
             # run the task specific post process
             self.work_unit_complete(self._data_in_progress[index], results)
@@ -165,7 +167,7 @@ class ParallelTask(Task):
             # the queue the waiting worker will be selected automatically by
             # the scheduler.  Releasing it must be explicit though.
             if not self._data_in_progress:
-                logger.debug('[%s] ParallelTask - releasing a worker' % self.get_worker().worker_key)
+                self.logger.debug('ParallelTask - releasing a worker')
                 self.get_worker().request_worker_release()
 
             self._workunit_completed += 1
@@ -173,7 +175,7 @@ class ParallelTask(Task):
             #check for more work
             if not (self._data_in_progress or self._data):
                 #all work is done, call the task specific function to combine the results 
-                logger.debug('[%s] Paralleltask - all workunits complete, calling task post process' % self.get_worker().worker_key)
+                self.logger.debug('Paralleltask - all workunits complete, calling task post process')
                 results = self.work_complete()
                 self._complete(results)
                 return
@@ -183,7 +185,7 @@ class ParallelTask(Task):
         """
         A worker failed while working.  re-add the data to the list
         """
-        logger.warning('[%s] Paralleltask - Worker failure during workunit' % self.get_worker().worker_key)
+        self.logger.warning('Paralleltask - Worker failure during workunit')
         with self._lock:
             #remove data from in progress
             data = self._data_in_progress[index]
