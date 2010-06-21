@@ -299,11 +299,13 @@ class Task(object):
         return self._status
 
 
-    def work(self, **kwargs):
+    def work(self, *args, **kwargs):
         """
-        Function to be overrided by users to perform the real work
+        Do the actual computation of the task.
+
+        This method is abstract and must be implemented by any subclasses.
         """
-        pass
+        raise NotImplementedError
 
 
     def progress(self):
