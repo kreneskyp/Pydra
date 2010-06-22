@@ -304,3 +304,14 @@ class Task(object):
         Function to be overrided by users to perform the real work
         """
         pass
+
+
+    def progress(self):
+        """
+        Return the current progress of the task, as an integer between 0 and
+        100.
+
+        The default implementation returns 100 if the task is finished and 0
+        otherwise.
+        """
+        return 100 if self.status == STATUS_COMPLETE else 0
