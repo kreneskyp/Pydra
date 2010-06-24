@@ -33,27 +33,6 @@ from pydra.cluster.tasks.task_manager import TaskManager
 from pydra.models import TaskInstance
 from pydra.util.dir_tools import init_dir
 
-def suite():
-    """
-    Build a test suite from all the test suites in this module
-    """
-    task_manager_suite = unittest.TestSuite()
-    task_manager_suite.addTest(TaskManager_Test('test_init_cache'))
-    task_manager_suite.addTest(TaskManager_Test('test_init_package'))
-    task_manager_suite.addTest(TaskManager_Test('test_init_package_empty_package'))
-    task_manager_suite.addTest(TaskManager_Test('test_init_package_multiple_versions'))
-    task_manager_suite.addTest(TaskManager_Test('test_autodiscover'))
-    task_manager_suite.addTest(TaskManager_Test('test_add_package'))
-    task_manager_suite.addTest(TaskManager_Test('test_add_package_with_dependency'))
-    task_manager_suite.addTest(TaskManager_Test('test_add_package_with_missing_dependency'))
-    task_manager_suite.addTest(TaskManager_Test('test_retrieve_task'))
-    task_manager_suite.addTest(TaskManager_Test('test_lazy_init'))
-    task_manager_suite.addTest(TaskManager_Test('test_lazy_init_with_dependency'))
-    task_manager_suite.addTest(TaskManager_Test('test_lazy_init_with_missing_dependency'))   
-    return task_manager_suite
-
-
-
 class TaskManager_Test(unittest.TestCase):
 
     def setUp(self):
@@ -284,3 +263,6 @@ class RetrieveHelper():
         
     def errback(self):
         pass
+
+if __name__ == "__main__":
+    unittest.main()
