@@ -45,15 +45,12 @@ class TaskManager_Test(unittest.TestCase):
             self.completion[task] = None
 
         # setup manager with an internal cache we can alter
-        self.manager = TaskManager(None, True)
-        self.tasks_dir_internal = '/var/lib/pydra/test_tasks_internal'
-        if not os.path.isdir(self.tasks_dir_internal):
-            os.makedirs(self.tasks_dir_internal)
-        self.manager.tasks_dir_internal = self.tasks_dir_internal
+        self.manager = TaskManager(None, lazy_init=True)
+        pydra_settings.TASK_DIR_INTERNAL = '/var/lib/pydra/test_tasks_internal'
 
         # find at least one task package to use for testing
         self.package = 'demo'
-        self.package_dir = '%s/%s' % (self.tasks_dir_internal, self.package)
+        self.package_dir = '%s/%s' % (self.manager.tasks_dir_internal, self.package)
 
         self.task_instances = []
         for task in self.tasks [:2]:
@@ -93,14 +90,14 @@ class TaskManager_Test(unittest.TestCase):
         for task in self.task_instances:
             task.delete()
         self.clear_cache()
-        os.removedirs(self.tasks_dir_internal)
+        os.removedirs(self.manager.tasks_dir_internal)
 
 
     def create_cache_entry(self, hash='FAKE_HASH'):
         """
         Creates an entry in the task_cache_internal
         """
-        internal_folder = os.path.join(self.tasks_dir_internal,
+        internal_folder = os.path.join(self.manager.tasks_dir_internal,
                     self.package, hash)
         pkg_dir = '%s/%s' % (pydra_settings.TASKS_DIR, self.package)
         if not os.path.isdir(pkg_dir):
@@ -124,6 +121,13 @@ class TaskManager_Test(unittest.TestCase):
         if os.path.exists(self.package_dir):
             for version in os.listdir(self.package_dir):
                 shutil.rmtree('%s/%s' % (self.package_dir, version))
+
+
+    def test_trivial(self):
+        """
+        Test the basic init and teardown of the test harness and TaskManager.
+        """
+        pass
 
 
     def test_listtasks(self):

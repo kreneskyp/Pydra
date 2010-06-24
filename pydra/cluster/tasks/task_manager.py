@@ -55,7 +55,7 @@ class TaskManager(Module):
 
     _shared = [
         'get_task',
-    ]    
+    ]
 
     lazy_init = False
 
@@ -68,7 +68,7 @@ class TaskManager(Module):
         """
         
         self._interfaces = [
-            self.list_tasks, 
+            self.list_tasks,
             self.task_history,
             self.task_history_detail,
             self.task_log,
@@ -83,14 +83,17 @@ class TaskManager(Module):
         if lazy_init:
             self.lazy_init = True
         else:
-            self._listeners['MANAGER_INIT']=self.init_task_cache
+            self._listeners['MANAGER_INIT'] = self.init_task_cache
 
         self.tasks_dir = pydra_settings.TASKS_DIR
         self.tasks_dir_internal = pydra_settings.TASKS_DIR_INTERNAL
 
+        if not os.path.isdir(self.tasks_dir_internal):
+            os.makedirs(self.tasks_dir_internal)
+
         # full_task_key or pkg_name: pkg_object
         # preserved for both compatibility and efficiency
-        self.registry = {} 
+        self.registry = {}
         self.package_dependency = graph.DirectedGraph()
 
         self._task_callbacks = {} # task_key : callback list
@@ -221,6 +224,7 @@ class TaskManager(Module):
         files = os.listdir(self.tasks_dir_internal)
         for pkg_name in files:
             self.init_package(pkg_name)
+
         # trigger the autodiscover procedure immediately
         if self.scan_interval:
             reactor.callLater(0, self.autodiscover)
