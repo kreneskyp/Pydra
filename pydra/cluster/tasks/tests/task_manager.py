@@ -47,7 +47,8 @@ class TaskManager_Test(unittest.TestCase):
         # setup manager with an internal cache we can alter
         self.manager = TaskManager(None, True)
         self.tasks_dir_internal = '/var/lib/pydra/test_tasks_internal'
-        os.makedirs(self.tasks_dir_internal)
+        if not os.path.isdir(self.tasks_dir_internal):
+            os.makedirs(self.tasks_dir_internal)
         self.manager.tasks_dir_internal = self.tasks_dir_internal
 
         # find at least one task package to use for testing
@@ -92,26 +93,7 @@ class TaskManager_Test(unittest.TestCase):
         for task in self.task_instances:
             task.delete()
         self.clear_cache()
-        os.rmdir(self.tasks_dir_internal)
-        pass
-
-
-    def test_listtasks(self):
-        """
-        Tests list tasks function to verify it returns all the tasks that it should
-        """
-        self.create_cache_entry()
-        self.manager.init_task_cache()
-        tasks = self.manager.list_tasks()
-        self.assertEqual(len(tasks), 6, "There should be 3 registered tasks")
-
-        for task in self.tasks:
-            self.assert_(tasks.has_key(task), 'Task is missing from list tasks')
-            recorded_time = self.completion[task]
-            recorded_time = time.mktime(recorded_time.timetuple()) if recorded_time else None
-            list_time = tasks[task]['last_run']
-            self.assertEqual(recorded_time, list_time, "Completion times for task don't match: %s != %s" % (recorded_time, list_time))
-
+        os.removedirs(self.tasks_dir_internal)
 
 
     def create_cache_entry(self, hash='FAKE_HASH'):
@@ -121,7 +103,8 @@ class TaskManager_Test(unittest.TestCase):
         internal_folder = os.path.join(self.tasks_dir_internal,
                     self.package, hash)
         pkg_dir = '%s/%s' % (pydra_settings.TASKS_DIR, self.package)
-        os.makedirs(pkg_dir)
+        if not os.path.isdir(pkg_dir):
+            os.makedirs(pkg_dir)
         shutil.copytree(pkg_dir, internal_folder)
         
         
@@ -141,7 +124,24 @@ class TaskManager_Test(unittest.TestCase):
         if os.path.exists(self.package_dir):
             for version in os.listdir(self.package_dir):
                 shutil.rmtree('%s/%s' % (self.package_dir, version))
-    
+
+
+    def test_listtasks(self):
+        """
+        Tests list tasks function to verify it returns all the tasks that it should
+        """
+        self.create_cache_entry()
+        self.manager.init_task_cache()
+        tasks = self.manager.list_tasks()
+        self.assertEqual(len(tasks), 6, "There should be 3 registered tasks")
+
+        for task in self.tasks:
+            self.assert_(tasks.has_key(task), 'Task is missing from list tasks')
+            recorded_time = self.completion[task]
+            recorded_time = time.mktime(recorded_time.timetuple()) if recorded_time else None
+            list_time = tasks[task]['last_run']
+            self.assertEqual(recorded_time, list_time, "Completion times for task don't match: %s != %s" % (recorded_time, list_time))
+
 
     def test_init_cache_empty_cache(self):
         self.manager.init_task_cache()
