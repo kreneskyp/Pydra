@@ -31,6 +31,7 @@ import pydra_settings
 from pydra.cluster.tasks import TaskNotFoundException, packaging
 from pydra.cluster.tasks.task_manager import TaskManager
 from pydra.models import TaskInstance
+from pydra.util import makedirs
 
 class TaskManager_Test(unittest.TestCase):
 
@@ -100,8 +101,8 @@ class TaskManager_Test(unittest.TestCase):
         internal_folder = os.path.join(self.manager.tasks_dir_internal,
                     self.package, hash)
         pkg_dir = '%s/%s' % (pydra_settings.TASKS_DIR, self.package)
-        if not os.path.isdir(pkg_dir):
-            os.makedirs(pkg_dir)
+
+        makedirs(pkg_dir)
         shutil.copytree(pkg_dir, internal_folder)
         
         

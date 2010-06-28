@@ -26,6 +26,7 @@ import os
 from threading import Lock
 
 import pydra_settings as settings
+from pydra.util import makedirs
 
 LOG_FORMAT = "%%(asctime)s [%%(levelname)s] %s %%(message)s"
 LOG_FORMAT_TASK = "%(asctime)s [%(levelname)s] %(message)s"
@@ -123,7 +124,7 @@ def get_task_logger(worker, task, subtask=None, workunit=None):
                          This is separate from the task instance log.
     """
     directory, filename = task_log_path(task, subtask, workunit, worker)
-    os.makedirs(directory)
+    makedirs(directory)
 
     logger_name = 'task.%s' % task
 

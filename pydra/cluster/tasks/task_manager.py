@@ -33,7 +33,7 @@ from pydra.cluster.module import Module
 from pydra.cluster.tasks.tasks import *
 from pydra.cluster.tasks import packaging
 from pydra.models import *
-from pydra.util import graph
+from pydra.util import graph, makedirs
 
 import logging
 logger = logging.getLogger('root')
@@ -88,8 +88,7 @@ class TaskManager(Module):
         self.tasks_dir = pydra_settings.TASKS_DIR
         self.tasks_dir_internal = pydra_settings.TASKS_DIR_INTERNAL
 
-        if not os.path.isdir(self.tasks_dir_internal):
-            os.makedirs(self.tasks_dir_internal)
+        makedirs(self.tasks_dir_internal)
 
         # full_task_key or pkg_name: pkg_object
         # preserved for both compatibility and efficiency

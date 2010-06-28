@@ -31,6 +31,7 @@ from logger import task_log_path
 from pydra.models import TaskInstance, WorkUnit
 from pydra.cluster.module import Module
 from pydra.cluster.tasks import STATUS_CANCELLED, STATUS_FAILED, STATUS_COMPLETE
+from pydra.util import makedirs
 
 STATUSES = (STATUS_FAILED, STATUS_CANCELLED, STATUS_COMPLETE)
 
@@ -157,10 +158,9 @@ class MasterLogAggregator(Module):
 
         d, path = task_log_path(task, subtask, workunit)
 
-        # Avoid races by avoiding os.path.exists.
         try:
-            os.makedirs(d)
-        except os.error:
+            makedirs(d)
+        except OSError:
             # Couldn't make our path to our log; give up.
             logger.debug("Couldn't recieve log: %s %s %s"
                 % (task, subtask, workunit))
