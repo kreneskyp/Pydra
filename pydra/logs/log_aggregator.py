@@ -126,6 +126,10 @@ class MasterLogAggregator(Module):
         @param subtask - task path for subtask, default=None
         @param workunit - id of workunit, default=None
         """
+        if worker not in self.workers:
+            logger.debug("Can't aggregate logs for unknown worker %s" % worker)
+            return
+
         key = (task, subtask, workunit)
         with self.transfer_lock:
             if key in self.transfers:
