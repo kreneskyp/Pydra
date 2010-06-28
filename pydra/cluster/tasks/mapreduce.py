@@ -382,7 +382,7 @@ class MapReduceWrapper():
     (self.task) real work() method.
 
     It stores intermediate results helper (self.im) and overrides:
-    * _generate_key() to assure proper subtask identification,
+    * get_key() to assure proper subtask identification,
     * get_subtask() to return self instead of subtask directly,
     * start() to run special self.work() instead of subtask's"""
 
@@ -393,12 +393,8 @@ class MapReduceWrapper():
         self.task.parent = parent
 
 
-    def _generate_key(self):
-        return self.task._generate_key()
-
-
     def get_key(self):
-        return self._generate_key()
+        return self.task.get_key()
 
 
     def get_worker(self):

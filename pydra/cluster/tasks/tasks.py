@@ -74,17 +74,6 @@ class Task(object):
             self.__callback(results, **self._callback_args)
         else:
             logger.warning('[%s] %s - Task._work() - NO CALLBACK TO MAKE: %s' % (self.get_worker().worker_key, self, self.__callback))
-
-
-    def _generate_key(self):
-        """
-        Generate the key for this task using a recursive algorithm.
-        """
-        key = self.__class__.__name__
-        base = self.parent.get_key()
-        if base:
-            key = '%s.%s' % (base, key)
-        return key
     
 
     def _get_subtask(self, task_path, clean=False):
@@ -165,11 +154,16 @@ class Task(object):
 
     def get_key(self):
         """
-        Get the key that represents this task instance.  This key will give
-        the path required to find it if iterating from the root of the task.
-        This is used so that subtasks can be selected.
+        A unique key that represents this task instance.
+
+        This key can be used to find this task from its root. The primary
+        purpose of these keys are to find subtasks.
         """
-        return self._generate_key()
+        key = self.__class__.__name__
+        base = self.parent.get_key()
+        if base:
+            key = '%s.%s' % (base, key)
+        return key
 
 
     def get_subtask(self, task_path, clean=False):
