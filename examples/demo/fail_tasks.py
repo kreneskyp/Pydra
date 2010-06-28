@@ -36,7 +36,7 @@ class FailTask(Task):
     def __init__(self, msg='Demo Task'):
         Task.__init__(self, msg)
 
-    def _work(self, **kwargs):
+    def work(self, **kwargs):
         time.sleep(5)
         logger.debug('FAILING!!')
         #failing intentionally
