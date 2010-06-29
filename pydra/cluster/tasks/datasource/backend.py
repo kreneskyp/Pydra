@@ -25,7 +25,7 @@ from pydra.util.key import keyable
 @keyable
 class SQLBackend(object):
     """
-    Backend for interfacing with SQL databases.
+    Backend for interfacing with DBAPI-compliant SQL databases.
     """
 
     handle = None
@@ -36,24 +36,34 @@ class SQLBackend(object):
         else:
             raise ValueError, "Database %s not supported" % db
 
+        self.connect(*args, **kwargs)
+
     def __del__(self):
         self.disconnect()
 
     def connect(self, *args, **kwargs):
         """
-        Open a database.
+        Open a database connection.
 
-        Relative paths may not be handled correctly.
+        SQLBackend can only have one connection open per instance.
         """
 
         if not self.handle:
             self.handle = self.dbapi.connect(*args, **kwargs)
 
     def disconnect(self):
+        """
+        Disconnect from the current database, if connected.
+        """
+
         if self.handle:
             self.handle.close()
         self.handle = None
 
     @property
     def connected(self):
+        """
+        Is this instance currently connected?
+        """
+
         return bool(self.handle)
