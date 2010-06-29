@@ -1,3 +1,9 @@
+"""
+Common utility functions used by multiple parts of Pydra.
+"""
+
+__docformat__ = "restructuredtext"
+
 import functools
 import logging
 import os
@@ -11,9 +17,9 @@ def deprecated(message=""):
     It can, and should, be customized by passing a message to the primary
     decorator, as follows:
 
-    @deprecated("Stupid function, consider using bar() instead")
-    def foo():
-        print "I'm kind of stupid, sorry."
+    >>> @deprecated("Stupid function, consider using bar() instead")
+    ... def foo():
+    ...     print "I'm kind of stupid, sorry."
     """
 
     def secondary_decorator(f):
