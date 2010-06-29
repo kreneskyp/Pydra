@@ -1,9 +1,6 @@
-import logging
 import unittest
 
 import pydra.util
-
-logging.basicConfig(level=logging.DEBUG)
 
 class InitTest(unittest.TestCase):
 

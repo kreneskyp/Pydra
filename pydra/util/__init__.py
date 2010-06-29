@@ -7,14 +7,15 @@ __docformat__ = "restructuredtext"
 import functools
 import logging
 import os
+import warnings
 
 logger = logging.getLogger("root")
 
-def deprecated(message=""):
+def deprecated(message="Generic warning of impending breakage"):
     """
     This decorator will emit a warning when its wrapped function is called.
 
-    It can, and should, be customized by passing a message to the primary
+    It should be customized by passing a message to the primary
     decorator, as follows:
 
     >>> @deprecated("Stupid function, consider using bar() instead")
@@ -25,8 +26,7 @@ def deprecated(message=""):
     def secondary_decorator(f):
         @functools.wraps(f)
         def warning(*args, **kwargs):
-            logger.warning("Call to deprecated function %s: %s"
-                % (f.__name__, message))
+            warnings.warn(message, DeprecationWarning, 2)
             return f(*args, **kwargs)
 
         return warning
