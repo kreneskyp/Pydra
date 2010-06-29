@@ -1,5 +1,3 @@
-import functools
-
 """
 Tools for automatic serialization and deserialization.
 
@@ -31,6 +29,8 @@ attribute.)
 
 ~ C.
 """
+
+import functools
 
 def save_class(cls):
     """
