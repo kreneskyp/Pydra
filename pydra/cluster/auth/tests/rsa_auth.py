@@ -347,6 +347,24 @@ class RSAClient_Test(unittest.TestCase):
         self.assertEqual(remote.kwargs['response'], avatar.challenge, 'Response did not match the expected response')
 
 
+    def test_auth_challenge_no_server_key(self):
+        """
+        Tests auth_challenge when server key is None.
+        """
+        client = RSAClient(self.priv_key)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, key_size=KEY_SIZE)
+        remote = RemoteProxy()
+
+        challenge = avatar.perspective_auth_challenge()
+        client.auth_challenge(challenge, remote, None)
+
+        #verify that auth_response got called
+        self.assertEqual(remote.func, 'auth_response', 'Calling auth_challenge should trigger auth_response call on server')
+
+        #verify the correct response was sent
+        self.assertFalse(remote.kwargs['response'], 'Response did not match the expected response')
+
+
     def test_auth_challenge_no_challenge(self):
         """
         Tests auth_challenge when the challenge received is None
@@ -355,13 +373,14 @@ class RSAClient_Test(unittest.TestCase):
         remote = RemoteProxy()
 
         challenge = None
-        client.auth_challenge(challenge, remote, self.pub_key.encrypt)
+        client.auth_challenge(challenge, remote, self.pub_key)
 
         #verify that auth_response got called
         self.assertEqual(remote.func, 'auth_response', 'Calling auth_challenge should trigger auth_response call on server')
 
         #verify the correct response was sent
         self.assertFalse(remote.kwargs['response'], 'Response did not match the expected response')
+
 
     def auth_result_success(self):
         """

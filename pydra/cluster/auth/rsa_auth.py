@@ -215,18 +215,21 @@ class RSAClient(object):
             # yet.  Its possible that it was deleted but the client has retained
             # the server's key.  This would allow the client to pass the first
             # check
-            self.exchange_keys(remote, callback=self.auth, server_key=server_key, **kwargs)        
+            self.exchange_keys(remote, callback=self.auth, server_key=server_key, **kwargs)
+            return
 
-        else:
+        if challenge and server_key:
             #decrypt challenge
             challenge_str = self.client_priv_key.decrypt(challenge)
 
             #re-encrypt using servers key and then sha hash it.
             challenge_encode = server_key.encrypt(challenge_str, None)
             challenge_hash = hashlib.sha512(challenge_encode[0]).hexdigest()
+        else:
+            challenge_hash = ""
 
-            d = remote.callRemote('auth_response', response=challenge_hash)
-            d.addCallback(self.auth_result, remote, **kwargs)
+        d = remote.callRemote('auth_response', response=challenge_hash)
+        d.addCallback(self.auth_result, remote, **kwargs)
 
 
     def auth_result(self, result, remote, **kwargs):
