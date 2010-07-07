@@ -17,8 +17,10 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import unittest
+import hashlib
 import os
+import unittest
+
 from Crypto.PublicKey import RSA
 from twisted.python.randbytes import secureRandom
 from django.utils import simplejson
@@ -332,11 +334,11 @@ class RSAClient_Test(unittest.TestCase):
         Tests a normal challenge string
         """
         client = RSAClient(self.priv_key)
-        avatar = RSAAvatar(self.priv_key.encrypt, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, key_size=KEY_SIZE)
         remote = RemoteProxy()
 
         challenge = avatar.perspective_auth_challenge()
-        client.auth_challenge(challenge, remote, self.pub_key.encrypt)
+        client.auth_challenge(challenge, remote, self.pub_key)
 
         #verify that auth_response got called
         self.assertEqual(remote.func, 'auth_response', 'Calling auth_challenge should trigger auth_response call on server')
