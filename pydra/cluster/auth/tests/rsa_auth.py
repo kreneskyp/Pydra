@@ -22,7 +22,7 @@ import os
 from Crypto.PublicKey import RSA
 from twisted.python.randbytes import secureRandom
 from django.utils import simplejson
-from pydra.cluster.auth.rsa_auth import *
+from pydra.cluster.auth.rsa_auth import RSAAvatar, RSAClient, generate_keys, load_crypto
 
 """
 This file contains tests related to the rsa_auth handshaking used
@@ -205,7 +205,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Tests challenge function if there is no key for the client.
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, None)
+        avatar = RSAAvatar(self.priv_key, None, None)
         result = avatar.perspective_auth_challenge()
         self.assertEquals(result, -1, 'No public key for client, challenge result should be error (-1)')
 
@@ -214,7 +214,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Tests challenge function when there is no key, but the first_use flag is set.
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
 
         # challenge should be None, no_key_first_use is a flag to allow keyless access the first
@@ -225,7 +225,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test a normal challenge where both keys are present
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
 
         self.verify_challenge(challenge, avatar.challenge)
@@ -234,7 +234,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function given the correct response
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         response = self.create_response(challenge)
         result = avatar.perspective_auth_response(response)
@@ -245,7 +245,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function when given an incorrect response
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         #create response that can't be string because its longer than the hash
         response = secureRandom(600)
@@ -257,7 +257,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function when first_use_flag is set
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         result = avatar.perspective_auth_response(None)
         self.assertFalse(result, 'auth_response should return None if handshake is successful')
@@ -267,7 +267,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test sending a response before a challenge has been created
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, None, key_size=KEY_SIZE)
         result = avatar.perspective_auth_response(None)
         self.assertEqual(result, 0, 'auth_response should return error (0) when called before auth_challenge')
 
@@ -276,7 +276,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the callback after a successful auth
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, authenticated_callback=self.callback, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key, None, self.pub_key, authenticated_callback=self.callback, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         response = self.create_response(challenge)
         result = avatar.perspective_auth_response(response)
