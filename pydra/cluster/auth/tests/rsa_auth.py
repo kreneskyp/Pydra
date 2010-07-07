@@ -29,35 +29,6 @@ This file contains tests related to the rsa_auth handshaking used
 within pydra
 """
 
-def suite():
-    """
-    Build a test suite from all the test suites in this module
-    """
-    rsa_auth_suite = unittest.TestSuite()
-    rsa_auth_suite.addTest(RSA_KeyPair_Test('test_generate_keys'))
-    rsa_auth_suite.addTest(RSA_KeyPair_Test('test_load_crypto_public_key'))
-    rsa_auth_suite.addTest(RSA_KeyPair_Test('test_load_crypto_key_pair'))
-    rsa_auth_suite.addTest(RSA_KeyPair_Test('test_load_crypto_key_pair_no_key'))
-    rsa_auth_suite.addTest(RSA_KeyPair_Test('test_load_crypto_key_pair_no_key_create_key'))
-
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_challenge_no_key'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_challenge_no_key_first_use'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_challenge'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_response'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_bad_response'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_response_first_use'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_response_before_challenge'))
-    rsa_auth_suite.addTest(RSA_RSAAvatar_Test('test_success_callback'))
-
-    rsa_auth_suite.addTest(RSAClient_Test('test_auth_challenge'))
-    rsa_auth_suite.addTest(RSAClient_Test('test_auth_challenge_no_challenge'))
-    rsa_auth_suite.addTest(RSAClient_Test('auth_result_success'))
-    rsa_auth_suite.addTest(RSAClient_Test('auth_result_failure'))
-    rsa_auth_suite.addTest(RSAClient_Test('auth_result_response_before_challenge'))
-
-    return rsa_auth_suite
-
-
 KEY_FILE = 'testkey.key'
 KEY_SIZE = 512
 
@@ -234,7 +205,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Tests challenge function if there is no key for the client.
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, None)
         result = avatar.perspective_auth_challenge()
         self.assertEquals(result, -1, 'No public key for client, challenge result should be error (-1)')
 
@@ -243,7 +214,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Tests challenge function when there is no key, but the first_use flag is set.
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
 
         # challenge should be None, no_key_first_use is a flag to allow keyless access the first
@@ -254,7 +225,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test a normal challenge where both keys are present
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
 
         self.verify_challenge(challenge, avatar.challenge)
@@ -263,7 +234,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function given the correct response
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         response = self.create_response(challenge)
         result = avatar.perspective_auth_response(response)
@@ -274,7 +245,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function when given an incorrect response
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, self.pub_key.encrypt, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         #create response that can't be string because its longer than the hash
         response = secureRandom(600)
@@ -286,7 +257,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the response function when first_use_flag is set
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         result = avatar.perspective_auth_response(None)
         self.assertFalse(result, 'auth_response should return None if handshake is successful')
@@ -296,7 +267,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test sending a response before a challenge has been created
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, None, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, None, key_size=KEY_SIZE)
         result = avatar.perspective_auth_response(None)
         self.assertEqual(result, 0, 'auth_response should return error (0) when called before auth_challenge')
 
@@ -305,7 +276,7 @@ class RSA_RSAAvatar_Test(unittest.TestCase):
         """
         Test the callback after a successful auth
         """
-        avatar = RSAAvatar(self.priv_key.encrypt, self.pub_key.encrypt, authenticated_callback=self.callback, key_size=KEY_SIZE)
+        avatar = RSAAvatar(self.priv_key.encrypt, None, self.pub_key.encrypt, authenticated_callback=self.callback, key_size=KEY_SIZE)
         challenge = avatar.perspective_auth_challenge()
         response = self.create_response(challenge)
         result = avatar.perspective_auth_response(response)
@@ -345,7 +316,7 @@ class RSAClient_Test(unittest.TestCase):
         self.pub_key = RSA.construct(pub)
         self.priv_key = RSA.construct(priv)
 
-    def test_auth():
+    def test_auth(self):
         """
         Tests the auth function
         """
@@ -415,3 +386,6 @@ class RSAClient_Test(unittest.TestCase):
 
         #verify that auth_response got called
         self.assertEqual(remote.func, 'auth_challenge', 'Calling auth_response before auth_challegne should trigger auth_response call on server')
+
+if __name__ == "__main__":
+    unittest.main()
