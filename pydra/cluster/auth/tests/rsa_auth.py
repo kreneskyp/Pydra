@@ -324,7 +324,7 @@ class RSAClient_Test(unittest.TestCase):
         """
         client = RSAClient(self.priv_key)
         remote = RemoteProxy()
-        client.auth(remote, self.pub_key.encrypt)
+        client.auth(remote, server_key=self.pub_key)
 
         self.assertEqual(remote.func, 'auth_challenge', 'Calling auth should trigger auth_challenge call on server')
 
