@@ -17,28 +17,32 @@
     along with Pydra.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import hashlib
+import math
+import os
+import simplejson
+
 from twisted.spread import pb
 from twisted.python.randbytes import secureRandom
 from twisted.conch.ssh.keys import Key
 from twisted.internet import threads
 from Crypto.PublicKey import RSA
-import hashlib
-import simplejson
-import os
-import math
 
 import logging
 logger = logging.getLogger('root')
 
 class RSAAvatar(pb.Avatar):
     """
-    Avatar that includes remote functions for authentication via
-    RSA keypairs.  The functions perform a challenge response
-    that verifies the client and server have matching keys
+    Avatar for authenticating with RSA key pairs.
 
-    This handshake should be built in as a checker but the PerspectiveBroker
-    api does not suuport ISSHKey credentials for authorization
+    RSAAvatar implements a challenge and response that verifies that the
+    client and server have matching keys.
+
+    Note: This handshake should be built in as a checker, but the
+    PerspectiveBroker API does not suuport ISSHKey credentials for
+    authorization.
     """
+
     def __init__(self, server_key, server_pub_key, client_key, authenticated_callback=None, save_key=None, key_size=4096):
         self.server_key = server_key
         self.server_pub_key = server_pub_key
@@ -53,27 +57,29 @@ class RSAAvatar(pb.Avatar):
 
     def attached(self, mind):
         """
-        called when Master Connects
+        Set the Mind used for remote calls.
         """
         self.remote = mind
 
     def detached(self, mind):
         """
-        called when the Master disconnects.
+        Forget the Mind.
         """
         self.remote = None
 
 
     def perspective_auth_challenge(self):
         """
-        Remote method for requesting to begin the challenge/response
-        Authorization handshake.  Start by creating a random, signed challenge
-        string that is encrypted using the clients public key.  Only the client
-        with the correct key can decrypt it and send it back
+        Remote method for starting the challenge-response authorization
+        handshake.
 
-        If the Avatar does not have the public key for the client attempting to
-        connect it will return -1 indicating as such.  This allows the client
-        to trigger the key exchange (pairing) before retrying.
+        Start by creating a random, signed challenge string that is encrypted
+        using the client's public key. Only the client with the correct key
+        can decrypt it and send it back.
+
+        If the Avatar does not have the public key for the client attempting
+        to connect, it will return -1. This allows the client to trigger the
+        key exchange and pairing before retrying.
         """
         if not self.client_key:
             return -1
@@ -84,8 +90,8 @@ class RSAAvatar(pb.Avatar):
         # key will be able to decode this message
         encrypted = self.client_key.encrypt(challenge, None)[0]
 
-        # now encode and hash the challenge string so it is not stored 
-        # plaintext.  It will be received in this same form so it will be 
+        # now encode and hash the challenge string so it is not stored
+        # plaintext.  It will be received in this same form so it will be
         # easier to compare
         challenge = self.server_key.encrypt(challenge, None)
         challenge = hashlib.sha512(challenge[0]).hexdigest()
@@ -97,10 +103,14 @@ class RSAAvatar(pb.Avatar):
 
 
     def perspective_auth_response(self, response):
-        # the avatar has not been challenged yet, do not let it continue
-        # this is required to prevent 'init' from being called before 'info'
-        # that would result in an empty challenge every time.  The only time the challenge
-        # should be None is if the key hasn't been received yet.
+        """
+        Called to verify a response from a challenger.
+
+        If the avatar hasn't been challenged, it will not respond. The avatar
+        will only respond to one single challenger before refreshing its
+        challenge, to avoid brute-force and replay attacks.
+        """
+
         if not self.challenged:
             return 0
 
@@ -124,8 +134,10 @@ class RSAAvatar(pb.Avatar):
 
     def perspective_exchange_keys(self, master_pub_key):
         """
-        Exchange public keys with the client.  This allows the Client
-        to authenticate in the using the keypair handshake
+        Exchange public keys with the client.
+
+        This allows the client to authenticate in the using the keypair
+        handshake.
         """
         logger.info('Exchanging keys with master')
 
@@ -134,11 +146,11 @@ class RSAAvatar(pb.Avatar):
         json_key = ''.join(master_pub_key)
 
         if self.save_key:
-            self.save_key(json_key)            
+            self.save_key(json_key)
 
         key = [long(x) for x in simplejson.loads(json_key)]
-        self.client_key = RSA.construct(key)            
-        
+        self.client_key = RSA.construct(key)
+
         #send the nodes public key.  serialize it and encrypt it
         #the key must be broken into chunks for it to be signed
         #for ease recompiling it we'll store the chunks as a list
@@ -148,7 +160,7 @@ class RSAAvatar(pb.Avatar):
             key_chunks.append(enc[0])
 
         return key_chunks
-        
+
 
     def chunks(self):
         json_key = simplejson.dumps(self.server_pub_key)
@@ -161,19 +173,18 @@ class RSAAvatar(pb.Avatar):
 
     def perspective_get_key(self):
         """
-        Return the public key to the remote user
+        Returns the public key of the avatar.
         """
         return self.chunks()
 
 
 class RSAClient(object):
     """
-    Class encompassing the clients part of the RSA Handshake.
+    Class encompassing the client's part of the RSA handshake.
 
-    When auth() is called it will make the require calls and then
-    optionally call the callback or errback depending on the result
-    of the authorization attempt
+    The main work is done in `auth`.
     """
+
     def __init__(self, client_priv_key, client_pub_key=None, callback=None, errback=None):
         self.callback = callback
         self.errback  = errback
@@ -185,7 +196,10 @@ class RSAClient(object):
 
     def auth(self, remote, save_key=None, server_key=None, **kwargs):
         """
-        Starts the authentication handshake with the remote
+        Performs an authentication handshake with the specified remote avatar.
+
+        If set, the client's callback will be called on success, or the
+        errback on failure.
         """
         if server_key:
             logger.debug('Logging into server')
@@ -198,16 +212,16 @@ class RSAClient(object):
             self.exchange_keys(remote, callback=self.auth, server_key=server_key, save_key=save_key, **kwargs)
 
 
-    def auth_challenge(self, challenge, remote, server_key=None,  **kwargs):
+    def auth_challenge(self, challenge, remote, server_key=None, **kwargs):
         """
-        Callback for a request for authorization challenge.  This callback
-        will decode and respond to the string passed in.
+        Callback for a request for authorization challenge.
 
-        if there is a challenge from the Node it must be answered
-        else it will not allow access to any of its functions
-        The challenge will be encrypted with the masters key.
-        it should be decrypted, and then re-encrypted with the nodes
-        key and hashed.
+        This callback will decode and respond to the string passed in.
+
+        If there is a challenge from the Node, it must be answered; otherwise,
+        the Node will not allow access to any of its functions.  The challenge
+        will be encrypted with the master's key.  It should be decrypted, then
+        encrypted with the node's key, and hashed.
         """
 
         if challenge == -1:
@@ -234,7 +248,7 @@ class RSAClient(object):
 
     def auth_result(self, result, remote, **kwargs):
         """
-        Callback that handles the response from the challenge response handshake
+        Callback to handle the result of the challenge-response handshake.
         """
         if result == -1:
             #authentication failed
@@ -259,8 +273,10 @@ class RSAClient(object):
 
     def exchange_keys(self, remote, callback=None, server_key=None, **kwargs):
         """
-        Starts the key exchange process, also known as "pairing".  Client and
-        Server will both send their keys which will be saved for authentication.
+        Starts the key exchange process, also known as "pairing".
+
+        Client and Server will both send their keys to each other, and save
+        them for later authentication.
         """
         #twisted.bannana doesnt handle large ints very well
         #we'll encode it with json and split it up into chunks
@@ -280,27 +296,35 @@ class RSAClient(object):
 
         The key is only saved if save_key is a function that can save the key
         to a storage medium of somesort
-        """       
+        """
         dec = [self.client_priv_key.decrypt(chunk) for chunk in returned_key_raw]
         json_key = ''.join(dec)
         key = [long(x) for x in simplejson.loads(json_key)]
         rsa_key = RSA.construct(key)
 
         if save_key:
-            logger.debug('Saving public key from server')        
+            logger.debug('Saving public key from server')
             save_key(json_key, **kwargs)
 
         if callback:
             threads.deferToThread(callback, save_key=save_key, server_key=rsa_key, **kwargs)
 
 
-
 def generate_keys(size=4096):
         """
         Generates an RSA key pair used for connecting to a node.
-        keys are returned as the list of values required to serialize/deserilize the keys
 
-        Keys can be reconstructed by RSA.construct(list)
+        Keys are returned as the minimum lists of values required to
+        reconstruct the keys mathematically; see Wikipedia's RSA article at
+        http://en.wikipedia.org/wiki/RSA for a brief explanation of the maths
+        involved. n and e are the public key; n, e, d, q, and p are the
+        private key. The ordering is chosen to match `RSA.construct`.
+
+        >>> publist, privlist = generate_keys()
+        >>> public = RSA.construct(publist)
+        >>> private = RSA.construct(privlist)
+
+        :return: (list(n, e), list(n, e, d, q, p))
         """
         logging.info('Generating RSA keypair')
         KEY_LENGTH = size
@@ -316,9 +340,10 @@ def generate_keys(size=4096):
 
 def load_crypto(path, create=True, key_size=4096, both=True):
         """
-        Loads RSA keys from the specified path, optionally creating
-        new keys.  It automatically detects whether it is a keypair
-        or just the public key
+        Loads RSA keys from the specified path, optionally creating new keys.
+
+        This function automatically detects whether it is a pair of public and
+        private keys, or just the public key.
         """
         import os
         if not os.path.exists(path):
