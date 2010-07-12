@@ -123,10 +123,10 @@ class TestParallelTask(ParallelTask):
     description = 'A demo task illustrating a Parallel task.  This task runs 5 TestTasks at the same time'
 
     def __init__(self):
+        self.datasource = (IterSlicer, range(10))
+
         ParallelTask.__init__(self)
         self.set_subtask(TestTask, 'subtask')
-        self.input = IterSlicer(range(10))
-        self._data = range(10)
         self._finished = []
 
         logger.setLevel(logging.DEBUG)
