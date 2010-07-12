@@ -25,21 +25,23 @@ from twisted.internet import reactor, threads
 
 from pydra.cluster.tasks import Task, TaskNotFoundException, STATUS_CANCELLED,\
     STATUS_FAILED,STATUS_STOPPED,STATUS_RUNNING,STATUS_PAUSED,STATUS_COMPLETE
+from pydra.cluster.tasks.datasource import unpack, validate
 from pydra.util.key import thaw
 
 class ParallelTask(Task):
     """
     ParallelTask - is a task that can be broken into discrete work units
     """
-    _data = None                # list of data for this task
     _data_in_progress = {}      # workunits of data
     _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
     _workunit_total = 0
     _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
     subtask_key = None          # cached key from subtask
-    _ds = None                  # Datasource slicer.
 
-    def __init__(self, msg=None, datasource=None):
+    datasource = None
+    slicer = None
+
+    def __init__(self, msg=None):
         Task.__init__(self, msg)
         self._lock = RLock()             # general lock
         self.subtask = None              # subtask that is parallelized
@@ -47,8 +49,9 @@ class ParallelTask(Task):
         self.__subtask_args = None       # args for initializing subtask
         self.__subtask_kwargs = None     # kwargs for initializing subtask
 
-        if datasource:
-            self._ds = thaw(datasource)
+        self.datasource = validate(self.datasource)
+        # XXX wrong!
+        self.slicer = unpack(self.datasource)
 
         self.logger = logging.getLogger('root')
 
@@ -124,11 +127,6 @@ class ParallelTask(Task):
         """
         Work function overridden to delegate workunits to other Workers.
         """
-        # save data, if any
-        if kwargs and kwargs.has_key('data'):
-            self._data = kwargs['data']
-            self._workunit_total = len(self._data)
-            self.logger.debug('Paralleltask - data was passed in!')
         # request initial workers
         self._request_workers()
         self.logger.debug('Paralleltask - initial work assigned!')
@@ -173,7 +171,7 @@ class ParallelTask(Task):
             self._workunit_completed += 1
 
             #check for more work
-            if not (self._data_in_progress or self._data):
+            if not self._data_in_progress:
                 #all work is done, call the task specific function to combine the results 
                 self.logger.debug('Paralleltask - all workunits complete, calling task post process')
                 results = self.work_complete()
@@ -190,8 +188,6 @@ class ParallelTask(Task):
             #remove data from in progress
             data = self._data_in_progress[index]
             del self._data_in_progress[index]
-            #add data to the end of the list
-            self._data.append(data)
 
 
     @staticmethod
@@ -213,20 +209,20 @@ class ParallelTask(Task):
 
         This method *MUST* lock while it is altering the lists of data
         """
-        data = None
+        # XXX horribly wrong and inefficient
+        # XXX needs to have a delayable path as well
         with self._lock:
 
-            #grab from the beginning of the list
-            if len(self._data) != 0:
-                data = self._data.pop(0)
-            else:
+            try:
+                data = next(self.slicer)
+            except:
                 return None, None
 
             self._workunit_count += 1
 
             #remove from _data and add to in_progress
             self._data_in_progress[self._workunit_count] = data
-        return data, self._workunit_count;
+        return data, self._workunit_count
 
 
     def progress(self):
@@ -236,9 +232,7 @@ class ParallelTask(Task):
         A parallel task's progress is a derivitive of its workunits:
            COMPLETE_WORKUNITS / TOTAL_WORKUNITS
         """
-        data = len(self._data) if self._data else 0
-        total = self._workunit_completed + data + \
-            len(self._data_in_progress)
+        total = self._workunit_completed + len(self._data_in_progress)
 
         if total == 0:
             return 0
