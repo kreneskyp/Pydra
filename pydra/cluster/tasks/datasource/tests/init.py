@@ -3,10 +3,13 @@
 import unittest
 
 from pydra.cluster.tasks.datasource import unpack, validate
+from pydra.cluster.tasks.datasource.slicer import IterSlicer
 
 class ValidateTest(unittest.TestCase):
 
-    pass
+    def test_none(self):
+        ds = validate(None)
+        self.assertEqual(ds, (IterSlicer, [None]))
 
 class UnpackTest(unittest.TestCase):
 
