@@ -50,8 +50,6 @@ class ParallelTask(Task):
         self.__subtask_kwargs = None     # kwargs for initializing subtask
 
         self.datasource = validate(self.datasource)
-        # XXX wrong!
-        self.slicer = unpack(self.datasource)
 
         self.logger = logging.getLogger('root')
 
@@ -103,13 +101,13 @@ class ParallelTask(Task):
         Create work requests for all planned subtasks.
 
         This function eagerly creates all planned work requests in one shot,
-        using `get_work_unit()` to create all work units.
+        using `get_work_units()` to create all work units.
 
         More complex `Task` subclasses, like `MapReduceTask`, may employ a
         more sophisticated algorithm that permits cross worker dependencies.
         """
 
-        for data, index in iter(self.get_work_unit, (None, None)):
+        for data, index in self.get_work_units():
             self.logger.debug('Paralleltask - assigning remote work: key=%s, args=%s'
                 % ('--', index))
             self.parent.request_worker(self.subtask.get_key(), {'data': data},
@@ -202,32 +200,29 @@ class ParallelTask(Task):
         return pt
 
 
-    def get_work_unit(self):
+    def get_work_units(self):
         """
         Yield a series of work units.
 
         This function returns *all* work units, one by one. For each work
         unit, the data of the unit is stored in `_data_in_progress`.
 
-        Warning: This method will take the instance lock as needed. It should
-        be reentrant.
+        Warning: This method will take the instance lock as needed, but should
+        not be locked during yields.
 
         :return: tuple(data, index)
         """
-        # XXX horribly wrong and inefficient
         # XXX needs to have a delayable path as well
-        with self._lock:
+        slicer = unpack(self.datasource)
 
-            try:
-                data = next(self.slicer)
-            except:
-                return None, None
+        while True:
+            data, index = next(slicer), self._workunit_count
 
-            self._workunit_count += 1
+            yield data, index
 
-            #remove from _data and add to in_progress
-            self._data_in_progress[self._workunit_count] = data
-        return data, self._workunit_count
+            with self._lock:
+                self._workunit_count += 1
+                self._data_in_progress[index] = data
 
 
     def progress(self):

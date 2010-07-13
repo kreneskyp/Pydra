@@ -19,6 +19,7 @@
 
 import unittest
 from threading import Event
+
 from twisted.trial import unittest as twisted_unittest
 from twisted.internet import threads
 
@@ -39,9 +40,10 @@ class ParallelTaskStandaloneTest(unittest.TestCase):
     def test_trivial(self):
         pass
 
-    def test_get_work_unit(self):
-        work_unit = self.pt.get_work_unit()
-        self.assertEqual(work_unit[0], 0)
+    def test_get_work_units(self):
+        for i, work_unit in enumerate(self.pt.get_work_units()):
+            data, index = work_unit
+            self.assertEqual(data, i)
 
 class ParallelTask_Test(unittest.TestCase):
     """
