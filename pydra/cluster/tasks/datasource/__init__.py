@@ -10,6 +10,19 @@ are arguments to be given to the class upon instantiation.
 
 from pydra.cluster.tasks.datasource.slicer import IterSlicer
 
+def iterable(i):
+    """
+    Test for iterability.
+
+    :return: Whether `i` is iterable.
+    """
+
+    try:
+        iter(i)
+        return True
+    except TypeError:
+        return False
+
 def validate(ds):
     """
     Given a potential datasource description, return its canonical form.
@@ -19,7 +32,7 @@ def validate(ds):
     """
 
     # If it's iterable...
-    if hasattr(ds, "__iter__"):
+    if iterable(ds):
         if not callable(next(iter(ds))):
             # Turn raw iterables into IterSlicers.
             ds = (IterSlicer, ds)

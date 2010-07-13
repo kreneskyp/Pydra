@@ -11,6 +11,15 @@ class ValidateTest(unittest.TestCase):
         ds = validate(None)
         self.assertEqual(ds, (IterSlicer, [None]))
 
+    def test_string(self):
+        s = "Make it so, Number One!"
+        ds = validate(s)
+        self.assertEqual(ds, (IterSlicer, s))
+
+    def test_iterslicer(self):
+        ds = (IterSlicer, [1, 2, 3, 4, 5])
+        self.assertEqual(ds, validate(ds))
+
 class UnpackTest(unittest.TestCase):
 
     pass
