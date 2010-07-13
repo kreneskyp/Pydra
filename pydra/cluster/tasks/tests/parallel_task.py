@@ -41,9 +41,12 @@ class ParallelTaskStandaloneTest(unittest.TestCase):
         pass
 
     def test_get_work_units(self):
+        s = set()
         for i, work_unit in enumerate(self.pt.get_work_units()):
             data, index = work_unit
+            s.add(index)
             self.assertEqual(data, i)
+        self.assertEqual(s, set(self.pt._data_in_progress.keys()))
 
 class ParallelTask_Test(unittest.TestCase):
     """

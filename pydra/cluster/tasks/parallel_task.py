@@ -96,7 +96,7 @@ class ParallelTask(Task):
         return task_path[:2], subtask
 
 
-    def _request_workers(self):
+    def request_workers(self):
         """
         Create work requests for all planned subtasks.
 
@@ -127,7 +127,7 @@ class ParallelTask(Task):
         Work function overridden to delegate workunits to other Workers.
         """
         # request initial workers
-        self._request_workers()
+        self.request_workers()
         self.logger.debug('Paralleltask - initial work assigned!')
 
 
@@ -155,10 +155,6 @@ class ParallelTask(Task):
             #check stop flag
             if self.STOP_FLAG:
                 self.task_complete(None)
-
-            # process any new work requests.  This moves any data that can be
-            # queued into the queue, and into the in_progress list locally
-            self._request_workers()
 
             # no data left in progress, release 1 worker.  when there is work in
             # the queue the waiting worker will be selected automatically by
