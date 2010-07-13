@@ -23,13 +23,32 @@ def iterable(i):
     except TypeError:
         return False
 
-def validate(ds):
+def validate(ds, *args):
     """
     Given a potential datasource description, return its canonical form.
 
     This function can and will make guesses; it will always return a valid, if
     slightly mangled, datasource description.
+
+    :Parameters:
+        ds : tuple
+            The datasource description, or some object vaguely similar to a
+            datasource description
+        args
+            Stopgap against TypeError from incorrectly protected tuples. Will
+            be appended to the datasource description.
     """
+
+    # If the caller didn't read the docs...
+    if args:
+        # Hax. Only lists are ordered, mutable, and iterable, and we need all
+        # three in order to prepare our tuple. To make matters worse, we need
+        # to check the iterability of ds in order to pick the right list
+        # constructor (list() vs. []) so that we Do the Right Thing.
+        if iterable(ds):
+            ds = tuple(list(ds) + list(args))
+        else:
+            ds = tuple([ds] + list(args))
 
     # If it's iterable...
     if iterable(ds):

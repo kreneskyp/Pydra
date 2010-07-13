@@ -21,6 +21,10 @@ class ValidateTest(unittest.TestCase):
         ds = (IterSlicer, [1, 2, 3, 4, 5])
         self.assertEqual(ds, validate(ds))
 
+    def test_args(self):
+        ds = validate(IterSlicer, [1, 2, 3, 4, 5])
+        self.assertEqual(ds, validate(ds))
+
 class UnpackTest(unittest.TestCase):
 
     def test_iterslicer(self):
