@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import itertools
 import unittest
 
 from pydra.cluster.tasks.datasource import unpack, validate
@@ -22,7 +23,31 @@ class ValidateTest(unittest.TestCase):
 
 class UnpackTest(unittest.TestCase):
 
-    pass
+    def test_iterslicer(self):
+        l = [chr(i) for i in range(255)]
+        u = u"\u03c0 \u042f \u97f3 \u00e6 \u221e"
+        s = "Aye aye, Cap'n."
+        t = (True, False, None)
+        x = xrange(10)
+
+        for i in l, u, s, t, x:
+            ds = validate((IterSlicer, i))
+            for expected, unpacked in itertools.izip_longest(i,
+                unpack(ds)):
+                self.assertEqual(expected, unpacked)
+
+    def test_iterslicer_unvalidated(self):
+        l = [chr(i) for i in range(255)]
+        u = u"\u03c0 \u042f \u97f3 \u00e6 \u221e"
+        s = "Aye aye, Cap'n."
+        t = (True, False, None)
+        x = xrange(10)
+
+        for i in l, u, s, t, x:
+            ds = IterSlicer, i
+            for expected, unpacked in itertools.izip_longest(i,
+                unpack(ds)):
+                self.assertEqual(expected, unpacked)
 
 if __name__ == "__main__":
     unittest.main()
