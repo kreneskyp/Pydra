@@ -22,42 +22,36 @@ from threading import Event
 from twisted.trial import unittest as twisted_unittest
 from twisted.internet import threads
 
-from pydra.cluster.tasks.tasks import *
-from pydra.task_cache.demo_task import *
-from proxies import *
+from pydra.cluster.tasks.parallel_task import ParallelTask
+from pydra.cluster.tasks.datasource.slicer import IterSlicer
 
-def suite():
+class ParallelTaskStandaloneTest(unittest.TestCase):
     """
-    Build a test suite from all the test suites in this module
+    Test `ParallelTask` functionality without actually running the Twisted
+    reactor.
     """
-    tasks_suite = unittest.TestSuite()
 
-    # key generation
-    tasks_suite.addTest(Task_Test('test_key_generation_paralleltask'))
-    tasks_suite.addTest(Task_Test('test_key_generation_paralleltask_child'))
+    def setUp(self):
+        class pt(ParallelTask):
+            datasource = IterSlicer, range(10)
+        self.pt = pt()
 
-    # subtask lookup
-    tasks_suite.addTest(Task_Test('test_get_subtask_paralleltask'))
-    tasks_suite.addTest(Task_Test('test_get_subtask_paralleltask_child'))
+    def test_trivial(self):
+        pass
 
-    # worker lookup
-    tasks_suite.addTest(Task_Test('test_get_worker_paralleltask'))
-    tasks_suite.addTest(Task_Test('test_get_worker_paralleltask_child'))
-
-    return tasks_suite
-
+    def test_get_work_unit(self):
+        work_unit = self.pt.get_work_unit()
+        self.assertEqual(work_unit[0], 0)
 
 class ParallelTask_Test(unittest.TestCase):
     """
     Tests for verify functionality of ParllelTask class
     """
+
     def setUp(self):
         self.parallel_task = TestParallelTask()
         self.worker = WorkerProxy()
         self.parallel_task.parent = self.worker
-
-    def tearDown(self):
-        pass
 
 
     def test_key_generation_paralleltask(self):
@@ -127,4 +121,4 @@ class ParallelTask_Test(unittest.TestCase):
         """
         returned = self.parallel_task.subtask.get_worker()
         self.assert_(returned, 'no worker was returned')
-        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')    
+        self.assertEqual(returned, self.worker, 'worker retrieved was not the expected worker')
