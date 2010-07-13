@@ -107,12 +107,12 @@ class ParallelTask(Task):
         employ a more sophisticated mechanism that allows dependence between
         work units.
         """        
-        data, index = self.get_work_unit()
-        while data is not None:
+
+        for data, index in iter(self.get_work_unit, (None, None)):
             self.logger.debug('Paralleltask - assigning remote work: key=%s, args=%s'
                 % ('--', index))
-            self.parent.request_worker(self.subtask.get_key(), {'data':data}, index)
-            data, index = self.get_work_unit()
+            self.parent.request_worker(self.subtask.get_key(), {'data': data},
+                index)
 
 
     def _stop(self):
