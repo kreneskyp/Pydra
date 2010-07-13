@@ -100,13 +100,14 @@ class ParallelTask(Task):
 
     def _request_workers(self):
         """
-        Requests workers to process workunits
-    
-        expand all the work units eagerly. the master will handles these
-        worker requests. other task implementations (like MapReduceTask) may
-        employ a more sophisticated mechanism that allows dependence between
-        work units.
-        """        
+        Create work requests for all planned subtasks.
+
+        This function eagerly creates all planned work requests in one shot,
+        using `get_work_unit()` to create all work units.
+
+        More complex `Task` subclasses, like `MapReduceTask`, may employ a
+        more sophisticated algorithm that permits cross worker dependencies.
+        """
 
         for data, index in iter(self.get_work_unit, (None, None)):
             self.logger.debug('Paralleltask - assigning remote work: key=%s, args=%s'
@@ -203,11 +204,15 @@ class ParallelTask(Task):
 
     def get_work_unit(self):
         """
-        Get the next work unit, by default a ParallelTask expects a list of values/tuples.
-        When a arg is retrieved its removed from the list and placed in the in progress list.
-        The arg is saved so that if the node fails the args can be re-run on another node
+        Yield a series of work units.
 
-        This method *MUST* lock while it is altering the lists of data
+        This function returns *all* work units, one by one. For each work
+        unit, the data of the unit is stored in `_data_in_progress`.
+
+        Warning: This method will take the instance lock as needed. It should
+        be reentrant.
+
+        :return: tuple(data, index)
         """
         # XXX horribly wrong and inefficient
         # XXX needs to have a delayable path as well
