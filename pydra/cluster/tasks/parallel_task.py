@@ -33,12 +33,13 @@ class ParallelTask(Task):
     ParallelTask - is a task that can be broken into discrete work units
     """
     _data_in_progress = {}      # workunits of data
-    _workunit_count = 0         # count of workunits handed out.  This is used to identify transactions
+    _workunit_count = 1         # count of workunits handed out.  This is used to identify transactions
     _workunit_total = 0
     _workunit_completed = 0     # count of workunits handed out.  This is used to identify transactions
     subtask_key = None          # cached key from subtask
 
     datasource = None
+    """The datasource description."""
     slicer = None
 
     def __init__(self, msg=None):
